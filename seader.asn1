@@ -26,7 +26,8 @@ SamCommand ::= CHOICE {
   version [2] IMPLICIT NULL,
   cardDetected [13] IMPLICIT CardDetected,
   serialNumber [22] IMPLICIT NoArguments,
-  requestPacs2 [30] IMPLICIT RequestPacs
+  requestPacs2 [30] IMPLICIT RequestPacs,
+  processConfigCard [26] IMPLICIT NoArguments
 }
 
 CardDetected ::= SEQUENCE {

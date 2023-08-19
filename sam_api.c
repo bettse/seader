@@ -276,6 +276,27 @@ void seader_send_payload(
     seader_send_apdu(seader, 0xA0, 0xDA, 0x02, 0x63, rBuffer, 6 + er.encoded);
 }
 
+void seader_send_process_config_card(Seader* seader) {
+    SamCommand_t* samCommand = 0;
+    samCommand = calloc(1, sizeof *samCommand);
+    assert(samCommand);
+
+    samCommand->present = SamCommand_PR_processConfigCard;
+    seader->samCommand = samCommand->present;
+
+    Payload_t* payload = 0;
+    payload = calloc(1, sizeof *payload);
+    assert(payload);
+
+    payload->present = Payload_PR_samCommand;
+    payload->choice.samCommand = *samCommand;
+
+    seader_send_payload(seader, payload, 0x44, 0x0a, 0x44);
+
+    ASN_STRUCT_FREE(asn_DEF_SamCommand, samCommand);
+    ASN_STRUCT_FREE(asn_DEF_Payload, payload);
+}
+
 void seader_send_response(
     Seader* seader,
     Response_t* response,
@@ -671,6 +692,12 @@ bool seader_parse_sam_response(Seader* seader, SamResponse_t* samResponse) {
         view_dispatcher_send_custom_event(seader->view_dispatcher, SeaderCustomEventPollerSuccess);
         seader->samCommand = SamCommand_PR_NOTHING;
         break;
+    case SamCommand_PR_processConfigCard:
+        FURI_LOG_I(TAG, "samResponse SamCommand_PR_processConfigCard");
+        seader_worker->stage = SeaderPollerEventTypeFail;
+        //view_dispatcher_send_custom_event(seader->view_dispatcher, SeaderCustomEventPollerSuccess);
+        seader->samCommand = SamCommand_PR_NOTHING;
+        break;
     case SamCommand_PR_version:
         FURI_LOG_I(TAG, "samResponse SamCommand_PR_version");
         seader_parse_version(seader_worker, samResponse->buf, samResponse->size);
@@ -683,7 +710,9 @@ bool seader_parse_sam_response(Seader* seader, SamResponse_t* samResponse) {
         break;
     case SamCommand_PR_cardDetected:
         FURI_LOG_I(TAG, "samResponse SamCommand_PR_cardDetected");
-        if(seader->is_debug_enabled) {
+        if(seader->credential->type == SeaderCredentialTypeConfig) {
+            seader_send_process_config_card(seader);
+        } else if(seader->is_debug_enabled) {
             seader_send_request_pacs2(seader);
         } else {
             seader_send_request_pacs(seader);

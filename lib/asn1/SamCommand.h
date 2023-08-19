@@ -29,7 +29,8 @@ typedef enum SamCommand_PR {
 	SamCommand_PR_version,
 	SamCommand_PR_cardDetected,
 	SamCommand_PR_serialNumber,
-	SamCommand_PR_requestPacs2
+	SamCommand_PR_requestPacs2,
+	SamCommand_PR_processConfigCard
 } SamCommand_PR;
 
 /* SamCommand */
@@ -41,6 +42,7 @@ typedef struct SamCommand {
 		CardDetected_t	 cardDetected;
 		NoArguments_t	 serialNumber;
 		RequestPacs_t	 requestPacs2;
+		NoArguments_t	 processConfigCard;
 	} choice;
 	
 	/* Context for parsing across buffer boundaries */
@@ -50,7 +52,7 @@ typedef struct SamCommand {
 /* Implementation */
 extern asn_TYPE_descriptor_t asn_DEF_SamCommand;
 extern asn_CHOICE_specifics_t asn_SPC_SamCommand_specs_1;
-extern asn_TYPE_member_t asn_MBR_SamCommand_1[5];
+extern asn_TYPE_member_t asn_MBR_SamCommand_1[6];
 
 #ifdef __cplusplus
 }

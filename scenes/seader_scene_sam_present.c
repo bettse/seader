@@ -3,6 +3,7 @@ enum SubmenuIndex {
     SubmenuIndexReadPicopass,
     SubmenuIndexRead14a,
     SubmenuIndexReadMfc,
+    SubmenuIndexReadConfigCard,
     SubmenuIndexSaved,
     SubmenuIndexAPDURunner,
     SubmenuIndexSamInfo,
@@ -43,6 +44,15 @@ void seader_scene_sam_present_on_update(void* context) {
         seader);
     submenu_add_item(
         submenu, "Saved", SubmenuIndexSaved, seader_scene_sam_present_submenu_callback, seader);
+
+    if(seader->is_debug_enabled) {
+        submenu_add_item(
+            submenu,
+            "Read Config Card",
+            SubmenuIndexReadConfigCard,
+            seader_scene_sam_present_submenu_callback,
+            seader);
+    }
 
     if(apdu_log_check_presence(SEADER_APDU_RUNNER_FILE_NAME)) {
         submenu_add_item(
@@ -93,6 +103,10 @@ bool seader_scene_sam_present_on_event(void* context, SceneManagerEvent event) {
             consumed = true;
         } else if(event.event == SubmenuIndexReadMfc) {
             scene_manager_next_scene(seader->scene_manager, SeaderSceneReadMfc);
+        } else if(event.event == SubmenuIndexReadConfigCard) {
+            scene_manager_set_scene_state(
+                seader->scene_manager, SeaderSceneSamPresent, SubmenuIndexReadConfigCard);
+            scene_manager_next_scene(seader->scene_manager, SeaderSceneReadConfigCard);
             consumed = true;
         } else if(event.event == SubmenuIndexSamInfo) {
             scene_manager_next_scene(seader->scene_manager, SeaderSceneSamInfo);
