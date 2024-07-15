@@ -6,7 +6,6 @@
 
 #define TAG "SAMAPI"
 
-#define APDU_HEADER_LEN                 5
 #define ASN1_PREFIX                     6
 #define ASN1_DEBUG                      true
 #define SEADER_ICLASS_SR_SIO_BASE_BLOCK 10
@@ -137,6 +136,7 @@ void seader_picopass_state_machine(Seader* seader, uint8_t* buffer, size_t len) 
     bit_buffer_free(rx_buffer);
 }
 
+uint8_t APDU_HEADER_LEN = 5;
 bool seader_send_apdu(
     Seader* seader,
     uint8_t CLA,
@@ -144,12 +144,16 @@ bool seader_send_apdu(
     uint8_t P1,
     uint8_t P2,
     uint8_t* payload,
-    uint8_t length) {
+    uint8_t payloadLen) {
     SeaderWorker* seader_worker = seader->worker;
     SeaderUartBridge* seader_uart = seader_worker->uart;
 
-    if(APDU_HEADER_LEN + length > SEADER_UART_RX_BUF_SIZE) {
-        FURI_LOG_E(TAG, "Cannot send message, too long: %d", APDU_HEADER_LEN + length);
+    if(seader_uart->T == 1) {
+        APDU_HEADER_LEN = 7;
+    }
+
+    if(APDU_HEADER_LEN + payloadLen > SEADER_UART_RX_BUF_SIZE) {
+        FURI_LOG_E(TAG, "Cannot send message, too long: %d", APDU_HEADER_LEN + payloadLen);
         return false;
     }
 
@@ -158,16 +162,30 @@ bool seader_send_apdu(
     apdu[1] = INS;
     apdu[2] = P1;
     apdu[3] = P2;
-    apdu[4] = length;
-    memcpy(apdu + APDU_HEADER_LEN, payload, length);
+
+    if(seader_uart->T == 1) {
+        apdu[4] = 0x00;
+        apdu[5] = 0x00;
+        apdu[6] = payloadLen;
+    } else {
+        apdu[4] = payloadLen;
+    }
+
+    memcpy(apdu + APDU_HEADER_LEN, payload, payloadLen);
+    uint8_t length = APDU_HEADER_LEN + payloadLen;
 
     memset(display, 0, sizeof(display));
-    for(uint8_t i = 0; i < APDU_HEADER_LEN + length; i++) {
+    for(uint8_t i = 0; i < length; i++) {
         snprintf(display + (i * 2), sizeof(display), "%02x", apdu[i]);
     }
     FURI_LOG_D(TAG, "seader_send_apdu %s", display);
 
-    seader_ccid_XfrBlock(seader_uart, apdu, APDU_HEADER_LEN + length);
+    if(seader_uart->T == 1) {
+        seader_send_t1(seader_uart, apdu, length);
+    } else {
+        seader_ccid_XfrBlock(seader_uart, apdu, length);
+    }
+
     return true;
 }
 
@@ -629,6 +647,7 @@ void seader_iso15693_transmit(
     uint8_t* buffer,
     size_t len) {
     SeaderWorker* seader_worker = seader->worker;
+
     BitBuffer* tx_buffer = bit_buffer_alloc(len);
     BitBuffer* rx_buffer = bit_buffer_alloc(SEADER_POLLER_MAX_BUFFER_SIZE);
 

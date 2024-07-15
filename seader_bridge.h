@@ -42,6 +42,9 @@ struct SeaderUartBridge {
     uint8_t rx_buf[SEADER_UART_RX_BUF_SIZE];
     uint8_t tx_buf[SEADER_UART_RX_BUF_SIZE];
     size_t tx_len;
+
+    // T=0 or T=1
+    uint8_t T;
 };
 
 typedef struct SeaderUartBridge SeaderUartBridge;
