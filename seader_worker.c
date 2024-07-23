@@ -114,9 +114,7 @@ bool seader_process_success_response(Seader* seader, uint8_t* apdu, size_t len) 
     return true;
 }
 
-bool seader_worker_process_sam_message(Seader* seader, CCID_Message* message) {
-    size_t len = message->dwLength;
-    uint8_t* apdu = message->payload;
+bool seader_worker_process_sam_message(Seader* seader, uint8_t* apdu, uint32_t len) {
     SeaderWorker* seader_worker = seader->worker;
     SeaderUartBridge* seader_uart = seader_worker->uart;
     if(len < 2) {

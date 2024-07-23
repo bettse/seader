@@ -329,7 +329,7 @@ size_t seader_ccid_process(Seader* seader, uint8_t* cmd, size_t cmd_len) {
         if(message.bMessageType == CCID_MESSAGE_TYPE_RDR_to_PC_DataBlock) {
             if(hasSAM) {
                 if(message.bSlot == sam_slot) {
-                    seader_worker_process_sam_message(seader, &message);
+                    seader_worker_process_sam_message(seader, message.payload, message.dwLength);
                 } else {
                     FURI_LOG_D(TAG, "Discarding message on non-sam slot");
                 }
