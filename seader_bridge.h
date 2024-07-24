@@ -9,7 +9,8 @@
 #include <furi.h>
 #include <furi_hal.h>
 
-#define SEADER_UART_RX_BUF_SIZE (128)
+// https://ww1.microchip.com/downloads/en/DeviceDoc/00001561C.pdf
+#define SEADER_UART_RX_BUF_SIZE (261)
 
 typedef struct {
     uint8_t uart_ch;
