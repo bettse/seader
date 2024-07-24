@@ -19,24 +19,6 @@ uint8_t getSequence(uint8_t slot) {
     return sequence[slot]++;
 }
 
-uint8_t seader_ccid_calc_lrc(uint8_t* data, size_t len) {
-    uint8_t lrc = 0;
-    for(size_t i = 0; i < len; i++) {
-        lrc ^= data[i];
-    }
-    return lrc;
-}
-
-bool seader_ccid_validate_lrc(uint8_t* data, size_t len) {
-    uint8_t lrc = seader_ccid_calc_lrc(data, len - 1);
-    return lrc == data[len - 1];
-}
-
-size_t seader_ccid_add_lrc(uint8_t* data, size_t len) {
-    data[len] = seader_ccid_calc_lrc(data, len);
-    return len + 1;
-}
-
 void seader_ccid_IccPowerOn(SeaderUartBridge* seader_uart, uint8_t slot) {
     if(powered[slot]) {
         return;
@@ -53,7 +35,7 @@ void seader_ccid_IccPowerOn(SeaderUartBridge* seader_uart, uint8_t slot) {
     seader_uart->tx_buf[2 + 6] = getSequence(slot);
     seader_uart->tx_buf[2 + 7] = 2; //power
 
-    seader_uart->tx_len = seader_ccid_add_lrc(seader_uart->tx_buf, 2 + 10);
+    seader_uart->tx_len = seader_add_lrc(seader_uart->tx_buf, 2 + 10);
     furi_thread_flags_set(furi_thread_get_id(seader_uart->tx_thread), WorkerEvtSamRx);
 }
 
@@ -74,7 +56,7 @@ void seader_ccid_GetSlotStatus(SeaderUartBridge* seader_uart, uint8_t slot) {
     seader_uart->tx_buf[2 + 5] = slot;
     seader_uart->tx_buf[2 + 6] = getSequence(slot);
 
-    seader_uart->tx_len = seader_ccid_add_lrc(seader_uart->tx_buf, 2 + 10);
+    seader_uart->tx_len = seader_add_lrc(seader_uart->tx_buf, 2 + 10);
     furi_thread_flags_set(furi_thread_get_id(seader_uart->tx_thread), WorkerEvtSamRx);
 }
 
@@ -91,7 +73,7 @@ void seader_ccid_SetParameters(SeaderUartBridge* seader_uart) {
     seader_uart->tx_buf[2 + 8] = 0;
     seader_uart->tx_buf[2 + 9] = 0;
 
-    seader_uart->tx_len = seader_ccid_add_lrc(seader_uart->tx_buf, 2 + 10);
+    seader_uart->tx_len = seader_add_lrc(seader_uart->tx_buf, 2 + 10);
 
     furi_thread_flags_set(furi_thread_get_id(seader_uart->tx_thread), WorkerEvtSamRx);
 }
@@ -108,7 +90,7 @@ void seader_ccid_GetParameters(SeaderUartBridge* seader_uart) {
     seader_uart->tx_buf[2 + 8] = 0;
     seader_uart->tx_buf[2 + 9] = 0;
 
-    seader_uart->tx_len = seader_ccid_add_lrc(seader_uart->tx_buf, 2 + 10);
+    seader_uart->tx_len = seader_add_lrc(seader_uart->tx_buf, 2 + 10);
 
     furi_thread_flags_set(furi_thread_get_id(seader_uart->tx_thread), WorkerEvtSamRx);
 }
@@ -134,7 +116,7 @@ void seader_ccid_XfrBlockToSlot(
     seader_uart->tx_buf[2 + 9] = 0;
 
     memcpy(seader_uart->tx_buf + 2 + 10, data, len);
-    seader_uart->tx_len = seader_ccid_add_lrc(seader_uart->tx_buf, 2 + 10 + len);
+    seader_uart->tx_len = seader_add_lrc(seader_uart->tx_buf, 2 + 10 + len);
     // FURI_LOG_I(TAG, "seader_ccid_XfrBlock %d bytes", seader_uart->tx_len);
 
     furi_thread_flags_set(furi_thread_get_id(seader_uart->tx_thread), WorkerEvtSamRx);
@@ -248,12 +230,12 @@ size_t seader_ccid_process(Seader* seader, uint8_t* cmd, size_t cmd_len) {
         }
         message.consumed += 2 + 10 + message.dwLength + 1;
 
-        if(seader_ccid_validate_lrc(cmd, 2 + 10 + message.dwLength + 1) == false) {
+        if(seader_validate_lrc(cmd, 2 + 10 + message.dwLength + 1) == false) {
             FURI_LOG_W(
                 TAG,
                 "Invalid LRC.  Recv: %02x vs Calc: %02x",
                 cmd[2 + 10 + message.dwLength + 1],
-                seader_ccid_calc_lrc(cmd, 2 + 10 + message.dwLength));
+                seader_calc_lrc(cmd, 2 + 10 + message.dwLength));
             // TODO: Should I respond with an error?
             return message.consumed;
         }

@@ -50,6 +50,7 @@
 #include "seader.h"
 #include "ccid.h"
 #include "uart.h"
+#include "lrc.h"
 #include "seader_worker.h"
 #include "seader_credential.h"
 
