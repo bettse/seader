@@ -6,11 +6,11 @@
 
 #define TAG "SAMAPI"
 
-#define APDU_HEADER_LEN 5
-#define ASN1_PREFIX 6
-#define ASN1_DEBUG true
+#define APDU_HEADER_LEN                 5
+#define ASN1_PREFIX                     6
+#define ASN1_DEBUG                      true
 #define SEADER_ICLASS_SR_SIO_BASE_BLOCK 10
-#define SEADER_SERIAL_FILE_NAME "sam_serial"
+#define SEADER_SERIAL_FILE_NAME         "sam_serial"
 
 const uint8_t picopass_iclass_key[] = {0xaf, 0xa7, 0x85, 0xa7, 0xda, 0xb3, 0x33, 0x78};
 
