@@ -60,7 +60,12 @@ void seader_ccid_GetSlotStatus(SeaderUartBridge* seader_uart, uint8_t slot) {
     furi_thread_flags_set(furi_thread_get_id(seader_uart->tx_thread), WorkerEvtSamRx);
 }
 
-void seader_ccid_SetParameters(SeaderUartBridge* seader_uart) {
+void seader_ccid_SetParameters(Seader* seader, uint8_t slot, uint8_t* atr, size_t atr_len) {
+    SeaderWorker* seader_worker = seader->worker;
+    SeaderUartBridge* seader_uart = seader_worker->uart;
+    UNUSED(slot);
+    UNUSED(atr);
+    UNUSED(atr_len);
     uint8_t T1 = 1;
     memset(seader_uart->tx_buf, 0, SEADER_UART_RX_BUF_SIZE);
     seader_uart->tx_buf[0] = SYNC;
