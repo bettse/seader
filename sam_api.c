@@ -138,13 +138,16 @@ void seader_picopass_state_machine(Seader* seader, uint8_t* buffer, size_t len) 
 }
 
 bool seader_send_apdu(
-    SeaderUartBridge* seader_uart,
+    Seader* seader,
     uint8_t CLA,
     uint8_t INS,
     uint8_t P1,
     uint8_t P2,
     uint8_t* payload,
     uint8_t length) {
+    SeaderWorker* seader_worker = seader->worker;
+    SeaderUartBridge* seader_uart = seader_worker->uart;
+
     if(APDU_HEADER_LEN + length > SEADER_UART_RX_BUF_SIZE) {
         FURI_LOG_E(TAG, "Cannot send message, too long: %d", APDU_HEADER_LEN + length);
         return false;
@@ -186,8 +189,6 @@ void seader_send_payload(
     uint8_t to,
     uint8_t from,
     uint8_t replyTo) {
-    SeaderWorker* seader_worker = seader->worker;
-    SeaderUartBridge* seader_uart = seader_worker->uart;
     uint8_t rBuffer[SEADER_UART_RX_BUF_SIZE] = {0};
 
     asn_enc_rval_t er = der_encode_to_buffer(
@@ -213,7 +214,7 @@ void seader_send_payload(
     rBuffer[1] = from;
     rBuffer[2] = replyTo;
 
-    seader_send_apdu(seader_uart, 0xA0, 0xDA, 0x02, 0x63, rBuffer, 6 + er.encoded);
+    seader_send_apdu(seader, 0xA0, 0xDA, 0x02, 0x63, rBuffer, 6 + er.encoded);
 }
 
 void seader_send_response(
