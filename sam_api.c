@@ -936,8 +936,10 @@ void seader_parse_nfc_command_transmit(
     }
 }
 
-void seader_parse_nfc_off(SeaderUartBridge* seader_uart) {
+void seader_parse_nfc_off(Seader* seader) {
     FURI_LOG_D(TAG, "Set Field Off");
+    SeaderWorker* seader_worker = seader->worker;
+    SeaderUartBridge* seader_uart = seader_worker->uart;
 
     NFCResponse_t* nfcResponse = 0;
     nfcResponse = calloc(1, sizeof *nfcResponse);
@@ -959,14 +961,12 @@ void seader_parse_nfc_off(SeaderUartBridge* seader_uart) {
 }
 
 void seader_parse_nfc_command(Seader* seader, NFCCommand_t* nfcCommand, SeaderPollerContainer* spc) {
-    SeaderWorker* seader_worker = seader->worker;
-    SeaderUartBridge* seader_uart = seader_worker->uart;
     switch(nfcCommand->present) {
     case NFCCommand_PR_nfcSend:
         seader_parse_nfc_command_transmit(seader, &nfcCommand->choice.nfcSend, spc);
         break;
     case NFCCommand_PR_nfcOff:
-        seader_parse_nfc_off(seader_uart);
+        seader_parse_nfc_off(seader);
         seader->worker->stage = SeaderPollerEventTypeComplete;
         break;
     default:
