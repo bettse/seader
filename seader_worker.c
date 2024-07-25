@@ -124,7 +124,7 @@ bool seader_worker_process_sam_message(Seader* seader, uint8_t* apdu, uint32_t l
     for(uint8_t i = 0; i < len; i++) {
         snprintf(display + (i * 2), sizeof(display), "%02x", apdu[i]);
     }
-    // FURI_LOG_I(TAG, "APDU: %s", display);
+    FURI_LOG_I(TAG, "APDU: %s", display);
 
     uint8_t SW1 = apdu[len - 2];
     uint8_t SW2 = apdu[len - 1];
@@ -136,13 +136,15 @@ bool seader_worker_process_sam_message(Seader* seader, uint8_t* apdu, uint32_t l
         seader_ccid_XfrBlock(seader_uart, GET_RESPONSE, sizeof(GET_RESPONSE));
         return true;
         break;
-
     case 0x90:
         if(SW2 == 0x00) {
             if(len > 2) {
                 return seader_process_success_response(seader, apdu, len - 2);
             }
         }
+        break;
+    default:
+        FURI_LOG_W(TAG, "Unknown SW %02x%02x", SW1, SW2);
         break;
     }
 
