@@ -34,7 +34,7 @@ void* calloc(size_t count, size_t size) {
 }
 
 // Forward declarations
-void seader_send_nfc_rx(SeaderUartBridge* seader_uart, uint8_t* buffer, size_t len);
+void seader_send_nfc_rx(Seader* seader, uint8_t* buffer, size_t len);
 
 PicopassError seader_worker_fake_epurse_update(BitBuffer* tx_buffer, BitBuffer* rx_buffer) {
     const uint8_t* buffer = bit_buffer_get_data(tx_buffer);
@@ -56,9 +56,6 @@ PicopassError seader_worker_fake_epurse_update(BitBuffer* tx_buffer, BitBuffer* 
 }
 
 void seader_picopass_state_machine(Seader* seader, uint8_t* buffer, size_t len) {
-    SeaderWorker* seader_worker = seader->worker;
-    SeaderUartBridge* seader_uart = seader_worker->uart;
-
     BitBuffer* tx_buffer = bit_buffer_alloc(len);
     bit_buffer_append_bytes(tx_buffer, buffer, len);
     BitBuffer* rx_buffer = bit_buffer_alloc(SEADER_POLLER_MAX_BUFFER_SIZE);
@@ -131,7 +128,7 @@ void seader_picopass_state_machine(Seader* seader, uint8_t* buffer, size_t len) 
         }
 
         seader_send_nfc_rx(
-            seader_uart,
+            seader,
             (uint8_t*)bit_buffer_get_data(rx_buffer),
             bit_buffer_get_size_bytes(rx_buffer));
 
@@ -570,7 +567,10 @@ bool seader_parse_response(Seader* seader, Response_t* response) {
     return false;
 }
 
-void seader_send_nfc_rx(SeaderUartBridge* seader_uart, uint8_t* buffer, size_t len) {
+void seader_send_nfc_rx(Seader* seader, uint8_t* buffer, size_t len) {
+    SeaderWorker* seader_worker = seader->worker;
+    SeaderUartBridge* seader_uart = seader_worker->uart;
+
     OCTET_STRING_t rxData = {.buf = buffer, .size = len};
     uint8_t status[] = {0x00, 0x00};
     RfStatus_t rfStatus = {.buf = status, .size = 2};
@@ -639,13 +639,7 @@ void seader_iso15693_transmit(
     PicopassPoller* picopass_poller,
     uint8_t* buffer,
     size_t len) {
-    UNUSED(seader);
-    UNUSED(buffer);
-    UNUSED(len);
-
     SeaderWorker* seader_worker = seader->worker;
-    SeaderUartBridge* seader_uart = seader_worker->uart;
-
     BitBuffer* tx_buffer = bit_buffer_alloc(len);
     BitBuffer* rx_buffer = bit_buffer_alloc(SEADER_POLLER_MAX_BUFFER_SIZE);
 
@@ -671,7 +665,7 @@ void seader_iso15693_transmit(
 
         seader_capture_sio(tx_buffer, rx_buffer, seader->credential);
         seader_send_nfc_rx(
-            seader_uart,
+            seader,
             (uint8_t*)bit_buffer_get_data(rx_buffer),
             bit_buffer_get_size_bytes(rx_buffer));
 
@@ -696,7 +690,6 @@ void seader_iso14443a_transmit(
     furi_assert(buffer);
     furi_assert(iso14443_4a_poller);
     SeaderWorker* seader_worker = seader->worker;
-    SeaderUartBridge* seader_uart = seader_worker->uart;
     SeaderCredential* credential = seader->credential;
 
     BitBuffer* tx_buffer = bit_buffer_alloc(len);
@@ -721,7 +714,7 @@ void seader_iso14443a_transmit(
 
         seader_capture_sio(tx_buffer, rx_buffer, credential);
         seader_send_nfc_rx(
-            seader_uart,
+            seader,
             (uint8_t*)bit_buffer_get_data(rx_buffer),
             bit_buffer_get_size_bytes(rx_buffer));
 
@@ -745,7 +738,6 @@ void seader_mfc_transmit(
     furi_assert(buffer);
     furi_assert(mfc_poller);
     SeaderWorker* seader_worker = seader->worker;
-    SeaderUartBridge* seader_uart = seader_worker->uart;
 
     BitBuffer* tx_buffer = bit_buffer_alloc(len);
     BitBuffer* rx_buffer = bit_buffer_alloc(SEADER_POLLER_MAX_BUFFER_SIZE);
@@ -876,7 +868,7 @@ void seader_mfc_transmit(
         }
 
         seader_send_nfc_rx(
-            seader_uart,
+            seader,
             (uint8_t*)bit_buffer_get_data(rx_buffer),
             bit_buffer_get_size_bytes(rx_buffer));
 
