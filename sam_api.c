@@ -391,16 +391,16 @@ bool seader_unpack_pacs(Seader* seader, uint8_t* buf, size_t size) {
 //    800201298106683d052026b6820101
 //300F800201298106683D052026B6820101
 bool seader_parse_version(SeaderWorker* seader_worker, uint8_t* buf, size_t size) {
-    SamVersion_t* version = 0;
-    version = calloc(1, sizeof *version);
-    assert(version);
-
     bool rtn = false;
     if(size > 30) {
         // Too large to handle now
         FURI_LOG_W(TAG, "Version of %d is to long to parse", size);
         return false;
     }
+    SamVersion_t* version = 0;
+    version = calloc(1, sizeof *version);
+    assert(version);
+
     // Add sequence prefix
     uint8_t seq[32] = {0x30};
     seq[1] = (uint8_t)size;
