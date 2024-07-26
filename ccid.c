@@ -113,7 +113,8 @@ void seader_ccid_XfrBlockToSlot(
     seader_uart->tx_buf[0] = SYNC;
     seader_uart->tx_buf[1] = CTRL;
     seader_uart->tx_buf[2 + 0] = CCID_MESSAGE_TYPE_PC_to_RDR_XfrBlock;
-    seader_uart->tx_buf[2 + 1] = len;
+    seader_uart->tx_buf[2 + 1] = (len >> 0) & 0xff;
+    seader_uart->tx_buf[2 + 2] = (len >> 8) & 0xff;
     seader_uart->tx_buf[2 + 5] = slot;
     seader_uart->tx_buf[2 + 6] = getSequence(slot);
     seader_uart->tx_buf[2 + 7] = 5;
@@ -122,7 +123,12 @@ void seader_ccid_XfrBlockToSlot(
 
     memcpy(seader_uart->tx_buf + 2 + 10, data, len);
     seader_uart->tx_len = seader_add_lrc(seader_uart->tx_buf, 2 + 10 + len);
-    // FURI_LOG_I(TAG, "seader_ccid_XfrBlock %d bytes", seader_uart->tx_len);
+
+    char display[SEADER_UART_RX_BUF_SIZE * 2 + 1] = {0};
+    for(uint8_t i = 0; i < seader_uart->tx_len; i++) {
+        snprintf(display + (i * 2), sizeof(display), "%02x", seader_uart->tx_buf[i]);
+    }
+    FURI_LOG_D(TAG, "seader_ccid_XfrBlock %d bytes: %s", seader_uart->tx_len, display);
 
     furi_thread_flags_set(furi_thread_get_id(seader_uart->tx_thread), WorkerEvtSamRx);
 }
