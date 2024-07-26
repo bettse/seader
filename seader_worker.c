@@ -13,9 +13,6 @@
     (FURI_HAL_NFC_LL_TXRX_FLAGS_CRC_TX_MANUAL | FURI_HAL_NFC_LL_TXRX_FLAGS_AGC_ON | \
      FURI_HAL_NFC_LL_TXRX_FLAGS_PAR_RX_REMV | FURI_HAL_NFC_LL_TXRX_FLAGS_CRC_RX_KEEP)
 
-// TODO: const
-uint8_t GET_RESPONSE[] = {0x00, 0xc0, 0x00, 0x00, 0xff};
-
 char display[SEADER_UART_RX_BUF_SIZE * 2 + 1] = {0};
 
 // Forward declaration
@@ -128,6 +125,7 @@ bool seader_worker_process_sam_message(Seader* seader, uint8_t* apdu, uint32_t l
 
     uint8_t SW1 = apdu[len - 2];
     uint8_t SW2 = apdu[len - 1];
+    uint8_t GET_RESPONSE[] = {0x00, 0xc0, 0x00, 0x00, 0xff};
 
     switch(SW1) {
     case 0x61:
