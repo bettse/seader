@@ -158,7 +158,7 @@ bool seader_send_apdu(
     }
 
     uint8_t length = APDU_HEADER_LEN + payloadLen;
-    uint8_t *apdu = malloc(length);
+    uint8_t* apdu = malloc(length);
     if(!apdu) {
         FURI_LOG_E(TAG, "Failed to allocate memory for apdu in seader_send_apdu");
         return false;
