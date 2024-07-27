@@ -13,8 +13,6 @@
     (FURI_HAL_NFC_LL_TXRX_FLAGS_CRC_TX_MANUAL | FURI_HAL_NFC_LL_TXRX_FLAGS_AGC_ON | \
      FURI_HAL_NFC_LL_TXRX_FLAGS_PAR_RX_REMV | FURI_HAL_NFC_LL_TXRX_FLAGS_CRC_RX_KEEP)
 
-char display[SEADER_UART_RX_BUF_SIZE * 2 + 1] = {0};
-
 // Forward declaration
 void seader_send_card_detected(SeaderUartBridge* seader_uart, CardDetails_t* cardDetails);
 
@@ -117,11 +115,14 @@ bool seader_worker_process_sam_message(Seader* seader, uint8_t* apdu, uint32_t l
     if(len < 2) {
         return false;
     }
-    memset(display, 0, sizeof(display));
+
+    char* display = malloc(len * 2 + 1);
+    memset(display, 0, len * 2 + 1);
     for(uint8_t i = 0; i < len; i++) {
         snprintf(display + (i * 2), sizeof(display), "%02x", apdu[i]);
     }
     FURI_LOG_I(TAG, "APDU: %s", display);
+    free(display);
 
     uint8_t SW1 = apdu[len - 2];
     uint8_t SW2 = apdu[len - 1];
