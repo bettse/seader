@@ -159,6 +159,9 @@ int32_t seader_uart_worker(void* context) {
 SeaderUartBridge* seader_uart_enable(SeaderUartConfig* cfg, Seader* seader) {
     SeaderUartBridge* seader_uart = malloc(sizeof(SeaderUartBridge));
 
+    seader_uart->T = 0;
+    seader_uart->T = (seader->is_debug_enabled ? 1 : 0);
+
     memcpy(&(seader_uart->cfg_new), cfg, sizeof(SeaderUartConfig));
 
     seader_uart->thread =
