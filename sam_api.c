@@ -157,7 +157,13 @@ bool seader_send_apdu(
         return false;
     }
 
-    uint8_t apdu[SEADER_UART_RX_BUF_SIZE];
+    uint8_t length = APDU_HEADER_LEN + payloadLen;
+    uint8_t *apdu = malloc(length);
+    if(!apdu) {
+        FURI_LOG_E(TAG, "Failed to allocate memory for apdu in seader_send_apdu");
+        return false;
+    }
+
     apdu[0] = CLA;
     apdu[1] = INS;
     apdu[2] = P1;
@@ -172,7 +178,6 @@ bool seader_send_apdu(
     }
 
     memcpy(apdu + APDU_HEADER_LEN, payload, payloadLen);
-    uint8_t length = APDU_HEADER_LEN + payloadLen;
 
     memset(display, 0, sizeof(display));
     for(uint8_t i = 0; i < length; i++) {
@@ -185,6 +190,7 @@ bool seader_send_apdu(
     } else {
         seader_ccid_XfrBlock(seader_uart, apdu, length);
     }
+    free(apdu);
 
     return true;
 }
