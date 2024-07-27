@@ -295,6 +295,11 @@ NfcCommand seader_worker_poller_callback_iso14443_4a(NfcGenericEvent event, void
             seader_worker_poller_conversation(seader, &spc);
         } else if(seader_worker->stage == SeaderPollerEventTypeComplete) {
             ret = NfcCommandStop;
+        } else if(seader_worker->stage == SeaderPollerEventTypeFail) {
+            ret = NfcCommandStop;
+            view_dispatcher_send_custom_event(
+                seader->view_dispatcher, SeaderCustomEventWorkerExit);
+            FURI_LOG_W(TAG, "SeaderPollerEventTypeFail");
         }
     } else if(iso14443_4a_event->type == Iso14443_4aPollerEventTypeError) {
         Iso14443_4aPollerEventData* data = iso14443_4a_event->data;
