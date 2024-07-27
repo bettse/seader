@@ -116,6 +116,10 @@ bool seader_worker_process_sam_message(Seader* seader, uint8_t* apdu, uint32_t l
         return false;
     }
 
+    if(seader_worker->state == SeaderWorkerStateAPDURunner) {
+        return seader_apdu_runner_response(seader, apdu, len);
+    }
+
     char* display = malloc(len * 2 + 1);
     memset(display, 0, len * 2 + 1);
     for(uint8_t i = 0; i < len; i++) {
@@ -211,6 +215,10 @@ int32_t seader_worker_task(void* context) {
     } else if(seader_worker->state == SeaderWorkerStateVirtualCredential) {
         FURI_LOG_D(TAG, "Virtual Credential");
         seader_worker_virtual_credential(seader);
+    } else if(seader_worker->state == SeaderWorkerStateAPDURunner) {
+        FURI_LOG_D(TAG, "APDU Runner");
+        seader_apdu_runner_init(seader);
+        return 0;
     }
     seader_worker_change_state(seader_worker, SeaderWorkerStateReady);
 
