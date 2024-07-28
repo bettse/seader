@@ -987,17 +987,19 @@ bool seader_worker_state_machine(
 
     switch(payload->present) {
     case Payload_PR_response:
+        FURI_LOG_D(TAG, "Payload_PR_response");
         seader_parse_response(seader, &payload->choice.response);
         processed = true;
         break;
     case Payload_PR_nfcCommand:
+        FURI_LOG_D(TAG, "Payload_PR_nfcCommand");
         if(online) {
             seader_parse_nfc_command(seader, &payload->choice.nfcCommand, spc);
             processed = true;
         }
         break;
     case Payload_PR_errorResponse:
-        FURI_LOG_W(TAG, "Error Response");
+        FURI_LOG_W(TAG, "Payload_PR_errorResponse");
         processed = true;
         view_dispatcher_send_custom_event(seader->view_dispatcher, SeaderCustomEventWorkerExit);
         break;
@@ -1037,8 +1039,12 @@ bool seader_process_success_response_i(
                 ->op->print_struct(
                     &asn_DEF_Payload, payload, 1, seader_print_struct_callback, payloadDebug);
             if(strlen(payloadDebug) > 0) {
-                FURI_LOG_D(TAG, "Payload: %s", payloadDebug);
+                FURI_LOG_D(TAG, "Received Payload: %s", payloadDebug);
+            } else {
+                FURI_LOG_D(TAG, "Received empty Payload");
             }
+        } else {
+            FURI_LOG_D(TAG, "Online mode");
         }
 #endif
 
