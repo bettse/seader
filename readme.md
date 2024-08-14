@@ -19,7 +19,7 @@ Seader can save from the Source(top) formats to the Destination(left) formats.
 | iClass (legacy) | X | x | x | X | X | x | x | X |
 | MFC (legacy) | X | x | x | X | X | x | x | X |
 | Seader (with SIO) | | x | x | | | x | x | |
-| iClass SR | | x | x | | | x | x | |
+| iClass SR (emulation only) | | x | x | | | x | x | |
 
 
 ## Hardware
