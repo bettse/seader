@@ -12,6 +12,7 @@
 
 static const char* seader_file_header = "Flipper Seader Credential";
 static const uint32_t seader_file_version = 1;
+extern const uint8_t picopass_iclass_key[];
 
 SeaderCredential* seader_credential_alloc() {
     SeaderCredential* seader_dev = malloc(sizeof(SeaderCredential));
@@ -394,6 +395,10 @@ bool seader_credential_save_picopass(SeaderCredential* cred, const char* name) {
     bool use_load_path = true;
     bool saved = false;
     bool withSIO = cred->save_format == SeaderCredentialSaveFormatSR;
+    if(withSIO) {
+        loclass_iclass_calc_div_key(cred->diversifier, picopass_iclass_key, debit_key, false);
+    }
+
     FlipperFormat* file = flipper_format_file_alloc(cred->storage);
     FuriString* temp_str = furi_string_alloc();
 

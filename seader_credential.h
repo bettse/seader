@@ -5,6 +5,8 @@
 #include <storage/storage.h>
 #include <dialogs/dialogs.h>
 #include "protocol/picopass_protocol.h"
+#include <optimized_ikeys.h>
+#include <optimized_cipher.h>
 
 #define SEADER_CRED_NAME_MAX_LEN 22
 #define SEADER_APP_EXTENSION     ".credential"
