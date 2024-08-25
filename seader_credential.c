@@ -355,6 +355,9 @@ bool seader_credential_save_agnostic(SeaderCredential* cred, const char* name) {
             furi_string_printf(
                 temp_str, "%s/%s%s", STORAGE_APP_DATA_PATH_PREFIX, name, SEADER_APP_EXTENSION);
         }
+
+        FURI_LOG_D(TAG, "Save as Seader [%s]", furi_string_get_cstr(temp_str));
+
         // Open file
         if(!flipper_format_file_open_always(file, furi_string_get_cstr(temp_str))) break;
 
