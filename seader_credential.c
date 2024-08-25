@@ -534,7 +534,7 @@ bool seader_credential_save_picopass(SeaderCredential* cred, const char* name) {
 bool seader_credential_save_rfid(SeaderCredential* cred, const char* name) {
     bool result = false;
     FuriString* file_path = furi_string_alloc();
-    furi_string_printf(file_path, "%s/%s%s", ANY_PATH("lfrfid"), name, ".rfid");
+    furi_string_printf(file_path, "%s/%s%s", EXT_PATH("lfrfid"), name, ".rfid");
     ProtocolDict* dict = protocol_dict_alloc(lfrfid_protocols, LFRFIDProtocolMax);
     ProtocolId protocol = LFRFIDProtocolHidGeneric;
 
