@@ -73,6 +73,7 @@ bool seader_scene_card_menu_on_event(void* context, SceneManagerEvent event) {
         if(event.event == SubmenuIndexSave) {
             scene_manager_set_scene_state(
                 seader->scene_manager, SeaderSceneCardMenu, SubmenuIndexSave);
+            seader->credential->save_format = SeaderCredentialSaveFormatAgnostic;
             scene_manager_next_scene(seader->scene_manager, SeaderSceneSaveName);
             consumed = true;
         } else if(event.event == SubmenuIndexSavePicopass) {
