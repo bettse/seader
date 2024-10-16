@@ -382,6 +382,10 @@ NfcCommand seader_worker_poller_callback_picopass(PicopassPollerEvent event, voi
             seader_worker_poller_conversation(seader, &spc);
         } else if(seader_worker->stage == SeaderPollerEventTypeComplete) {
             ret = NfcCommandStop;
+        } else if(seader_worker->stage == SeaderPollerEventTypeFail) {
+            view_dispatcher_send_custom_event(
+                seader->view_dispatcher, SeaderCustomEventWorkerExit);
+            ret = NfcCommandStop;
         }
     } else if(event.type == PicopassPollerEventTypeFail) {
         ret = NfcCommandStop;
