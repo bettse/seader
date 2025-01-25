@@ -639,6 +639,7 @@ void seader_credential_clear(SeaderCredential* cred) {
     cred->type = SeaderCredentialTypeNone;
     memset(cred->sio, 0, sizeof(cred->sio));
     cred->sio_len = 0;
+    cred->sio_start_block = 0;
     memset(cred->diversifier, 0, sizeof(cred->diversifier));
     cred->diversifier_len = 0;
     furi_string_reset(cred->load_path);
