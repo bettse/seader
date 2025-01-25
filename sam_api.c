@@ -387,15 +387,14 @@ bool seader_unpack_pacs(Seader* seader, uint8_t* buf, size_t size) {
             ->op->print_struct(&asn_DEF_PAC, pac, 1, seader_print_struct_callback, pacDebug);
         if(strlen(pacDebug) > 0) {
             FURI_LOG_D(TAG, "Received pac: %s", pacDebug);
+        }
 
-            memset(display, 0, sizeof(display));
-            if(seader_credential->sio[0] == 0x30) {
-                for(uint8_t i = 0; i < seader_credential->sio_len; i++) {
-                    snprintf(
-                        display + (i * 2), sizeof(display), "%02x", seader_credential->sio[i]);
-                }
-                FURI_LOG_D(TAG, "SIO %s", display);
+        memset(display, 0, sizeof(display));
+        if(seader_credential->sio[0] == 0x30) {
+            for(uint8_t i = 0; i < seader_credential->sio_len; i++) {
+                snprintf(display + (i * 2), sizeof(display), "%02x", seader_credential->sio[i]);
             }
+            FURI_LOG_D(TAG, "SIO %s", display);
         }
 
         if(pac->size <= sizeof(seader_credential->credential)) {
