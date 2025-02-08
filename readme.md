@@ -39,7 +39,6 @@ Buy it at [Red Team Tools](https://www.redteamtools.com/flippermeister/).
 ### Option 3: Smart Card 2 Click
 
 Buy HID SAM:
- * [Australia](https://store.dorks.com.au/products/hp-sim-for-hid-iclass-for-hip2-reader-2583766)
  * [USA](https://www.cdw.com/product/hp-sim-for-hid-iclass-for-hip2-reader-security-sim/4854794)
  * [Europe](https://www.rfideas-shop.com/en/kt-sim-se-sim-card-hid-iclass-and-seos-for-sphip-r.html)
  * [Canada](https://www.pc-canada.com/item/hp-sim-for-hid-iclass-se-and-hid-iclass-seos-for-hip2-reader/y7c07a)
