@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1"><!-- Begin Jekyll SEO tag v2.8.0 -->
+<title>Seader | Interface with a SAM from the Flipper Zero over UART</title>
+<meta name="generator" content="Jekyll v4.3.2" />
+<meta property="og:title" content="Seader" />
+<meta property="og:locale" content="en_US" />
+<meta name="description" content="Interface with a SAM from the Flipper Zero over UART" />
+<meta property="og:description" content="Interface with a SAM from the Flipper Zero over UART" />
+<link rel="canonical" href="http://localhost:4000/" />
+<meta property="og:url" content="http://localhost:4000/" />
+<meta property="og:site_name" content="Seader" />
+<meta property="og:type" content="website" />
+<meta name="twitter:card" content="summary" />
+<meta property="twitter:title" content="Seader" />
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"WebSite","description":"Interface with a SAM from the Flipper Zero over UART","headline":"Seader","name":"Seader","url":"http://localhost:4000/"}</script>
+<!-- End Jekyll SEO tag -->
+<link rel="stylesheet" href="/assets/main.css"><link type="application/atom+xml" rel="alternate" href="http://localhost:4000/feed.xml" title="Seader" /></head>
+<body><header class="site-header" role="banner">
+
+  <div class="wrapper"><a class="site-title" rel="author" href="/">Seader</a><nav class="site-nav">
+        <input type="checkbox" id="nav-trigger" class="nav-trigger" />
+        <label for="nav-trigger">
+          <span class="menu-icon">
+            <svg viewBox="0 0 18 15" width="18px" height="15px">
+              <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.032C17.335,0,18,0.665,18,1.484L18,1.484z M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.032C17.335,6.031,18,6.696,18,7.516L18,7.516z M18,13.516C18,14.335,17.335,15,16.516,15H1.484 C0.665,15,0,14.335,0,13.516l0,0c0-0.82,0.665-1.483,1.484-1.483h15.032C17.335,12.031,18,12.695,18,13.516L18,13.516z"/>
+            </svg>
+          </span>
+        </label>
+
+        <div class="trigger"></div>
+      </nav></div>
+</header>
+<main class="page-content" aria-label="Content">
+      <div class="wrapper">
+        <div class="home"><script src="https://cdn.jsdelivr.net/npm/anchor-js/anchor.min.js"></script>
+
+<p>A <a href="https://flipperzero.one/">Flipper Zero</a> application (aka “fap”) to interface with a SAM from the Flipper Zero over UART.</p>
+
+<h1 id="faq">FAQ</h1>
+
+<p>See “Probably Frequently Asked Questions:” on Red Team Tools <a href="https://www.redteamtools.com/nard-sam-expansion-board-for-flipper-zero-with-hid-seos-iclass-sam/">NARD SAM expansion board product page</a></p>
+
+<h1 id="download">Download</h1>
+
+<h2 id="release">Release</h2>
+
+<p>Download release versions via the Flipper App Catalog in the mobile companion apps</p>
+
+<h2 id="betadev">Beta/Dev</h2>
+
+<p>Download builds based off of git at <a href="https://flipc.org/bettse/seader?branch=main">flipc</a></p>
+
+<h1 id="bugs">Bugs</h1>
+
+<p>File issues in <a href="https://github.com/bettse/seader/issues">GitHub</a>.</p>
+
+<h1 id="hardware">Hardware</h1>
+
+<h2 id="option-1-nard-flipper-add-on">Option 1: NARD Flipper add-on</h2>
+
+<p>Buy it assembled at <a href="https://www.redteamtools.com/nard-sam-expansion-board-for-flipper-zero-with-hid-seos-iclass-sam/">Red Team Tools</a>, with or without SAM.</p>
+
+<p>Or build it yourself from the files in the <a href="https://github.com/killergeek/nard">NARD repo</a>.</p>
+
+<h2 id="option-2-smart-card-2-click">Option 2: Smart Card 2 Click</h2>
+
+<p>Put SAM (<a href="https://www.cdw.com/product/hp-sim-for-hid-iclass-for-hip2-reader-security-sim/4854794">USA</a> <a href="https://www.rfideas-shop.com/en/kt-sim-se-sim-card-hid-iclass-and-seos-for-sphip-r.html">EU</a> <a href="https://www.pc-canada.com/item/hp-sim-for-hid-iclass-se-and-hid-iclass-seos-for-hip2-reader/y7c07a">CA</a>) into <strong><a href="https://a.co/d/1E9Zk1h">adapter</a></strong> (because of chip on top) and plug into <strong><a href="https://www.mikroe.com/smart-card-2-click">reader</a></strong>. Connect reader to Flipper Zero (See <code class="language-plaintext highlighter-rouge">Connections</code> below).</p>
+
+<p>Optionally 3d print a <a href="https://www.printables.com/model/543149-case-for-flipper-zero-devboard-smart2click-samsim">case designed by sean</a></p>
+
+<h3 id="connections">Connections</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Smart Card 2 Click</th>
+      <th>Flipper</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>5v</td>
+      <td>1</td>
+    </tr>
+    <tr>
+      <td>GND</td>
+      <td>8 / 11 / 18</td>
+    </tr>
+    <tr>
+      <td>TX</td>
+      <td>16</td>
+    </tr>
+    <tr>
+      <td>RX</td>
+      <td>15</td>
+    </tr>
+  </tbody>
+</table>
+
+<h1 id="development">Development</h1>
+
+<p>See <a href="https://github.com/bettse/seader#seader">repo readme</a>.</p>
+
+<script>
+   anchors.add();
+</script>
+
+<hr />
+
+<p><a href="http://buymeacoffee.com/bettse">Buy Me A Coffee</a></p>
+
+</div>
+
+      </div>
+    </main><footer class="site-footer h-card">
+  <data class="u-url" href="/"></data>
+
+  <div class="wrapper">
+
+    <h2 class="footer-heading">Seader</h2>
+
+    <div class="footer-col-wrapper">
+      <div class="footer-col footer-col-1">
+        <ul class="contact-list">
+          <li class="p-name">Seader</li><li><a class="u-email" href="mailto:bettse@fastmail.fm">bettse@fastmail.fm</a></li></ul>
+      </div>
+
+      <div class="footer-col footer-col-2"><ul class="social-media-list"><li><a href="https://github.com/bettse"><svg class="svg-icon"><use xlink:href="/assets/minima-social-icons.svg#github"></use></svg> <span class="username">bettse</span></a></li><li><a href="https://www.linkedin.com/in/eric-betts"><svg class="svg-icon"><use xlink:href="/assets/minima-social-icons.svg#linkedin"></use></svg> <span class="username">eric-betts</span></a></li><li><a href="https://defcon.social/@bettse"><svg class="svg-icon"><use xlink:href="/assets/minima-social-icons.svg#mastodon"></use></svg> <span class="username">bettse</span></a></li></ul>
+</div>
+
+      <div class="footer-col footer-col-3">
+        <p>Interface with a SAM from the Flipper Zero over UART</p>
+      </div>
+    </div>
+
+  </div>
+
+</footer>
+<script>
+var clicky_site_ids = clicky_site_ids || [];
+clicky_site_ids.push(101415968);
+(function() {
+  var s = document.createElement('script');
+  s.type = 'text/javascript';
+  s.async = true;
+  s.src = '//static.getclicky.com/js';
+  ( document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0] ).appendChild( s );
+})();
+</script>
+<noscript><p><img alt="Clicky" width="1" height="1" src="//in.getclicky.com/101415968ns.gif" /></p></noscript>
+</body>
+
+</html>
