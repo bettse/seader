@@ -18,7 +18,7 @@
             color: white;
             text-align: center;
             padding: 100px 20px;
-            background-image: url('banner.png');
+            background-image: url('./banner.png');
             background-size: cover;
             background-position: center;
         }
@@ -101,6 +101,23 @@
         .hardware-details {
             text-align: left;
         }
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .comparison-table th, .comparison-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: center;
+        }
+        .comparison-table th {
+            background-color: #1a1a1a;
+            color: white;
+        }
+        .comparison-table td {
+            background-color: #2a2a2a;
+            color: white;
+        }
     </style>
 </head>
 <body>
@@ -113,13 +130,71 @@
         <ul>
             <li>Allows for reading credential from HID: iClass, iClass SE, MFC SE, Desfire EV1/EV2, and Seos.</li>
             <li>Downgrade credentials to iClass SR, iClass legacy, and Prox.</li>
-            <li>Works flawlessly with Picopass Flipper app.</li>
+            <li>Works with Picopass Flipper app.</li>
         </ul>
     </div>
     <div class="screenshots">
-        <img src="menu.png" alt="Menu Screenshot">
-        <img src="pacs.png" alt="PACS Screenshot">
-        <img src="save_menu.png" alt="Save Menu Screenshot">
+        <img src="./menu.png" alt="Menu Screenshot">
+        <img src="./pacs.png" alt="PACS Screenshot">
+        <img src="./save_menu.png" alt="Save Menu Screenshot">
+    </div>
+    <div class="features">
+        <h2>Feature Comparison</h2>
+        <table class="comparison-table">
+            <thead>
+                <tr>
+                    <th>Feature</th>
+                    <th>Seader</th>
+                    <th>iCopyXS + ICS Decoder</th>
+                    <th>Weaponized Reader</th>
+                    <th>Proxmark3 RDV 4.01</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Reading Credentials</td>
+                    <td>Yes</td>
+                    <td>Yes</td>
+                    <td>Yes</td>
+                    <td>Yes</td>
+                </tr>
+                <tr>
+                    <td>Downgrading Credentials</td>
+                    <td>Yes</td>
+                    <td>Limited</td>
+                    <td>No</td>
+                    <td>Yes</td>
+                </tr>
+                <tr>
+                    <td>Works with Flipper</td>
+                    <td>Yes</td>
+                    <td>No</td>
+                    <td>No</td>
+                    <td>No</td>
+                </tr>
+                <tr>
+                    <td>Supports Multiple Credential Types</td>
+                    <td>Yes</td>
+                    <td>Yes</td>
+                    <td>Yes</td>
+                    <td>Yes</td>
+                </tr>
+                <tr>
+                    <td>Open Source</td>
+                    <td>Yes</td>
+                    <td>Yes</td>
+                    <td>Conditional</td>
+                    <td>Yes</td>
+                </tr>
+                <tr>
+                    <td>Community Support</td>
+                    <td>Yes</td>
+                    <td>No</td>
+                    <td>No</td>
+                    <td>Yes</td>
+                </tr>
+            </tbody>
+        </table>
     </div>
     <div class="hardware">
         <h2>Hardware Options</h2>
