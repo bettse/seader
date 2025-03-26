@@ -82,15 +82,17 @@
         }
         .screenshots {
             display: flex;
-            justify-content: center;
             gap: 20px;
             margin: 20px 0;
+            overflow-x: auto;
+            padding: 10px;
         }
         .screenshots img {
             width: 512px;
             height: 256px;
             border: 2px solid #ffcc00;
             border-radius: 10px;
+            flex-shrink: 0;
         }
         ul {
             list-style-type: none; /* Remove bullet points */
