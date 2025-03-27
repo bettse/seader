@@ -12,6 +12,10 @@
 
 #include <Payload.h>
 
+#define ExternalApplicationA 0x44
+#define NFCInterface         0x14
+#define SAMInterface         0x0a
+
 NfcCommand seader_worker_card_detect(
     Seader* seader,
     uint8_t sak,
