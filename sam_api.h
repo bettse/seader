@@ -11,6 +11,7 @@
 #include "protocol/rfal_picopass.h"
 
 #include <Payload.h>
+#include <SIO.h>
 
 #define ExternalApplicationA 0x44
 #define NFCInterface         0x14
