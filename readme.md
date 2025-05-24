@@ -7,21 +7,6 @@ A [Flipper Zero](https://flipperzero.one/) application (aka "fap") to interface 
 
 File issues in [GitHub](https://github.com/bettse/seader/issues).
 
-
-## Formats
-
-Seader can save from the Source(top) formats to the Destination(left) formats.
-
-| | Seos | Desfire Ev2 | Desfire Ev1 | MFC SE | MFC (legacy) | iClass SE | iClass SR | iClass (legacy) |
-| ----------- | ---- | ----------- | ----------- | ------ | ------------ | --------- | --------- | --------------- |
-| Seader (no SIO) | x | x | x | x | x | x | x | x |
-| LFRFID | x | x | x | x | x | x | x | x |
-| iClass (legacy) | X | x | x | X | X | x | x | X |
-| MFC (legacy) | X | x | x | X | X | x | x | X |
-| Seader (with SIO) | | x | x | | | x | x | |
-| iClass SR (emulation only) | | x | x | | | x | x | |
-
-
 ## Hardware
 
 ### Option 1: NARD flipper add-on
