@@ -1,7 +1,7 @@
 # Seader
 
-
-A [Flipper Zero](https://flipperzero.one/) application (aka "fap") to interface with a SAM from the Flipper Zero over UART.  Latest release on the [App Catalog](https://lab.flipper.net/apps/seader).
+A [Flipper Zero](https://flipperzero.one/) application (aka "fap") 
+that read credential from HID: iClass, iClass SE, Desfire EV1/EV2, and Seos using a HID SAM and UART adapter.  Latest release on the [App Catalog](https://lab.flipper.net/apps/seader).
 
 ## Bugs
 
@@ -46,7 +46,7 @@ Optionally 3d print a [case designed by sean](https://www.printables.com/model/5
 
 ### To Build App
 
- * Install [UFBT](https://github.com/flipperdevices/flipperzero-ufbt)
+ * Install [ufbt](https://github.com/flipperdevices/flipperzero-ufbt)
  * `ufbt` to build
  * `ufbt launch` to launch
 
@@ -68,5 +68,4 @@ Optionally 3d print a [case designed by sean](https://www.printables.com/model/5
 - `arm-none-eabi-nm ~/.ufbt/build/seader.fap -CS --size-sort`
 - `arm-none-eabi-readelf ~/.ufbt/build/seader.fap -t`
 - `ufbt cli` -> `free_blocks`
-
 
