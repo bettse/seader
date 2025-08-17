@@ -3,7 +3,7 @@
 #include <toolbox/version.h>
 #include <bit_lib/bit_lib.h>
 
-//#define ASN1_DEBUG                      true
+// #define ASN1_DEBUG true
 
 #define TAG "SAMAPI"
 
@@ -12,6 +12,8 @@
 #define SEADER_SERIAL_FILE_NAME         "sam_serial"
 
 const uint8_t picopass_iclass_key[] = {0xaf, 0xa7, 0x85, 0xa7, 0xda, 0xb3, 0x33, 0x78};
+const uint8_t seader_oid[] =
+    {0x2B, 0x06, 0x01, 0x04, 0x01, 0x81, 0xE4, 0x38, 0x01, 0x01, 0x02, 0x04};
 
 #ifdef ASN1_DEBUG
 char asn1_log[SEADER_UART_RX_BUF_SIZE] = {0};
@@ -322,6 +324,42 @@ void seader_send_request_pacs(Seader* seader) {
     ASN_STRUCT_FREE(asn_DEF_RequestPacs, requestPacs);
 }
 
+void seader_send_request_pacs2(Seader* seader) {
+    RequestPacs_t* requestPacs = 0;
+    requestPacs = calloc(1, sizeof *requestPacs);
+    assert(requestPacs);
+
+    OCTET_STRING_t oid = {
+        .buf = (uint8_t*)seader_oid,
+        .size = sizeof(seader_oid),
+    };
+
+    requestPacs->contentElementTag = ContentElementTag_implicitFormatPhysicalAccessBits;
+    requestPacs->oid = &oid;
+
+    SamCommand_t* samCommand = 0;
+    samCommand = calloc(1, sizeof *samCommand);
+    assert(samCommand);
+
+    samCommand->present = SamCommand_PR_requestPacs2;
+    seader->samCommand = samCommand->present;
+
+    samCommand->choice.requestPacs2 = *requestPacs;
+
+    Payload_t* payload = 0;
+    payload = calloc(1, sizeof *payload);
+    assert(payload);
+
+    payload->present = Payload_PR_samCommand;
+    payload->choice.samCommand = *samCommand;
+
+    seader_send_payload(seader, payload, ExternalApplicationA, SAMInterface, ExternalApplicationA);
+
+    ASN_STRUCT_FREE(asn_DEF_Payload, payload);
+    ASN_STRUCT_FREE(asn_DEF_SamCommand, samCommand);
+    ASN_STRUCT_FREE(asn_DEF_RequestPacs, requestPacs);
+}
+
 void seader_worker_send_serial_number(Seader* seader) {
     SamCommand_t* samCommand = 0;
     samCommand = calloc(1, sizeof *samCommand);
@@ -464,6 +502,8 @@ bool seader_unpack_pacs(Seader* seader, uint8_t* buf, size_t size) {
             view_dispatcher_send_custom_event(
                 seader->view_dispatcher, SeaderCustomEventWorkerExit);
         }
+    } else {
+        FURI_LOG_W(TAG, "Failed to decode PAC %d consumed, size %d", rval.consumed, size);
     }
 
     ASN_STRUCT_FREE(asn_DEF_PAC, pac);
@@ -593,6 +633,34 @@ bool seader_parse_serial_number(Seader* seader, uint8_t* buf, size_t size) {
     return seader_sam_save_serial(seader, buf, size);
 }
 
+bool seader_parse_sam_response2(Seader* seader, SamResponse2_t* samResponse) {
+    uint8_t buffer[10];
+    switch(samResponse->present) {
+    case SamResponse2_PR_pacs:
+        FURI_LOG_I(TAG, "samResponse2 SamResponse2_PR_pacs");
+        Pacs2_t pacs2 = samResponse->choice.pacs;
+        OCTET_STRING_t* pacs = pacs2.bits;
+
+        buffer[0] = 0x03;
+        buffer[1] = pacs->size & 0xFF;
+        memcpy(buffer + 2, pacs->buf, pacs->size);
+        seader_unpack_pacs(seader, buffer, pacs->size + 2);
+
+        view_dispatcher_send_custom_event(seader->view_dispatcher, SeaderCustomEventPollerSuccess);
+        seader->samCommand = SamCommand_PR_NOTHING;
+        break;
+    case SamResponse2_PR_NOTHING:
+        FURI_LOG_I(TAG, "samResponse2 SamResponse2_PR_NOTHING");
+        break;
+    default:
+        FURI_LOG_I(TAG, "Unknown samResponse2 %d", samResponse->present);
+        view_dispatcher_send_custom_event(seader->view_dispatcher, SeaderCustomEventWorkerExit);
+        break;
+    }
+
+    return false;
+}
+
 bool seader_parse_sam_response(Seader* seader, SamResponse_t* samResponse) {
     SeaderWorker* seader_worker = seader->worker;
 
@@ -615,12 +683,19 @@ bool seader_parse_sam_response(Seader* seader, SamResponse_t* samResponse) {
         break;
     case SamCommand_PR_cardDetected:
         FURI_LOG_I(TAG, "samResponse SamCommand_PR_cardDetected");
-        seader_send_request_pacs(seader);
+        if(seader->is_debug_enabled) {
+            seader_send_request_pacs2(seader);
+        } else {
+            seader_send_request_pacs(seader);
+        }
         break;
     case SamCommand_PR_NOTHING:
         FURI_LOG_I(TAG, "samResponse SamCommand_PR_NOTHING");
         seader_log_hex_data(TAG, "Unknown samResponse", samResponse->buf, samResponse->size);
         view_dispatcher_send_custom_event(seader->view_dispatcher, SeaderCustomEventWorkerExit);
+        break;
+    case SamCommand_PR_requestPacs2:
+        FURI_LOG_E(TAG, "samResponse SamCommand_PR_requestPacs2");
         break;
     }
 
@@ -631,6 +706,9 @@ bool seader_parse_response(Seader* seader, Response_t* response) {
     switch(response->present) {
     case Response_PR_samResponse:
         seader_parse_sam_response(seader, &response->choice.samResponse);
+        break;
+    case Response_PR_samResponse2:
+        seader_parse_sam_response2(seader, &response->choice.samResponse2);
         break;
     default:
         FURI_LOG_D(TAG, "non-sam response");
