@@ -17,6 +17,11 @@
 #define SEADER_POLLER_MAX_FWT         (200000U)
 #define SEADER_POLLER_MAX_BUFFER_SIZE (255U)
 
+// ATS bit definitions
+#define ISO14443_4A_ATS_T0_TA1 (1U << 4)
+#define ISO14443_4A_ATS_T0_TB1 (1U << 5)
+#define ISO14443_4A_ATS_T0_TC1 (1U << 6)
+
 struct SeaderWorker {
     FuriThread* thread;
     Storage* storage;

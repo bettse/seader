@@ -284,23 +284,46 @@ NfcCommand seader_worker_poller_callback_iso14443_4a(NfcGenericEvent event, void
             const Iso14443_4aData* iso14443_4a_data =
                 nfc_device_get_data(seader->nfc_device, NfcProtocolIso14443_4a);
             const Iso14443_3aData* iso14443_3a_data = iso14443_4a_get_base_data(iso14443_4a_data);
-            uint32_t ats_len = 0;
-            uint8_t* ats = NULL;
+
+            uint32_t t1_tk_size = 0;
             if(iso14443_4a_data->ats_data.t1_tk != NULL) {
-                // for some reason Seos cards fail to read the ATS
-                SimpleArray* ats_array = iso14443_4a_data->ats_data.t1_tk;
-                ats_len = simple_array_get_count(ats_array);
-                if(ats_len > 0xFF) {
-                    ats_len = 0;
-                }
-                if(ats_len > 0) {
-                    ats = simple_array_get_data(ats_array);
+                t1_tk_size = simple_array_get_count(iso14443_4a_data->ats_data.t1_tk);
+                if(t1_tk_size > 0xFF) {
+                    t1_tk_size = 0;
                 }
             }
+
+            uint8_t ats_len = 0;
+            uint8_t* ats = malloc(4 + t1_tk_size);
+            furi_assert(ats);
+
+            if(iso14443_4a_data->ats_data.tl > 1) {
+                ats[ats_len++] = iso14443_4a_data->ats_data.t0;
+                if(iso14443_4a_data->ats_data.t0 & ISO14443_4A_ATS_T0_TA1) {
+                    ats[ats_len++] = iso14443_4a_data->ats_data.ta_1;
+                }
+                if(iso14443_4a_data->ats_data.t0 & ISO14443_4A_ATS_T0_TB1) {
+                    ats[ats_len++] = iso14443_4a_data->ats_data.tb_1;
+                }
+                if(iso14443_4a_data->ats_data.t0 & ISO14443_4A_ATS_T0_TC1) {
+                    ats[ats_len++] = iso14443_4a_data->ats_data.tc_1;
+                }
+
+                if(t1_tk_size != 0) {
+                    memcpy(
+                        ats + ats_len,
+                        simple_array_cget_data(iso14443_4a_data->ats_data.t1_tk),
+                        t1_tk_size);
+                    ats_len += t1_tk_size;
+                }
+            }
+
             uint8_t sak = iso14443_3a_get_sak(iso14443_3a_data);
 
             seader_worker_card_detect(
                 seader, sak, (uint8_t*)iso14443_3a_data->atqa, uid, uid_len, ats, ats_len);
+
+            free(ats);
 
             // nfc_set_fdt_poll_fc(event.instance, SEADER_POLLER_MAX_FWT);
             furi_thread_set_current_priority(FuriThreadPriorityLowest);

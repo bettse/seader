@@ -1101,6 +1101,7 @@ NfcCommand seader_worker_card_detect(
     uint8_t uid_len,
     uint8_t* ats,
     uint8_t ats_len) {
+    UNUSED(atqa);
     SeaderCredential* credential = seader->credential;
 
     CardDetails_t* cardDetails = 0;
@@ -1109,37 +1110,21 @@ NfcCommand seader_worker_card_detect(
 
     OCTET_STRING_fromBuf(&cardDetails->csn, (const char*)uid, uid_len);
     OCTET_STRING_t sak_string = {.buf = &sak, .size = 1};
-    OCTET_STRING_t ats_string = {0};
-    if(ats != NULL) {
-        ats_string.buf = ats;
-        ats_string.size = ats_len;
-    } else {
-        // technically I think this field is only ever meant to be ATS not ATQA
-        // for 14443a-4 cards but in practice, Seos cards seem to fail to read the
-        // ATS but the ATS doesn't matter for Seos as long as it's there otherwise
-        // the SAM thinks it's a part3 card, and filling it with the ATQA is what
-        // we did previously and seemed to work so eh
-        ats_string.buf = atqa;
-        ats_string.size = 2;
-    }
+    OCTET_STRING_t ats_string = {.buf = ats, .size = ats_len};
     uint8_t protocol_bytes[] = {0x00, 0x00};
 
-    if(sak != 0 && atqa != NULL) { // type 4
+    if(ats != NULL) { // type 4
         protocol_bytes[1] = FrameProtocol_nfc;
         OCTET_STRING_fromBuf(
             &cardDetails->protocol, (const char*)protocol_bytes, sizeof(protocol_bytes));
         cardDetails->sak = &sak_string;
+        // TODO: Update asn1 to change atqa to ats
         cardDetails->atqa = &ats_string;
         credential->isDesfire = seader_mf_df_check_card_type(atqa[0], atqa[1], sak);
         if(credential->isDesfire) {
             memcpy(credential->diversifier, uid, uid_len);
             credential->diversifier_len = uid_len;
         }
-    } else if(sak != 0 && atqa == NULL) { // MFC
-        protocol_bytes[1] = FrameProtocol_nfc;
-        OCTET_STRING_fromBuf(
-            &cardDetails->protocol, (const char*)protocol_bytes, sizeof(protocol_bytes));
-        cardDetails->sak = &sak_string;
     } else if(uid_len == 8) { // picopass
         protocol_bytes[1] = FrameProtocol_iclass;
         OCTET_STRING_fromBuf(
@@ -1147,8 +1132,11 @@ NfcCommand seader_worker_card_detect(
         memcpy(credential->diversifier, uid, uid_len);
         credential->diversifier_len = uid_len;
         credential->isDesfire = false;
-    } else {
-        FURI_LOG_D(TAG, "Unknown card type");
+    } else { // MFC
+        protocol_bytes[1] = FrameProtocol_nfc;
+        OCTET_STRING_fromBuf(
+            &cardDetails->protocol, (const char*)protocol_bytes, sizeof(protocol_bytes));
+        cardDetails->sak = &sak_string;
     }
 
     seader_send_card_detected(seader, cardDetails);
