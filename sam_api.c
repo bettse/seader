@@ -23,6 +23,8 @@ uint8_t updateBlock2[] = {RFAL_PICOPASS_CMD_UPDATE, 0x02};
 
 uint8_t select_seos_app[] =
     {0x00, 0xa4, 0x04, 0x00, 0x0a, 0xa0, 0x00, 0x00, 0x04, 0x40, 0x00, 0x01, 0x01, 0x00, 0x01, 0x00};
+uint8_t select_desfire_app_no_le[] =
+    {0x00, 0xA4, 0x04, 0x00, 0x07, 0xD2, 0x76, 0x00, 0x00, 0x85, 0x01, 0x00};
 uint8_t FILE_NOT_FOUND[] = {0x6a, 0x82};
 
 void* calloc(size_t count, size_t size) {
@@ -677,7 +679,8 @@ void seader_capture_sio(BitBuffer* tx_buffer, BitBuffer* rx_buffer, SeaderCreden
         // Desfire EV1 passes SIO in the clear
         uint8_t desfire_read[] = {
             0x90, 0xbd, 0x00, 0x00, 0x07, 0x0f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-        if(memcmp(buffer, desfire_read, len) == 0 && rxBuffer[0] == 0x30) {
+        if(sizeof(desfire_read) == len && memcmp(buffer, desfire_read, len) == 0 &&
+           rxBuffer[0] == 0x30) {
             credential->sio_len =
                 bit_buffer_get_size_bytes(rx_buffer) - 2; // -2 for the APDU response bytes
             memcpy(credential->sio, rxBuffer, credential->sio_len);
@@ -744,23 +747,47 @@ void seader_iso14443a_transmit(
     SeaderWorker* seader_worker = seader->worker;
     SeaderCredential* credential = seader->credential;
 
-    BitBuffer* tx_buffer = bit_buffer_alloc(len);
+    BitBuffer* tx_buffer =
+        bit_buffer_alloc(len + 1); // extra byte to allow for appending a Le byte sometimes
     BitBuffer* rx_buffer = bit_buffer_alloc(SEADER_POLLER_MAX_BUFFER_SIZE);
 
     do {
-        if(credential->isDesfire && sizeof(select_seos_app) == len &&
-           memcmp(buffer, select_seos_app, len) == 0) {
-            FURI_LOG_I(TAG, "Intercept SELECT SeosApp to DESFire card and return File Not Found");
-            bit_buffer_append_bytes(rx_buffer, FILE_NOT_FOUND, sizeof(FILE_NOT_FOUND));
-        } else {
-            bit_buffer_append_bytes(tx_buffer, buffer, len);
+        bit_buffer_append_bytes(tx_buffer, buffer, len);
 
-            Iso14443_4aError error =
-                iso14443_4a_poller_send_block(iso14443_4a_poller, tx_buffer, rx_buffer);
-            if(error != Iso14443_4aErrorNone) {
-                FURI_LOG_W(TAG, "iso14443_4a_poller_send_block error %d", error);
-                seader_worker->stage = SeaderPollerEventTypeFail;
-                break;
+        if(seader->credential->isDesfireEV2 && sizeof(select_desfire_app_no_le) == len &&
+           memcmp(buffer, select_desfire_app_no_le, len) == 0) {
+            // If a DESFire EV2 card has previously sent a dodgy reply to a SELECT SeosApp
+            // future SELECT DESFire commands with no Le byte (Ne == 0) fail with SW 6C00 (Wrong length Le)
+            // If it has responded with a file not found (ie non-EV2 cards) to the SELECT SeosApp
+            // then the SELECT DESFire without the Le byte is accepted fine.
+            // No clue why this happens, but we have to deal with it annoyingly
+            // We can't just always add the Le byte as this breaks OG D40 cards, so only do it when needed
+            bit_buffer_append_byte(tx_buffer, 0x00); // Le byte of 0x00 is Ne 256
+        }
+
+        Iso14443_4aError error =
+            iso14443_4a_poller_send_block(iso14443_4a_poller, tx_buffer, rx_buffer);
+        if(error != Iso14443_4aErrorNone) {
+            FURI_LOG_W(TAG, "iso14443_4a_poller_send_block error %d", error);
+            seader_worker->stage = SeaderPollerEventTypeFail;
+            break;
+        }
+
+        // if the cAPDU was select seos app and the response starts with 6F228520
+        // then this is almost certainly a dodgy response from a DESFire EV2 card
+        // not a Seos card which old SAM firmware don't handle very well, so fake
+        // a FILD_NOT_FOUND response instead of the real response
+        if(sizeof(select_seos_app) == len && memcmp(buffer, select_seos_app, len) == 0 &&
+           bit_buffer_get_size_bytes(rx_buffer) == 38) {
+            const uint8_t ev2_select_reply_prefix[] = {0x6F, 0x22, 0x85, 0x20};
+            const uint8_t* rapdu = bit_buffer_get_data(rx_buffer);
+            if(memcmp(ev2_select_reply_prefix, rapdu, sizeof(ev2_select_reply_prefix)) == 0) {
+                FURI_LOG_I(
+                    TAG,
+                    "Intercept DESFire EV2 reply to SELECT SeosApp and return File Not Found");
+                seader->credential->isDesfireEV2 = true;
+                bit_buffer_reset(rx_buffer);
+                bit_buffer_append_bytes(rx_buffer, FILE_NOT_FOUND, sizeof(FILE_NOT_FOUND));
             }
         }
 
@@ -1099,10 +1126,6 @@ bool seader_process_success_response_i(
     return processed;
 }
 
-bool seader_mf_df_check_card_type(uint8_t ATQA0, uint8_t ATQA1, uint8_t SAK) {
-    return ATQA0 == 0x44 && ATQA1 == 0x03 && SAK == 0x20;
-}
-
 NfcCommand seader_worker_card_detect(
     Seader* seader,
     uint8_t sak,
@@ -1123,6 +1146,11 @@ NfcCommand seader_worker_card_detect(
     OCTET_STRING_t ats_string = {.buf = ats, .size = ats_len};
     uint8_t protocol_bytes[] = {0x00, 0x00};
 
+    // this won't hold true for Seos cards, but then we won't see the SIO from Seos cards anyway
+    // so it doesn't really matter
+    memcpy(credential->diversifier, uid, uid_len);
+    credential->diversifier_len = uid_len;
+
     if(ats != NULL) { // type 4
         protocol_bytes[1] = FrameProtocol_nfc;
         OCTET_STRING_fromBuf(
@@ -1130,18 +1158,10 @@ NfcCommand seader_worker_card_detect(
         cardDetails->sak = &sak_string;
         // TODO: Update asn1 to change atqa to ats
         cardDetails->atqa = &ats_string;
-        credential->isDesfire = seader_mf_df_check_card_type(atqa[0], atqa[1], sak);
-        if(credential->isDesfire) {
-            memcpy(credential->diversifier, uid, uid_len);
-            credential->diversifier_len = uid_len;
-        }
     } else if(uid_len == 8) { // picopass
         protocol_bytes[1] = FrameProtocol_iclass;
         OCTET_STRING_fromBuf(
             &cardDetails->protocol, (const char*)protocol_bytes, sizeof(protocol_bytes));
-        memcpy(credential->diversifier, uid, uid_len);
-        credential->diversifier_len = uid_len;
-        credential->isDesfire = false;
     } else { // MFC
         protocol_bytes[1] = FrameProtocol_nfc;
         OCTET_STRING_fromBuf(
