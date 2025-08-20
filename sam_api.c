@@ -677,12 +677,18 @@ void seader_capture_sio(BitBuffer* tx_buffer, BitBuffer* rx_buffer, SeaderCreden
         }
     } else if(credential->type == SeaderCredentialType14A) {
         // Desfire EV1 passes SIO in the clear
-        uint8_t desfire_read[] = {
-            0x90, 0xbd, 0x00, 0x00, 0x07, 0x0f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-        if(sizeof(desfire_read) == len && memcmp(buffer, desfire_read, len) == 0 &&
+        // The desfire_read command is 13 bytes in total, but we deliberately don't check the read length as newer SAM
+        // firmware versions read 5 bytes first to determine the length of the SIO from the ASN.1 tag length then do a
+        // second read with just the required length to skip reading any additional bytes at the end of the file
+        uint8_t desfire_read[] = {0x90, 0xbd, 0x00, 0x00, 0x07, 0x0f, 0x00, 0x00, 0x00};
+        if(len == 13 && memcmp(buffer, desfire_read, sizeof(desfire_read)) == 0 &&
            rxBuffer[0] == 0x30) {
-            credential->sio_len =
+            size_t sio_len =
                 bit_buffer_get_size_bytes(rx_buffer) - 2; // -2 for the APDU response bytes
+            if(sio_len > sizeof(credential->sio)) {
+                return;
+            }
+            credential->sio_len = sio_len;
             memcpy(credential->sio, rxBuffer, credential->sio_len);
         }
     }
