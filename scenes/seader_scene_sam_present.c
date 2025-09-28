@@ -55,6 +55,7 @@ void seader_scene_sam_present_on_update(void* context) {
     if(seader_worker->sam_version[0] != 0 && seader_worker->sam_version[1] != 0) {
         // Use reusable string instead of allocating new one
         FuriString* fw_str = seader->temp_string1;
+        furi_string_reset(fw_str);
         furi_string_cat_printf(
             fw_str, "FW %d.%d", seader_worker->sam_version[0], seader_worker->sam_version[1]);
         submenu_add_item(
