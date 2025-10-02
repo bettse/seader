@@ -47,6 +47,7 @@ Optionally 3d print a [case designed by sean](https://www.printables.com/model/5
 ### To Build App
 
  * Install [ufbt](https://github.com/flipperdevices/flipperzero-ufbt)
+ * `git submodule update --init --recursive` to get dependencies
  * `ufbt` to build
  * `ufbt launch` to launch
 
