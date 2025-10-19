@@ -3,7 +3,7 @@
 #include <toolbox/version.h>
 #include <bit_lib/bit_lib.h>
 
-// #define ASN1_DEBUG true
+#define ASN1_DEBUG true
 
 #define TAG "SAMAPI"
 

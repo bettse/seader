@@ -210,8 +210,9 @@ int32_t seader_worker_task(void* context) {
     SeaderUartBridge* seader_uart = seader_worker->uart;
 
     if(seader_worker->state == SeaderWorkerStateCheckSam) {
-        FURI_LOG_D(TAG, "Check for SAM");
-        seader_ccid_check_for_sam(seader_uart);
+        //FURI_LOG_D(TAG, "Check for SAM");
+        //seader_ccid_check_for_sam(seader_uart);
+      UNUSED(seader_uart);
     } else if(seader_worker->state == SeaderWorkerStateVirtualCredential) {
         FURI_LOG_D(TAG, "Virtual Credential");
         seader_worker_virtual_credential(seader);
