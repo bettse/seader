@@ -1,7 +1,12 @@
 #include "seader_i.h"
+#include <furi_hal_gpio.h>
 
 #define TAG              "SeaderUART"
-#define BAUDRATE_DEFAULT 115200
+#define CLOCK_PIN        &gpio_ext_pa7
+#define RESET_PIN        &gpio_ext_pa6
+#define PWM_FREQ        3000000
+//#define BAUDRATE_DEFAULT 9600
+#define BAUDRATE_DEFAULT (PWM_FREQ / 372)
 
 static void seader_uart_on_irq_rx_dma_cb(
     FuriHalSerialHandle* handle,
@@ -40,6 +45,17 @@ void seader_uart_serial_init(SeaderUartBridge* seader_uart, uint8_t uart_ch) {
     furi_hal_serial_init(seader_uart->serial_handle, BAUDRATE_DEFAULT);
     furi_hal_serial_dma_rx_start(
         seader_uart->serial_handle, seader_uart_on_irq_rx_dma_cb, seader_uart, false);
+
+    //furi_hal_pwm_start(FuriHalPwmOutputIdTim1PA7, (BAUDRATE_DEFAULT * 372) / 2, 50);
+    furi_hal_pwm_start(FuriHalPwmOutputIdTim1PA7, PWM_FREQ, 50);
+
+    furi_hal_gpio_init(RESET_PIN, GpioModeOutputPushPull, GpioPullNo, GpioSpeedLow);
+    furi_hal_gpio_write(RESET_PIN, true); // Active low, so set high
+
+    // reset SAM
+    furi_hal_gpio_write(RESET_PIN, false);
+    furi_delay_ms(1);
+    furi_hal_gpio_write(RESET_PIN, true);
 }
 
 void seader_uart_serial_deinit(SeaderUartBridge* seader_uart) {
@@ -47,6 +63,11 @@ void seader_uart_serial_deinit(SeaderUartBridge* seader_uart) {
     furi_hal_serial_deinit(seader_uart->serial_handle);
     furi_hal_serial_control_release(seader_uart->serial_handle);
     seader_uart->serial_handle = NULL;
+
+    furi_hal_pwm_stop(FuriHalPwmOutputIdTim1PA7);
+
+    furi_hal_gpio_init_simple(RESET_PIN, GpioModeAnalog);
+    furi_hal_gpio_write(RESET_PIN, false);
 }
 
 void seader_uart_set_baudrate(SeaderUartBridge* seader_uart, uint32_t baudrate) {
@@ -75,13 +96,12 @@ size_t seader_uart_process_buffer(Seader* seader, uint8_t* cmd, size_t cmd_len) 
             }
             seader_uart->st.rx_cnt += consumed;
 
-            /*
+            char display[SEADER_UART_RX_BUF_SIZE * 2 + 1] = {0};
             memset(display, 0, SEADER_UART_RX_BUF_SIZE);
-            for (uint8_t i = 0; i < cmd_len; i++) {
-                snprintf(display+(i*2), sizeof(display), "%02x", cmd[i]);
+            for(uint8_t i = 0; i < cmd_len; i++) {
+                snprintf(display + (i * 2), sizeof(display), "%02x", cmd[i]);
             }
             FURI_LOG_I(TAG, "cmd is now %d bytes: %s", cmd_len, display);
-            */
         }
     } while(consumed > 0 && cmd_len > 0);
     return cmd_len;
@@ -126,13 +146,11 @@ int32_t seader_uart_worker(void* context) {
             if(len > 0) {
                 furi_delay_ms(5); //WTF
 
-                /*
                 char display[SEADER_UART_RX_BUF_SIZE * 2 + 1] = {0};
-                for (uint8_t i = 0; i < len; i++) {
-                    snprintf(display+(i*2), sizeof(display), "%02x", seader_uart->rx_buf[i]);
+                for(uint8_t i = 0; i < len; i++) {
+                    snprintf(display + (i * 2), sizeof(display), "%02x", seader_uart->rx_buf[i]);
                 }
                 FURI_LOG_I(TAG, "RECV %d bytes: %s", len, display);
-                */
 
                 if(cmd_len + len > SEADER_UART_RX_BUF_SIZE) {
                     FURI_LOG_I(TAG, "OVERFLOW: %d + %d", cmd_len, len);
@@ -187,7 +205,7 @@ int32_t seader_uart_tx_thread(void* context) {
                 for(uint8_t i = 0; i < seader_uart->tx_len; i++) {
                     snprintf(display + (i * 2), sizeof(display), "%02x", seader_uart->tx_buf[i]);
                 }
-                // FURI_LOG_I(TAG, "SEND %d bytes: %s", seader_uart->tx_len, display);
+                FURI_LOG_I(TAG, "SEND %d bytes: %s", seader_uart->tx_len, display);
                 seader_uart->st.tx_cnt += seader_uart->tx_len;
                 furi_hal_serial_tx(
                     seader_uart->serial_handle, seader_uart->tx_buf, seader_uart->tx_len);
