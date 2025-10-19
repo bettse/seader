@@ -51,6 +51,11 @@ typedef enum {
     SeaderPollerEventTypeFail,
 } SeaderPollerEventType;
 
+typedef enum {
+    SeaderSamCommunicationTypeSec1210,
+    SeaderSamCommunicationTypeRaw,
+} SeaderSamCommunicationType;
+
 typedef void (*SeaderWorkerCallback)(SeaderWorkerEvent event, void* context);
 
 SeaderWorker* seader_worker_alloc();
