@@ -4,8 +4,7 @@
 #define TAG              "SeaderUART"
 #define CLOCK_PIN        &gpio_ext_pa7
 #define RESET_PIN        &gpio_ext_pa6
-#define PWM_FREQ        3000000
-//#define BAUDRATE_DEFAULT 9600
+#define PWM_FREQ         3571200
 #define BAUDRATE_DEFAULT (PWM_FREQ / 372)
 
 static void seader_uart_on_irq_rx_dma_cb(
@@ -232,7 +231,7 @@ SeaderUartBridge* seader_uart_alloc(Seader* seader) {
     SeaderUartState uart_state;
     SeaderUartBridge* seader_uart;
 
-    FURI_LOG_I(TAG, "Enable UART");
+    FURI_LOG_I(TAG, "Enable UART %d baud", BAUDRATE_DEFAULT);
     seader_uart = seader_uart_enable(&cfg, seader);
 
     seader_uart_get_config(seader_uart, &cfg);
