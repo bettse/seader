@@ -34,6 +34,10 @@ SeaderWorker* seader_worker_alloc() {
 
     seader_worker_change_state(seader_worker, SeaderWorkerStateReady);
 
+    // Default assume SEC1210
+    seader_worker->sam_comm_type = SeaderSamCommunicationTypeSec1210;
+    //TODO: Detect SAM type
+
     return seader_worker;
 }
 
@@ -210,9 +214,12 @@ int32_t seader_worker_task(void* context) {
     SeaderUartBridge* seader_uart = seader_worker->uart;
 
     if(seader_worker->state == SeaderWorkerStateCheckSam) {
-        //FURI_LOG_D(TAG, "Check for SAM");
-        //seader_ccid_check_for_sam(seader_uart);
-        UNUSED(seader_uart);
+        FURI_LOG_D(TAG, "Check for SAM");
+        if (seader_worker->sam_comm_type == SeaderSamCommunicationTypeSec1210) {
+            seader_ccid_check_for_sam(seader_uart);
+        } else {
+            seader_uart_sam_reset(seader_uart);
+        }
     } else if(seader_worker->state == SeaderWorkerStateVirtualCredential) {
         FURI_LOG_D(TAG, "Virtual Credential");
         seader_worker_virtual_credential(seader);

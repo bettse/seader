@@ -36,6 +36,7 @@ struct SeaderWorker {
 
     SeaderPollerEventType stage;
     SeaderWorkerState state;
+    SeaderSamCommunicationType sam_comm_type;
 };
 
 struct SeaderAPDU {
