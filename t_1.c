@@ -38,6 +38,7 @@ void seader_t_1_reset() {
 }
 
 void seader_t_1_set_IFSD(Seader* seader) {
+    FURI_LOG_D(TAG, "Setting IFSD to %02X", IFSD_VALUE);
     SeaderWorker* seader_worker = seader->worker;
     SeaderUartBridge* seader_uart = seader_worker->uart;
     uint8_t frame[5];
@@ -68,7 +69,11 @@ void seader_t_1_IFSD_response(Seader* seader) {
 
     frame_len = seader_add_lrc(frame, frame_len);
 
-    seader_ccid_XfrBlock(seader_uart, frame, frame_len);
+    if(seader_worker->sam_comm_type == SeaderSamCommunicationTypeSec1210) {
+        seader_ccid_XfrBlock(seader_uart, frame, frame_len);
+    } else {
+        seader_uart_send(seader_uart, frame, frame_len);
+    }
 }
 
 void seader_t_1_send_ack(Seader* seader) {
@@ -86,7 +91,11 @@ void seader_t_1_send_ack(Seader* seader) {
 
     //FURI_LOG_D(TAG, "Sending R-Block ACK: PCB: %02x", frame[1]);
 
-    seader_ccid_XfrBlock(seader_uart, frame, frame_len);
+    if(seader_worker->sam_comm_type == SeaderSamCommunicationTypeSec1210) {
+        seader_ccid_XfrBlock(seader_uart, frame, frame_len);
+    } else {
+        seader_uart_send(seader_uart, frame, frame_len);
+    }
 }
 
 BitBuffer* seader_t_1_tx_buffer;
@@ -112,7 +121,11 @@ void seader_send_t1_chunk(Seader* seader, uint8_t PCB, uint8_t* chunk, size_t le
     frame_len = seader_add_lrc(frame, frame_len);
 
     FURI_LOG_D(TAG, "seader_send_t1_chunk T=1 frame: PCB: %02x, LEN: %02x", PCB, len);
-    seader_ccid_XfrBlock(seader_uart, frame, frame_len);
+    if(seader_worker->sam_comm_type == SeaderSamCommunicationTypeSec1210) {
+        seader_ccid_XfrBlock(seader_uart, frame, frame_len);
+    } else {
+        seader_uart_send(seader_uart, frame, frame_len);
+    }
     free(frame);
 }
 
