@@ -18,3 +18,4 @@ void seader_uart_sam_reset(SeaderUartBridge* seader_uart);
 
 SeaderUartBridge* seader_uart_alloc(Seader* seader);
 void seader_uart_free(SeaderUartBridge* seader_uart);
+void seader_uart_send(SeaderUartBridge* seader_uart, uint8_t* data, size_t len);
