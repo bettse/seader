@@ -139,11 +139,7 @@ size_t seader_uart_process_buffer_raw(Seader* seader, uint8_t* cmd, size_t cmd_l
             if(seader_worker->callback) {
                 seader_worker->callback(SeaderWorkerEventSamPresent, seader_worker->context);
             }
-            memset(cmd, 0, sizeof(SAM_ATR));
-            cmd_len -= sizeof(SAM_ATR);
-            if(cmd_len > 0) {
-                memmove(cmd, cmd + sizeof(SAM_ATR), cmd_len);
-            }
+            return 0;
         }
 
         cmd++;
@@ -241,6 +237,12 @@ SeaderUartBridge* seader_uart_enable(SeaderUartConfig* cfg, Seader* seader) {
 
     furi_thread_start(seader_uart->thread);
     return seader_uart;
+}
+
+void seader_uart_send(SeaderUartBridge* seader_uart, uint8_t* data, size_t len) {
+    memcpy(seader_uart->tx_buf, data, len);
+    seader_uart->tx_len = len;
+    furi_thread_flags_set(furi_thread_get_id(seader_uart->tx_thread), WorkerEvtSamRx);
 }
 
 int32_t seader_uart_tx_thread(void* context) {
