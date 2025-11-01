@@ -66,6 +66,9 @@
 #define SEADER_MAX_ATR_SIZE    33
 #define MAX_FRAME_HEADERS      32
 
+extern const uint8_t SAM_ATR[15];
+extern const uint8_t SAM_ATR2[11];
+
 enum SeaderCustomEvent {
     // Reserve first 100 events for button types and indexes, starting from 0
     SeaderCustomEventReserved = 100,
