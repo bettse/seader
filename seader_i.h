@@ -64,6 +64,9 @@
 
 #define SEADER_TEXT_STORE_SIZE 128
 
+extern const uint8_t SAM_ATR[15];
+extern const uint8_t SAM_ATR2[11];
+
 enum SeaderCustomEvent {
     // Reserve first 100 events for button types and indexes, starting from 0
     SeaderCustomEventReserved = 100,
