@@ -53,7 +53,7 @@ void seader_uart_serial_init(SeaderUartBridge* seader_uart, uint8_t uart_ch) {
 }
 
 void seader_uart_sam_reset(SeaderUartBridge* seader_uart) {
-  UNUSED(seader_uart);
+    UNUSED(seader_uart);
     furi_hal_gpio_write(RESET_PIN, false);
     furi_delay_ms(1);
     furi_hal_gpio_write(RESET_PIN, true);
