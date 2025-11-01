@@ -92,7 +92,10 @@ void seader_t_1_send_ack(Seader* seader) {
 BitBuffer* seader_t_1_tx_buffer;
 size_t seader_t_1_tx_buffer_offset = 0;
 
-void seader_send_t1_chunk(SeaderUartBridge* seader_uart, uint8_t PCB, uint8_t* chunk, size_t len) {
+void seader_send_t1_chunk(Seader* seader, uint8_t PCB, uint8_t* chunk, size_t len) {
+    SeaderWorker* seader_worker = seader->worker;
+    SeaderUartBridge* seader_uart = seader_worker->uart;
+
     uint8_t* frame = malloc(3 + len + 1);
     uint8_t frame_len = 0;
 
@@ -112,7 +115,7 @@ void seader_send_t1_chunk(SeaderUartBridge* seader_uart, uint8_t PCB, uint8_t* c
     free(frame);
 }
 
-void seader_send_t1(SeaderUartBridge* seader_uart, uint8_t* apdu, size_t len) {
+void seader_send_t1(Seader* seader, uint8_t* apdu, size_t len) {
     uint8_t ifsc = seader_uart->IFSC;
 
     if(len > ifsc) {
@@ -129,10 +132,10 @@ void seader_send_t1(SeaderUartBridge* seader_uart, uint8_t* apdu, size_t len) {
 
         if(remaining > ifsc) {
             uint8_t PCB = seader_next_dpcb() | MORE_BIT;
-            seader_send_t1_chunk(seader_uart, PCB, chunk, copy_length);
+            seader_send_t1_chunk(seader, PCB, chunk, copy_length);
         } else {
             uint8_t PCB = seader_next_dpcb();
-            seader_send_t1_chunk(seader_uart, PCB, chunk, copy_length);
+            seader_send_t1_chunk(seader, PCB, chunk, copy_length);
         }
 
         seader_t_1_tx_buffer_offset += copy_length;
@@ -144,7 +147,7 @@ void seader_send_t1(SeaderUartBridge* seader_uart, uint8_t* apdu, size_t len) {
         return;
     }
 
-    seader_send_t1_chunk(seader_uart, seader_next_dpcb(), apdu, len);
+    seader_send_t1_chunk(seader, seader_next_dpcb(), apdu, len);
 }
 
 BitBuffer* seader_t_1_rx_buffer;
@@ -235,10 +238,8 @@ bool seader_recv_t1(Seader* seader, CCID_Message* message) {
 
         if(seader_t_1_tx_buffer != NULL) {
             // Send more data, re-using the buffer to trigger the code path that sends the next block
-            SeaderWorker* seader_worker = seader->worker;
-            SeaderUartBridge* seader_uart = seader_worker->uart;
             seader_send_t1(
-                seader_uart,
+                seader,
                 (uint8_t*)bit_buffer_get_data(seader_t_1_tx_buffer),
                 bit_buffer_get_size_bytes(seader_t_1_tx_buffer));
             return false;

@@ -214,7 +214,7 @@ bool seader_send_apdu(
     seader_log_hex_data(TAG, "seader_send_apdu", apdu, length);
 
     if(seader_uart->T == 1) {
-        seader_send_t1(seader_uart, apdu, length);
+        seader_send_t1(seader, apdu, length);
     } else {
         seader_ccid_XfrBlock(seader_uart, apdu, length);
     }
