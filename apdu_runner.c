@@ -57,7 +57,7 @@ bool seader_apdu_runner_send_next_line(Seader* seader) {
 
     apdu_runner_ctx->current_line++;
     if(seader_uart->T == 1) {
-        seader_send_t1(seader_uart, apdu, len);
+        seader_send_t1(seader, apdu, len);
     } else {
         seader_ccid_XfrBlock(seader_uart, apdu, len);
     }
