@@ -1,4 +1,5 @@
 #include "seader_worker_i.h"
+#include <furi_hal_gpio.h>
 
 #include <flipper_format/flipper_format.h>
 #include <lib/bit_lib/bit_lib.h>
@@ -8,6 +9,8 @@
 #define APDU_HEADER_LEN 5
 #define ASN1_PREFIX     6
 // #define ASN1_DEBUG      true
+
+#define RAW_DETECT_PIN &gpio_ext_pa4
 
 #define RFAL_PICOPASS_TXRX_FLAGS                                                    \
     (FURI_HAL_NFC_LL_TXRX_FLAGS_CRC_TX_MANUAL | FURI_HAL_NFC_LL_TXRX_FLAGS_AGC_ON | \
@@ -34,9 +37,15 @@ SeaderWorker* seader_worker_alloc() {
 
     seader_worker_change_state(seader_worker, SeaderWorkerStateReady);
 
-    // Default assume SEC1210
-    seader_worker->sam_comm_type = SeaderSamCommunicationTypeSec1210;
-    //TODO: Detect SAM type
+    furi_hal_gpio_init_simple(RAW_DETECT_PIN, GpioModeInput);
+    // if pin is low, it is a raw SAM
+    if(furi_hal_gpio_read(RAW_DETECT_PIN) == false) {
+        seader_worker->sam_comm_type = SeaderSamCommunicationTypeRaw;
+        FURI_LOG_I(TAG, "SAM Communication Type: RAW");
+    } else {
+        seader_worker->sam_comm_type = SeaderSamCommunicationTypeSec1210;
+        FURI_LOG_I(TAG, "SAM Communication Type: SEC1210");
+    }
 
     return seader_worker;
 }
@@ -215,7 +224,7 @@ int32_t seader_worker_task(void* context) {
 
     if(seader_worker->state == SeaderWorkerStateCheckSam) {
         FURI_LOG_D(TAG, "Check for SAM");
-        if (seader_worker->sam_comm_type == SeaderSamCommunicationTypeSec1210) {
+        if(seader_worker->sam_comm_type == SeaderSamCommunicationTypeSec1210) {
             seader_ccid_check_for_sam(seader_uart);
         } else {
             seader_uart_sam_reset(seader_uart);
