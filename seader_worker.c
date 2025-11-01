@@ -40,11 +40,11 @@ SeaderWorker* seader_worker_alloc() {
     furi_hal_gpio_init_simple(RAW_DETECT_PIN, GpioModeInput);
     // if pin is low, it is a raw SAM
     if(furi_hal_gpio_read(RAW_DETECT_PIN) == false) {
-        seader_worker->sam_comm_type = SeaderSamCommunicationTypeRaw;
         FURI_LOG_I(TAG, "SAM Communication Type: RAW");
+        seader_worker->sam_comm_type = SeaderSamCommunicationTypeRaw;
     } else {
-        seader_worker->sam_comm_type = SeaderSamCommunicationTypeSec1210;
         FURI_LOG_I(TAG, "SAM Communication Type: SEC1210");
+        seader_worker->sam_comm_type = SeaderSamCommunicationTypeSec1210;
     }
 
     return seader_worker;
@@ -149,6 +149,7 @@ bool seader_worker_process_sam_message(Seader* seader, uint8_t* apdu, uint32_t l
     case 0x61:
         // FURI_LOG_I(TAG, "Request %d bytes", SW2);
         GET_RESPONSE[4] = SW2;
+        // Only used for T=0
         seader_ccid_XfrBlock(seader_uart, GET_RESPONSE, sizeof(GET_RESPONSE));
         return true;
         break;

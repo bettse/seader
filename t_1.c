@@ -111,6 +111,7 @@ void seader_send_t1_chunk(Seader* seader, uint8_t PCB, uint8_t* chunk, size_t le
 
     frame_len = seader_add_lrc(frame, frame_len);
 
+    FURI_LOG_D(TAG, "seader_send_t1_chunk T=1 frame: PCB: %02x, LEN: %02x", PCB, len);
     seader_ccid_XfrBlock(seader_uart, frame, frame_len);
     free(frame);
 }

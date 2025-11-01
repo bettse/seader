@@ -7,6 +7,9 @@
 #define PWM_FREQ         3571200
 #define BAUDRATE_DEFAULT (PWM_FREQ / 372)
 
+// Raw version
+static bool hasSAM = false;
+
 static void seader_uart_on_irq_rx_dma_cb(
     FuriHalSerialHandle* handle,
     FuriHalSerialRxEvent ev,
@@ -79,7 +82,7 @@ void seader_uart_set_baudrate(SeaderUartBridge* seader_uart, uint32_t baudrate) 
     }
 }
 
-size_t seader_uart_process_buffer(Seader* seader, uint8_t* cmd, size_t cmd_len) {
+size_t seader_uart_process_buffer_sec1210(Seader* seader, uint8_t* cmd, size_t cmd_len) {
     SeaderUartBridge* seader_uart = seader->uart;
     if(cmd_len < 2) {
         return cmd_len;
@@ -106,6 +109,56 @@ size_t seader_uart_process_buffer(Seader* seader, uint8_t* cmd, size_t cmd_len) 
         }
     } while(consumed > 0 && cmd_len > 0);
     return cmd_len;
+}
+
+size_t seader_uart_process_buffer_raw(Seader* seader, uint8_t* cmd, size_t cmd_len) {
+    SeaderWorker* seader_worker = seader->worker;
+
+    char display[SEADER_UART_RX_BUF_SIZE * 2 + 1] = {0};
+    memset(display, 0, SEADER_UART_RX_BUF_SIZE);
+    for(uint8_t i = 0; i < cmd_len; i++) {
+        snprintf(display + (i * 2), sizeof(display), "%02x", cmd[i]);
+    }
+    FURI_LOG_I(TAG, "seader_uart_process_buffer_raw %d bytes: %s", cmd_len, display);
+
+    if(hasSAM) {
+        seader_worker_process_sam_message(seader, cmd, cmd_len);
+        return cmd_len;
+    }
+
+    if(cmd_len < sizeof(SAM_ATR)) {
+        return cmd_len;
+    }
+
+    do {
+        if(memcmp(SAM_ATR, cmd, sizeof(SAM_ATR)) == 0) {
+            FURI_LOG_I(TAG, "SAM ATR!");
+            hasSAM = true;
+
+            seader_worker_send_version(seader);
+            if(seader_worker->callback) {
+                seader_worker->callback(SeaderWorkerEventSamPresent, seader_worker->context);
+            }
+            memset(cmd, 0, sizeof(SAM_ATR));
+            cmd_len -= sizeof(SAM_ATR);
+            if(cmd_len > 0) {
+                memmove(cmd, cmd + sizeof(SAM_ATR), cmd_len);
+            }
+        }
+
+        cmd++;
+        cmd_len--;
+    } while(cmd_len > 0);
+
+    return cmd_len;
+}
+
+size_t seader_uart_process_buffer(Seader* seader, uint8_t* cmd, size_t cmd_len) {
+    if(seader->worker->sam_comm_type == SeaderSamCommunicationTypeSec1210) {
+        return seader_uart_process_buffer_sec1210(seader, cmd, cmd_len);
+    } else {
+        return seader_uart_process_buffer_raw(seader, cmd, cmd_len);
+    }
 }
 
 int32_t seader_uart_worker(void* context) {
