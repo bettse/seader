@@ -19,14 +19,14 @@ uint8_t cPCB = 0x00; // Init to 0x40 so first call to next_pcb will return 0x00
 
 uint8_t seader_next_dpcb() {
     uint8_t next_pcb = dPCB ^ 0x40;
-    //FURI_LOG_D(TAG, "dPCB was: %02X, current dPCB: %02X", dPCB, next_pcb);
+    FURI_LOG_D(TAG, "dPCB was: %02X, current dPCB: %02X", dPCB, next_pcb);
     dPCB = next_pcb;
     return dPCB;
 }
 
 uint8_t seader_next_cpcb() {
     uint8_t next_pcb = cPCB ^ 0x40;
-    //FURI_LOG_D(TAG, "cPCB was: %02X, current cPCB: %02X", cPCB, next_pcb);
+    FURI_LOG_D(TAG, "cPCB was: %02X, current cPCB: %02X", cPCB, next_pcb);
     cPCB = next_pcb;
     return cPCB;
 }
@@ -89,7 +89,7 @@ void seader_t_1_send_ack(Seader* seader) {
 
     frame_len = seader_add_lrc(frame, frame_len);
 
-    //FURI_LOG_D(TAG, "Sending R-Block ACK: PCB: %02x", frame[1]);
+    FURI_LOG_D(TAG, "Sending R-Block ACK: PCB: %02x", frame[1]);
 
     if(seader_worker->sam_comm_type == SeaderSamCommunicationTypeSec1210) {
         seader_ccid_XfrBlock(seader_uart, frame, frame_len);
@@ -191,7 +191,7 @@ bool seader_recv_t1(Seader* seader, CCID_Message* message) {
 
     if(rPCB == cPCB) {
         seader_next_cpcb();
-        if(seader_t_1_rx_buffer != NULL) {
+        if(seader_t_1_rx_buffer != NULL) { // More data
             bit_buffer_append_bytes(seader_t_1_rx_buffer, message->payload + 3, LEN);
 
             // TODO: validate LRC
@@ -236,6 +236,7 @@ bool seader_recv_t1(Seader* seader, CCID_Message* message) {
         }
 
     } else if((rPCB & R_BLOCK) == R_BLOCK) {
+        FURI_LOG_D(TAG, "Received R-Block frame");
         uint8_t R_SEQ = (rPCB & R_SEQUENCE_NUMBER_MASK) >> 4;
         uint8_t I_SEQ = (dPCB ^ 0x40) >> 6;
         if(R_SEQ != I_SEQ) {
