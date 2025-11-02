@@ -37,7 +37,7 @@ SeaderWorker* seader_worker_alloc() {
 
     seader_worker_change_state(seader_worker, SeaderWorkerStateReady);
 
-    furi_hal_gpio_init_simple(RAW_DETECT_PIN, GpioModeInput);
+    furi_hal_gpio_init(RAW_DETECT_PIN, GpioModeInput, GpioPullUp, GpioSpeedLow);
     // if pin is low, it is a raw SAM
     if(furi_hal_gpio_read(RAW_DETECT_PIN) == false) {
         FURI_LOG_I(TAG, "SAM Communication Type: RAW");
