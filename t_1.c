@@ -208,6 +208,7 @@ bool seader_recv_t1(Seader* seader, CCID_Message* message) {
 
         if(seader_validate_lrc(message->payload, message->dwLength) == false) {
             FURI_LOG_W(TAG, "Invalid T=1 frame: LRC mismatch");
+            seader_next_cpcb(); // Re-sync PCB
             return false;
         }
 
