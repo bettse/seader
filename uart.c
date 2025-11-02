@@ -1,16 +1,17 @@
 #include "seader_i.h"
 #include <furi_hal_gpio.h>
 
-#define TAG              "SeaderUART"
-#define CLOCK_PIN        &gpio_ext_pa7
-#define RESET_PIN        &gpio_ext_pa6
-#define PWM_FREQ         3571200
-#define BAUDRATE_DEFAULT (PWM_FREQ / 372)
+#define TAG                      "SeaderUART"
+#define CLOCK_PIN                &gpio_ext_pa7
+#define RESET_PIN                &gpio_ext_pa6
+#define PWM_FREQ                 3571200
+#define RAW_BAUDRATE_DEFAULT     (PWM_FREQ / 372)
+#define SEC1210_BAUDRATE_DEFAULT 115200
 
 // Raw version
 static bool hasSAM = false;
 
-static uint8_t PPS[] = {0xFF, 0x11, 0x11, 0xff};
+static uint8_t PPS[] = {0xFF, 0x11, 0x96, 0x78};
 
 static void seader_uart_on_irq_rx_dma_cb(
     FuriHalSerialHandle* handle,
@@ -40,40 +41,53 @@ void seader_uart_disable(SeaderUartBridge* seader_uart) {
     free(seader_uart);
 }
 
-void seader_uart_serial_init(SeaderUartBridge* seader_uart, uint8_t uart_ch) {
+void seader_uart_serial_init(Seader* seader, uint8_t uart_ch) {
+    SeaderUartBridge* seader_uart = seader->uart;
     furi_assert(!seader_uart->serial_handle);
 
     seader_uart->serial_handle = furi_hal_serial_control_acquire(uart_ch);
     furi_assert(seader_uart->serial_handle);
 
-    furi_hal_serial_init(seader_uart->serial_handle, BAUDRATE_DEFAULT);
-    furi_hal_serial_dma_rx_start(
-        seader_uart->serial_handle, seader_uart_on_irq_rx_dma_cb, seader_uart, false);
+    if(seader->worker->sam_comm_type == SeaderSamCommunicationTypeSec1210) {
+        furi_hal_serial_init(seader_uart->serial_handle, SEC1210_BAUDRATE_DEFAULT);
+        furi_hal_serial_dma_rx_start(
+            seader_uart->serial_handle, seader_uart_on_irq_rx_dma_cb, seader_uart, false);
+    } else {
+        furi_hal_serial_init(seader_uart->serial_handle, RAW_BAUDRATE_DEFAULT);
 
-    //furi_hal_pwm_start(FuriHalPwmOutputIdTim1PA7, (BAUDRATE_DEFAULT * 372) / 2, 50);
-    furi_hal_pwm_start(FuriHalPwmOutputIdTim1PA7, PWM_FREQ, 50);
+        furi_hal_serial_dma_rx_start(
+            seader_uart->serial_handle, seader_uart_on_irq_rx_dma_cb, seader_uart, false);
 
-    furi_hal_gpio_init(RESET_PIN, GpioModeOutputPushPull, GpioPullNo, GpioSpeedLow);
-    furi_hal_gpio_write(RESET_PIN, true); // Active low, so set high
+        furi_hal_pwm_start(FuriHalPwmOutputIdTim1PA7, PWM_FREQ, 50);
+
+        furi_hal_gpio_init(RESET_PIN, GpioModeOutputPushPull, GpioPullNo, GpioSpeedLow);
+        furi_hal_gpio_write(RESET_PIN, true); // Active low, so set high
+    }
 }
 
-void seader_uart_sam_reset(SeaderUartBridge* seader_uart) {
-    UNUSED(seader_uart);
-    furi_hal_gpio_write(RESET_PIN, false);
-    furi_delay_ms(1);
-    furi_hal_gpio_write(RESET_PIN, true);
+void seader_uart_sam_reset(Seader* seader) {
+    if(seader->worker->sam_comm_type == SeaderSamCommunicationTypeRaw) {
+        hasSAM = false;
+        seader_uart_set_baudrate(seader->uart, RAW_BAUDRATE_DEFAULT);
+        furi_hal_gpio_write(RESET_PIN, false);
+        furi_delay_ms(1);
+        furi_hal_gpio_write(RESET_PIN, true);
+    }
 }
 
-void seader_uart_serial_deinit(SeaderUartBridge* seader_uart) {
+void seader_uart_serial_deinit(Seader* seader) {
+    SeaderUartBridge* seader_uart = seader->uart;
     furi_assert(seader_uart->serial_handle);
     furi_hal_serial_deinit(seader_uart->serial_handle);
     furi_hal_serial_control_release(seader_uart->serial_handle);
     seader_uart->serial_handle = NULL;
 
-    furi_hal_pwm_stop(FuriHalPwmOutputIdTim1PA7);
+    if(seader->worker->sam_comm_type == SeaderSamCommunicationTypeRaw) {
+        furi_hal_pwm_stop(FuriHalPwmOutputIdTim1PA7);
 
-    furi_hal_gpio_init_simple(RESET_PIN, GpioModeAnalog);
-    furi_hal_gpio_write(RESET_PIN, false);
+        furi_hal_gpio_init_simple(RESET_PIN, GpioModeAnalog);
+        furi_hal_gpio_write(RESET_PIN, false);
+    }
 }
 
 void seader_uart_set_baudrate(SeaderUartBridge* seader_uart, uint32_t baudrate) {
@@ -114,6 +128,7 @@ size_t seader_uart_process_buffer_sec1210(Seader* seader, uint8_t* cmd, size_t c
 }
 
 size_t seader_uart_process_buffer_raw(Seader* seader, uint8_t* cmd, size_t cmd_len) {
+    SeaderUartBridge* seader_uart = seader->uart;
     char display[SEADER_UART_RX_BUF_SIZE * 2 + 1] = {0};
     memset(display, 0, SEADER_UART_RX_BUF_SIZE);
     for(uint8_t i = 0; i < cmd_len; i++) {
@@ -122,11 +137,29 @@ size_t seader_uart_process_buffer_raw(Seader* seader, uint8_t* cmd, size_t cmd_l
     FURI_LOG_I(TAG, "seader_uart_process_buffer_raw %d bytes: %s", cmd_len, display);
 
     if(hasSAM) {
+        if(memcmp(PPS, cmd, sizeof(PPS)) == 0) {
+            FURI_LOG_I(TAG, "PPS received, setting baudrate to 230400");
+            // On paper (based on PPS) the baudrate should be 223125, but in practice 230400 works fine
+            seader_uart_set_baudrate(seader->uart, 230400);
+
+            // Kick off next part of detection process
+            seader_worker_send_version(seader);
+            SeaderWorker* seader_worker = seader->worker;
+            if(seader_worker->callback) {
+                seader_worker->callback(SeaderWorkerEventSamPresent, seader_worker->context);
+            }
+
+            return 0;
+        }
+
         CCID_Message message;
         message.payload = cmd;
         message.dwLength = cmd_len;
-        seader_recv_t1(seader, &message);
-        return cmd_len;
+        if(seader_recv_t1(seader, &message)) {
+            return 0;
+        } else {
+            return cmd_len;
+        }
     }
 
     if(cmd_len < sizeof(SAM_ATR)) {
@@ -138,18 +171,19 @@ size_t seader_uart_process_buffer_raw(Seader* seader, uint8_t* cmd, size_t cmd_l
             FURI_LOG_I(TAG, "SAM ATR!");
             hasSAM = true;
 
+            // In order to get the transmission to work, we fudge the baudrate here
+            seader_uart_set_baudrate(seader_uart, 9900);
+
+            furi_hal_serial_configure_framing(
+                seader_uart->serial_handle,
+                FuriHalSerialDataBits8,
+                FuriHalSerialParityEven,
+                FuriHalSerialStopBits2);
+
             // 5.2.3 PPS - Protocol Parameter Selection
             // 0xFF, 0x11, 0x96, 0x78
-            // seader_uart_send(seader->uart, PPS, sizeof(PPS));
-            seader_t_1_set_IFSD(seader);
-            UNUSED(PPS);
-            /*
-            seader_worker_send_version(seader);
-            SeaderWorker* seader_worker = seader->worker;
-            if(seader_worker->callback) {
-                seader_worker->callback(SeaderWorkerEventSamPresent, seader_worker->context);
-            }
-            */
+            seader_uart_send(seader_uart, PPS, sizeof(PPS));
+
             return 0;
         }
 
@@ -182,7 +216,8 @@ int32_t seader_uart_worker(void* context) {
     seader_uart->tx_thread =
         furi_thread_alloc_ex("SeaderUartTxWorker", 1.5 * 1024, seader_uart_tx_thread, seader);
 
-    seader_uart_serial_init(seader_uart, seader_uart->cfg.uart_ch);
+    seader_uart_serial_init(seader, seader_uart->cfg.uart_ch);
+    // NOTE: I question the value of this
     seader_uart_set_baudrate(seader_uart, seader_uart->cfg.baudrate);
 
     furi_thread_flags_set(furi_thread_get_id(seader_uart->tx_thread), WorkerEvtSamRx);
@@ -229,7 +264,7 @@ int32_t seader_uart_worker(void* context) {
             }
         }
     }
-    seader_uart_serial_deinit(seader_uart);
+    seader_uart_serial_deinit(seader);
 
     furi_thread_flags_set(furi_thread_get_id(seader_uart->tx_thread), WorkerEvtTxStop);
     furi_thread_join(seader_uart->tx_thread);
@@ -299,11 +334,18 @@ void seader_uart_get_state(SeaderUartBridge* seader_uart, SeaderUartState* st) {
 }
 
 SeaderUartBridge* seader_uart_alloc(Seader* seader) {
-    SeaderUartConfig cfg = {.uart_ch = FuriHalSerialIdLpuart, .baudrate = BAUDRATE_DEFAULT};
+    uint32_t baudrate;
+    if(seader->worker->sam_comm_type == SeaderSamCommunicationTypeSec1210) {
+        baudrate = SEC1210_BAUDRATE_DEFAULT;
+    } else {
+        baudrate = RAW_BAUDRATE_DEFAULT;
+    }
+
+    SeaderUartConfig cfg = {.uart_ch = FuriHalSerialIdLpuart, .baudrate = baudrate};
     SeaderUartState uart_state;
     SeaderUartBridge* seader_uart;
 
-    FURI_LOG_I(TAG, "Enable UART %d baud", BAUDRATE_DEFAULT);
+    FURI_LOG_I(TAG, "Enable UART %ld baud", baudrate);
     seader_uart = seader_uart_enable(&cfg, seader);
 
     seader_uart_get_config(seader_uart, &cfg);

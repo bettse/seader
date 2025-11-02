@@ -228,7 +228,7 @@ int32_t seader_worker_task(void* context) {
         if(seader_worker->sam_comm_type == SeaderSamCommunicationTypeSec1210) {
             seader_ccid_check_for_sam(seader_uart);
         } else {
-            seader_uart_sam_reset(seader_uart);
+            seader_uart_sam_reset(seader);
         }
     } else if(seader_worker->state == SeaderWorkerStateVirtualCredential) {
         FURI_LOG_D(TAG, "Virtual Credential");
