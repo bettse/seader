@@ -172,11 +172,11 @@ bool seader_recv_t1(Seader* seader, CCID_Message* message) {
         FURI_LOG_W(TAG, "Invalid T=1 frame: too short");
         return false;
     }
-    //uint8_t NAD = message->payload[0];
+    uint8_t NAD = message->payload[0];
     uint8_t rPCB = message->payload[1];
     uint8_t LEN = message->payload[2];
-    //uint8_t LRC = message->payload[3 + LEN];
-    //FURI_LOG_D(TAG, "NAD: %02X, rPCB: %02X, LEN: %02X, LRC: %02X", NAD, rPCB, LEN, LRC);
+    uint8_t LRC = message->payload[3 + LEN];
+    FURI_LOG_D(TAG, "NAD: %02X, rPCB: %02X, LEN: %02X, LRC: %02X", NAD, rPCB, LEN, LRC);
 
     if(rPCB == 0xE1) {
         // S(IFS response)
@@ -207,6 +207,7 @@ bool seader_recv_t1(Seader* seader, CCID_Message* message) {
         }
 
         if(seader_validate_lrc(message->payload, message->dwLength) == false) {
+            FURI_LOG_W(TAG, "Invalid T=1 frame: LRC mismatch");
             return false;
         }
 
@@ -215,12 +216,12 @@ bool seader_recv_t1(Seader* seader, CCID_Message* message) {
         message->dwLength = LEN;
 
         if(message->dwLength == 0) {
-            //FURI_LOG_D(TAG, "Received T=1 frame with no data");
+            FURI_LOG_D(TAG, "Received T=1 frame with no data");
             return true;
         }
         return seader_worker_process_sam_message(seader, message->payload, message->dwLength);
     } else if(rPCB == (cPCB | MORE_BIT)) {
-        //FURI_LOG_D(TAG, "Received T=1 frame with more bit set");
+        FURI_LOG_D(TAG, "Received T=1 frame with more bit set");
         if(seader_t_1_rx_buffer == NULL) {
             seader_t_1_rx_buffer = bit_buffer_alloc(512);
         }
@@ -238,14 +239,12 @@ bool seader_recv_t1(Seader* seader, CCID_Message* message) {
         uint8_t R_SEQ = (rPCB & R_SEQUENCE_NUMBER_MASK) >> 4;
         uint8_t I_SEQ = (dPCB ^ 0x40) >> 6;
         if(R_SEQ != I_SEQ) {
-            /*
             FURI_LOG_D(
                 TAG,
                 "Received R-Block: Incorrect sequence.  Expected: %02X, Received: %02X",
                 I_SEQ,
                 R_SEQ);
 
-            */
             // When this happens, the flipper freezes if it is doing NFC and my attempts to do events to stop that have failed
             return false;
         }
