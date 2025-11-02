@@ -122,7 +122,10 @@ size_t seader_uart_process_buffer_raw(Seader* seader, uint8_t* cmd, size_t cmd_l
     FURI_LOG_I(TAG, "seader_uart_process_buffer_raw %d bytes: %s", cmd_len, display);
 
     if(hasSAM) {
-        seader_worker_process_sam_message(seader, cmd, cmd_len);
+        CCID_Message message;
+        message.payload = cmd;
+        message.dwLength = cmd_len;
+        seader_recv_t1(seader, &message);
         return cmd_len;
     }
 
