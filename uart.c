@@ -10,6 +10,8 @@
 // Raw version
 static bool hasSAM = false;
 
+static uint8_t PPS[] = {0xFF, 0x11, 0x11, 0xff};
+
 static void seader_uart_on_irq_rx_dma_cb(
     FuriHalSerialHandle* handle,
     FuriHalSerialRxEvent ev,
@@ -112,8 +114,6 @@ size_t seader_uart_process_buffer_sec1210(Seader* seader, uint8_t* cmd, size_t c
 }
 
 size_t seader_uart_process_buffer_raw(Seader* seader, uint8_t* cmd, size_t cmd_len) {
-    SeaderWorker* seader_worker = seader->worker;
-
     char display[SEADER_UART_RX_BUF_SIZE * 2 + 1] = {0};
     memset(display, 0, SEADER_UART_RX_BUF_SIZE);
     for(uint8_t i = 0; i < cmd_len; i++) {
@@ -138,10 +138,18 @@ size_t seader_uart_process_buffer_raw(Seader* seader, uint8_t* cmd, size_t cmd_l
             FURI_LOG_I(TAG, "SAM ATR!");
             hasSAM = true;
 
+            // 5.2.3 PPS - Protocol Parameter Selection
+            // 0xFF, 0x11, 0x96, 0x78
+            // seader_uart_send(seader->uart, PPS, sizeof(PPS));
+            seader_t_1_set_IFSD(seader);
+            UNUSED(PPS);
+            /*
             seader_worker_send_version(seader);
+            SeaderWorker* seader_worker = seader->worker;
             if(seader_worker->callback) {
                 seader_worker->callback(SeaderWorkerEventSamPresent, seader_worker->context);
             }
+            */
             return 0;
         }
 
@@ -198,6 +206,10 @@ int32_t seader_uart_worker(void* context) {
                 seader_uart->rx_stream, seader_uart->rx_buf, SEADER_UART_RX_BUF_SIZE, 0);
             if(len > 0) {
                 furi_delay_ms(5); //WTF
+                if(memcmp(seader_uart->rx_buf, seader_uart->tx_buf, len) == 0) {
+                    FURI_LOG_I(TAG, "Ignoring echoed data");
+                    continue;
+                }
 
                 char display[SEADER_UART_RX_BUF_SIZE * 2 + 1] = {0};
                 for(uint8_t i = 0; i < len; i++) {
