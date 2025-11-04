@@ -19,14 +19,14 @@ uint8_t cPCB = 0x00; // Init to 0x40 so first call to next_pcb will return 0x00
 
 uint8_t seader_next_dpcb() {
     uint8_t next_pcb = dPCB ^ 0x40;
-    FURI_LOG_D(TAG, "dPCB was: %02X, current dPCB: %02X", dPCB, next_pcb);
+    //FURI_LOG_D(TAG, "dPCB was: %02X, current dPCB: %02X", dPCB, next_pcb);
     dPCB = next_pcb;
     return dPCB;
 }
 
 uint8_t seader_next_cpcb() {
     uint8_t next_pcb = cPCB ^ 0x40;
-    FURI_LOG_D(TAG, "cPCB was: %02X, current cPCB: %02X", cPCB, next_pcb);
+    //FURI_LOG_D(TAG, "cPCB was: %02X, current cPCB: %02X", cPCB, next_pcb);
     cPCB = next_pcb;
     return cPCB;
 }
@@ -38,7 +38,7 @@ void seader_t_1_reset() {
 }
 
 void seader_t_1_set_IFSD(Seader* seader) {
-    FURI_LOG_D(TAG, "Setting IFSD to %02X", IFSD_VALUE);
+    //FURI_LOG_D(TAG, "Setting IFSD to %02X", IFSD_VALUE);
     SeaderWorker* seader_worker = seader->worker;
     SeaderUartBridge* seader_uart = seader_worker->uart;
     uint8_t frame[5];
@@ -89,7 +89,7 @@ void seader_t_1_send_ack(Seader* seader) {
 
     frame_len = seader_add_lrc(frame, frame_len);
 
-    FURI_LOG_D(TAG, "Sending R-Block ACK: PCB: %02x", frame[1]);
+    //FURI_LOG_D(TAG, "Sending R-Block ACK: PCB: %02x", frame[1]);
 
     if(seader_worker->sam_comm_type == SeaderSamCommunicationTypeSec1210) {
         seader_ccid_XfrBlock(seader_uart, frame, frame_len);
@@ -120,7 +120,7 @@ void seader_send_t1_chunk(Seader* seader, uint8_t PCB, uint8_t* chunk, size_t le
 
     frame_len = seader_add_lrc(frame, frame_len);
 
-    FURI_LOG_D(TAG, "seader_send_t1_chunk T=1 frame: PCB: %02x, LEN: %02x", PCB, len);
+    //FURI_LOG_D(TAG, "seader_send_t1_chunk T=1 frame: PCB: %02x, LEN: %02x", PCB, len);
     if(seader_worker->sam_comm_type == SeaderSamCommunicationTypeSec1210) {
         seader_ccid_XfrBlock(seader_uart, frame, frame_len);
     } else {
@@ -172,7 +172,7 @@ bool seader_recv_t1(Seader* seader, CCID_Message* message) {
         FURI_LOG_W(TAG, "Invalid T=1 frame: too short");
         return false;
     }
-    uint8_t NAD = message->payload[0];
+    //uint8_t NAD = message->payload[0];
     uint8_t rPCB = message->payload[1];
     uint8_t LEN = message->payload[2];
     //uint8_t LRC = message->payload[3 + LEN];
@@ -227,7 +227,7 @@ bool seader_recv_t1(Seader* seader, CCID_Message* message) {
         }
         return seader_worker_process_sam_message(seader, message->payload, message->dwLength);
     } else if(rPCB == (cPCB | MORE_BIT)) {
-        FURI_LOG_D(TAG, "Received T=1 frame with more bit set");
+        //FURI_LOG_D(TAG, "Received T=1 frame with more bit set");
         if(seader_t_1_rx_buffer == NULL) {
             seader_t_1_rx_buffer = bit_buffer_alloc(512);
         }
@@ -242,7 +242,7 @@ bool seader_recv_t1(Seader* seader, CCID_Message* message) {
         }
 
     } else if((rPCB & R_BLOCK) == R_BLOCK) {
-        FURI_LOG_D(TAG, "Received R-Block frame");
+        //FURI_LOG_D(TAG, "Received R-Block frame");
         uint8_t R_SEQ = (rPCB & R_SEQUENCE_NUMBER_MASK) >> 4;
         uint8_t I_SEQ = (dPCB ^ 0x40) >> 6;
         if(R_SEQ != I_SEQ) {

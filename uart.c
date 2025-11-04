@@ -143,6 +143,8 @@ size_t seader_uart_process_buffer_raw(Seader* seader, uint8_t* cmd, size_t cmd_l
             // On paper (based on PPS) the baudrate should be 223125, but in practice 230400 works fine
             seader_uart_set_baudrate(seader->uart, 230400);
 
+            //seader_t_1_set_IFSD(seader);
+
             // Kick off next part of detection process
             seader_worker_send_version(seader);
             SeaderWorker* seader_worker = seader->worker;
