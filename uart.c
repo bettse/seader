@@ -10,6 +10,7 @@
 
 // Raw version
 static bool hasSAM = false;
+static bool ppsSetup = false;
 
 static uint8_t PPS[] = {0xFF, 0x11, 0x96, 0x78};
 
@@ -136,7 +137,7 @@ size_t seader_uart_process_buffer_raw(Seader* seader, uint8_t* cmd, size_t cmd_l
     }
     FURI_LOG_I(TAG, "seader_uart_process_buffer_raw %d bytes: %s", cmd_len, display);
 
-    if(hasSAM) {
+    if(ppsSetup) {
         if(memcmp(PPS, cmd, sizeof(PPS)) == 0) {
             FURI_LOG_I(TAG, "PPS received, setting baudrate to 230400");
             // On paper (based on PPS) the baudrate should be 223125, but in practice 230400 works fine
@@ -151,7 +152,9 @@ size_t seader_uart_process_buffer_raw(Seader* seader, uint8_t* cmd, size_t cmd_l
 
             return 0;
         }
+    }
 
+    if(hasSAM) {
         CCID_Message message;
         message.payload = cmd;
         message.dwLength = cmd_len;
@@ -183,6 +186,7 @@ size_t seader_uart_process_buffer_raw(Seader* seader, uint8_t* cmd, size_t cmd_l
             // 5.2.3 PPS - Protocol Parameter Selection
             // 0xFF, 0x11, 0x96, 0x78
             seader_uart_send(seader_uart, PPS, sizeof(PPS));
+            ppsSetup = true;
 
             return 0;
         }

@@ -161,6 +161,7 @@ bool seader_recv_t1(Seader* seader, CCID_Message* message) {
 
     if(rPCB == 0xE1) {
         // S(IFS response)
+        FURI_LOG_D(TAG, "Received IFS response");
         seader_worker_send_version(seader);
         SeaderWorker* seader_worker = seader->worker;
         if(seader_worker->callback) {
