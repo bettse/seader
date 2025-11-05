@@ -106,7 +106,6 @@ void seader_uart_set_baudrate(SeaderUartBridge* seader_uart, uint32_t baudrate) 
 }
 
 size_t seader_uart_process_buffer_sec1210(Seader* seader, uint8_t* cmd, size_t cmd_len) {
-    SeaderUartBridge* seader_uart = seader->uart;
     if(cmd_len < 2) {
         return cmd_len;
     }
@@ -121,7 +120,6 @@ size_t seader_uart_process_buffer_sec1210(Seader* seader, uint8_t* cmd, size_t c
             if(cmd_len > 0) {
                 memmove(cmd, cmd + consumed, cmd_len);
             }
-            seader_uart->st.rx_cnt += consumed;
 
             char display[SEADER_UART_RX_BUF_SIZE * 2 + 1] = {0};
             memset(display, 0, SEADER_UART_RX_BUF_SIZE);
