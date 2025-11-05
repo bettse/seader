@@ -2,7 +2,6 @@
 #include <furi_hal_gpio.h>
 
 #define TAG                      "SeaderUART"
-#define CLOCK_PIN                &gpio_ext_pa7
 #define RESET_PIN                &gpio_ext_pa6
 #define PWM_FREQ                 3571200
 #define RAW_BAUDRATE_DEFAULT     (PWM_FREQ / 372)
