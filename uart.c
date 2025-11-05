@@ -269,8 +269,13 @@ SeaderUartBridge* seader_uart_enable(SeaderUartConfig* cfg, Seader* seader) {
 }
 
 void seader_uart_send(SeaderUartBridge* seader_uart, uint8_t* data, size_t len) {
+    furi_assert(seader_uart);
+    furi_assert(data);
     memcpy(seader_uart->tx_buf, data, len);
     seader_uart->tx_len = len;
+
+    // I've been getting a "[CRASH][ISR MemMgmt] NULL pointer dereference" here and the delay seems to fix it.
+    //furi_delay_ms(5);
     furi_thread_flags_set(furi_thread_get_id(seader_uart->tx_thread), WorkerEvtSamRx);
 }
 
@@ -291,6 +296,7 @@ int32_t seader_uart_tx_thread(void* context) {
                     snprintf(display + (i * 2), sizeof(display), "%02x", seader_uart->tx_buf[i]);
                 }
                 FURI_LOG_I(TAG, "SEND %d bytes: %s", seader_uart->tx_len, display);
+
                 furi_hal_serial_tx(
                     seader_uart->serial_handle, seader_uart->tx_buf, seader_uart->tx_len);
             }
