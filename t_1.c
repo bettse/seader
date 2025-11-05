@@ -38,7 +38,7 @@ void seader_t_1_reset() {
 }
 
 void seader_t_1_set_IFSD(Seader* seader) {
-    //FURI_LOG_D(TAG, "Setting IFSD to %02X", IFSD_VALUE);
+    FURI_LOG_D(TAG, "Setting IFSD to %02X", IFSD_VALUE);
     SeaderWorker* seader_worker = seader->worker;
     SeaderUartBridge* seader_uart = seader_worker->uart;
     uint8_t frame[5];
