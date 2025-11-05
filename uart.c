@@ -7,9 +7,14 @@
 #define RAW_BAUDRATE_DEFAULT     (PWM_FREQ / 372)
 #define SEC1210_BAUDRATE_DEFAULT 115200
 
-// Raw version
-static bool hasSAM = false;
-static bool ppsSetup = false;
+typedef enum {
+    SamSetupInit,
+    SamSetupATR,
+    SamSetupPPS,
+    SamSetupReady,
+} SamSetup;
+
+static SamSetup sam_setup_state = SamSetupInit;
 
 static uint8_t PPS[] = {0xFF, 0x11, 0x96, 0x78};
 
@@ -72,8 +77,7 @@ void seader_uart_serial_init(Seader* seader, uint8_t uart_ch) {
 
 void seader_uart_sam_reset(Seader* seader) {
     if(seader->worker->sam_comm_type == SeaderSamCommunicationTypeRaw) {
-        hasSAM = false;
-        ppsSetup = false;
+        sam_setup_state = SamSetupInit;
         furi_hal_serial_set_br(seader->uart->serial_handle, RAW_BAUDRATE_DEFAULT);
         furi_hal_gpio_write(RESET_PIN, false);
         furi_delay_ms(1);
@@ -132,17 +136,35 @@ size_t seader_uart_process_buffer_raw(Seader* seader, uint8_t* cmd, size_t cmd_l
     }
     FURI_LOG_I(TAG, "seader_uart_process_buffer_raw %d bytes: %s", cmd_len, display);
 
-    if(ppsSetup) {
+    switch(sam_setup_state) {
+    case SamSetupInit:
+        if(cmd_len < sizeof(SAM_ATR)) {
+            return cmd_len;
+        }
+
+        do {
+            if(memcmp(SAM_ATR, cmd, sizeof(SAM_ATR)) == 0) {
+                FURI_LOG_I(TAG, "SAM ATR!");
+                sam_setup_state = SamSetupPPS;
+                seader_uart_send(seader_uart, PPS, sizeof(PPS));
+                return 0;
+            }
+
+            cmd++;
+            cmd_len--;
+        } while(cmd_len > 0);
+        break;
+    case SamSetupPPS:
         if(memcmp(PPS, cmd, sizeof(PPS)) == 0) {
             // If you ever have issue with this, try bumping it to 230400
             FURI_LOG_I(TAG, "PPS received, setting baudrate to 223125");
             furi_hal_serial_set_br(seader_uart->serial_handle, 223125);
             seader_t_1_set_IFSD(seader);
+            sam_setup_state = SamSetupReady;
             return 0;
         }
-    }
-
-    if(hasSAM) {
+        break;
+    case SamSetupReady:
         CCID_Message message;
         message.payload = cmd;
         message.dwLength = cmd_len;
@@ -151,26 +173,11 @@ size_t seader_uart_process_buffer_raw(Seader* seader, uint8_t* cmd, size_t cmd_l
         } else {
             return cmd_len;
         }
+        break;
+    default:
+        FURI_LOG_E(TAG, "Unknown SAM setup state!");
+        break;
     }
-
-    if(cmd_len < sizeof(SAM_ATR)) {
-        return cmd_len;
-    }
-
-    do {
-        if(memcmp(SAM_ATR, cmd, sizeof(SAM_ATR)) == 0) {
-            FURI_LOG_I(TAG, "SAM ATR!");
-            hasSAM = true;
-
-            seader_uart_send(seader_uart, PPS, sizeof(PPS));
-            ppsSetup = true;
-
-            return 0;
-        }
-
-        cmd++;
-        cmd_len--;
-    } while(cmd_len > 0);
 
     return cmd_len;
 }
