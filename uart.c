@@ -63,6 +63,7 @@ void seader_uart_serial_init(Seader* seader, uint8_t uart_ch) {
         furi_hal_serial_dma_rx_start(
             seader_uart->serial_handle, seader_uart_on_irq_rx_dma_cb, seader_uart, false);
 
+        // NOTE: Consider putting this before the UART setup if we find the ATR on startup is problematic
         furi_hal_pwm_start(FuriHalPwmOutputIdLptim2PA4, PWM_FREQ, 50);
 
         furi_hal_gpio_init(RESET_PIN, GpioModeOutputPushPull, GpioPullNo, GpioSpeedLow);
@@ -73,6 +74,7 @@ void seader_uart_serial_init(Seader* seader, uint8_t uart_ch) {
 void seader_uart_sam_reset(Seader* seader) {
     if(seader->worker->sam_comm_type == SeaderSamCommunicationTypeRaw) {
         hasSAM = false;
+        ppsSetup = false;
         seader_uart_set_baudrate(seader->uart, RAW_BAUDRATE_DEFAULT);
         furi_hal_gpio_write(RESET_PIN, false);
         furi_delay_ms(1);
@@ -147,14 +149,16 @@ size_t seader_uart_process_buffer_raw(Seader* seader, uint8_t* cmd, size_t cmd_l
             FURI_LOG_I(TAG, "PPS received, setting baudrate to 223125");
             seader_uart_set_baudrate(seader->uart, 223125);
 
-            //seader_t_1_set_IFSD(seader);
+            seader_t_1_set_IFSD(seader);
 
             // Kick off next part of detection process
+            /*
             seader_worker_send_version(seader);
             SeaderWorker* seader_worker = seader->worker;
             if(seader_worker->callback) {
                 seader_worker->callback(SeaderWorkerEventSamPresent, seader_worker->context);
             }
+            */
 
             return 0;
         }
