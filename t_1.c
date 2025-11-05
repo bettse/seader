@@ -172,13 +172,14 @@ bool seader_recv_t1(Seader* seader, CCID_Message* message) {
         FURI_LOG_W(TAG, "Invalid T=1 frame: too short");
         return false;
     }
-    //uint8_t NAD = message->payload[0];
+    uint8_t NAD = message->payload[0];
     uint8_t rPCB = message->payload[1];
     uint8_t LEN = message->payload[2];
-    //uint8_t LRC = message->payload[3 + LEN];
-    //FURI_LOG_D(TAG, "NAD: %02X, rPCB: %02X, LEN: %02X, LRC: %02X", NAD, rPCB, LEN, LRC);
+    uint8_t LRC = message->payload[3 + LEN];
+    FURI_LOG_D(TAG, "NAD: %02X, rPCB: %02X, LEN: %02X, LRC: %02X", NAD, rPCB, LEN, LRC);
 
     if(message->dwLength < (uint32_t)(3 + LEN + 1)) {
+        FURI_LOG_W(TAG, "Incomplete T=1 frame");
         // incomplete frame
         return false;
     }
