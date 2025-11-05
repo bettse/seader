@@ -74,7 +74,7 @@ void seader_uart_sam_reset(Seader* seader) {
     if(seader->worker->sam_comm_type == SeaderSamCommunicationTypeRaw) {
         hasSAM = false;
         ppsSetup = false;
-        seader_uart_set_baudrate(seader->uart, RAW_BAUDRATE_DEFAULT);
+        furi_hal_serial_set_br(seader->uart->serial_handle, RAW_BAUDRATE_DEFAULT);
         furi_hal_gpio_write(RESET_PIN, false);
         furi_delay_ms(1);
         furi_hal_gpio_write(RESET_PIN, true);
@@ -93,14 +93,6 @@ void seader_uart_serial_deinit(Seader* seader) {
 
         furi_hal_gpio_init_simple(RESET_PIN, GpioModeAnalog);
         furi_hal_gpio_write(RESET_PIN, false);
-    }
-}
-
-void seader_uart_set_baudrate(SeaderUartBridge* seader_uart, uint32_t baudrate) {
-    if(baudrate != 0) {
-        furi_hal_serial_set_br(seader_uart->serial_handle, baudrate);
-    } else {
-        FURI_LOG_I(TAG, "No baudrate specified");
     }
 }
 
@@ -144,19 +136,8 @@ size_t seader_uart_process_buffer_raw(Seader* seader, uint8_t* cmd, size_t cmd_l
         if(memcmp(PPS, cmd, sizeof(PPS)) == 0) {
             // If you ever have issue with this, try bumping it to 230400
             FURI_LOG_I(TAG, "PPS received, setting baudrate to 223125");
-            seader_uart_set_baudrate(seader->uart, 223125);
-
+            furi_hal_serial_set_br(seader_uart->serial_handle, 223125);
             seader_t_1_set_IFSD(seader);
-
-            // Kick off next part of detection process
-            /*
-            seader_worker_send_version(seader);
-            SeaderWorker* seader_worker = seader->worker;
-            if(seader_worker->callback) {
-                seader_worker->callback(SeaderWorkerEventSamPresent, seader_worker->context);
-            }
-            */
-
             return 0;
         }
     }
@@ -181,18 +162,6 @@ size_t seader_uart_process_buffer_raw(Seader* seader, uint8_t* cmd, size_t cmd_l
             FURI_LOG_I(TAG, "SAM ATR!");
             hasSAM = true;
 
-            // In order to get the transmission to work, we fudge the baudrate here
-            /*
-            seader_uart_set_baudrate(seader_uart, 9900);
-
-            furi_hal_serial_configure_framing(
-                seader_uart->serial_handle,
-                FuriHalSerialDataBits8,
-                FuriHalSerialParityEven,
-                FuriHalSerialStopBits2);
-            */
-            // 5.2.3 PPS - Protocol Parameter Selection
-            // 0xFF, 0x11, 0x96, 0x78
             seader_uart_send(seader_uart, PPS, sizeof(PPS));
             ppsSetup = true;
 
@@ -229,8 +198,6 @@ int32_t seader_uart_worker(void* context) {
         furi_thread_alloc_ex("SeaderUartTxWorker", 1.5 * 1024, seader_uart_tx_thread, seader);
 
     seader_uart_serial_init(seader, seader_uart->cfg.uart_ch);
-    // NOTE: I question the value of this
-    seader_uart_set_baudrate(seader_uart, seader_uart->cfg.baudrate);
 
     furi_thread_flags_set(furi_thread_get_id(seader_uart->tx_thread), WorkerEvtSamRx);
 
