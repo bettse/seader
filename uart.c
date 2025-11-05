@@ -53,6 +53,11 @@ void seader_uart_serial_init(Seader* seader, uint8_t uart_ch) {
         furi_hal_serial_dma_rx_start(
             seader_uart->serial_handle, seader_uart_on_irq_rx_dma_cb, seader_uart, false);
     } else {
+        furi_hal_gpio_init(RESET_PIN, GpioModeOutputPushPull, GpioPullNo, GpioSpeedLow);
+        furi_hal_gpio_write(RESET_PIN, true); // Active low, so set high
+
+        furi_hal_pwm_start(FuriHalPwmOutputIdLptim2PA4, PWM_FREQ, 50);
+
         furi_hal_serial_init(seader_uart->serial_handle, RAW_BAUDRATE_DEFAULT);
         furi_hal_serial_configure_framing(
             seader_uart->serial_handle,
@@ -62,12 +67,6 @@ void seader_uart_serial_init(Seader* seader, uint8_t uart_ch) {
 
         furi_hal_serial_dma_rx_start(
             seader_uart->serial_handle, seader_uart_on_irq_rx_dma_cb, seader_uart, false);
-
-        // NOTE: Consider putting this before the UART setup if we find the ATR on startup is problematic
-        furi_hal_pwm_start(FuriHalPwmOutputIdLptim2PA4, PWM_FREQ, 50);
-
-        furi_hal_gpio_init(RESET_PIN, GpioModeOutputPushPull, GpioPullNo, GpioSpeedLow);
-        furi_hal_gpio_write(RESET_PIN, true); // Active low, so set high
     }
 }
 
