@@ -44,11 +44,10 @@ void seader_t_1_set_IFSD(Seader* seader) {
     uint8_t frame[5];
     uint8_t frame_len = 0;
 
-    frame[0] = NAD;
-    frame[1] = 0xC1; // S(IFS request)
-    frame[2] = 0x01;
-    frame[3] = IFSD_VALUE;
-    frame_len = 4;
+    frame[frame_len++] = NAD;
+    frame[frame_len++] = 0xC1; // S(IFS request)
+    frame[frame_len++] = 0x01;
+    frame[frame_len++] = IFSD_VALUE;
 
     frame_len = seader_add_lrc(frame, frame_len);
 
