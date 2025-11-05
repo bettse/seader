@@ -192,7 +192,7 @@ bool seader_recv_t1(Seader* seader, CCID_Message* message) {
         if(seader_worker->callback) {
             seader_worker->callback(SeaderWorkerEventSamPresent, seader_worker->context);
         }
-        return false;
+        return true;
     }
 
     if(rPCB == cPCB) {
