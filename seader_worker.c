@@ -10,7 +10,7 @@
 #define ASN1_PREFIX     6
 // #define ASN1_DEBUG      true
 
-#define RAW_DETECT_PIN &gpio_ext_pa4
+#define RAW_DETECT_PIN &gpio_ext_pb3
 
 #define RFAL_PICOPASS_TXRX_FLAGS                                                    \
     (FURI_HAL_NFC_LL_TXRX_FLAGS_CRC_TX_MANUAL | FURI_HAL_NFC_LL_TXRX_FLAGS_AGC_ON | \
