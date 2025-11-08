@@ -1,6 +1,6 @@
 #include "seader_i.h"
 
-#define TAG "SeaderUART"
+#define TAG              "SeaderUART"
 #define BAUDRATE_DEFAULT 115200
 
 static void seader_uart_on_irq_rx_dma_cb(
