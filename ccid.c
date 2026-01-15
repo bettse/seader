@@ -6,6 +6,8 @@ bool hasSAM = false;
 const uint8_t SAM_ATR[] =
     {0x3b, 0x95, 0x96, 0x80, 0xb1, 0xfe, 0x55, 0x1f, 0xc7, 0x47, 0x72, 0x61, 0x63, 0x65, 0x13};
 const uint8_t SAM_ATR2[] = {0x3b, 0x90, 0x96, 0x91, 0x81, 0xb1, 0xfe, 0x55, 0x1f, 0xc7, 0xd4};
+//3b95968011fc47726163653c
+const uint8_t SAM_ATR3[] = {0x3b, 0x95, 0x96, 0x80, 0x11, 0xfc, 0x47, 0x72, 0x61, 0x63, 0x65, 0x3c};
 
 bool powered[2] = {false, false};
 uint8_t sam_slot = 0;
@@ -357,6 +359,16 @@ size_t seader_ccid_process(Seader* seader, uint8_t* cmd, size_t cmd_len) {
                     sam_slot = message.bSlot;
                     // I don't have an ATR2 to test with
                     seader_ccid_GetParameters(seader_uart);
+                } else if(memcmp(SAM_ATR3, message.payload, sizeof(SAM_ATR3)) == 0) {
+                    FURI_LOG_I(TAG, "SAM ATR3!");
+                    hasSAM = true;
+                    sam_slot = message.bSlot;
+                    if(seader_uart->T == 0) {
+                        seader_ccid_GetParameters(seader_uart);
+                    } else if(seader_uart->T == 1) {
+                        seader_ccid_SetParameters(
+                            seader, sam_slot, message.payload, message.dwLength);
+                    }
                 } else {
                     FURI_LOG_W(TAG, "Unknown ATR");
                     if(seader_worker->callback) {
