@@ -312,7 +312,17 @@ size_t seader_ccid_process(Seader* seader, uint8_t* cmd, size_t cmd_len) {
             return message.consumed;
         }
         if(message.bError != 0) {
-            FURI_LOG_W(TAG, "CCID error %02x", message.bError);
+            switch(message.bError) {
+            case 0xfe: // CCID_ERROR_ICC_MUTE:
+                FURI_LOG_W(TAG, "CCID error ICC_MUTE");
+                break;
+            case 0xfb: // HW_ERROR
+                FURI_LOG_W(TAG, "CCID error HW_ERROR");
+                break;
+            default:
+                FURI_LOG_W(TAG, "Unhandled CCID error %02x", message.bError);
+                break;
+            }
             message.consumed = cmd_len;
             if(seader_worker->callback) {
                 seader_worker->callback(SeaderWorkerEventSamMissing, seader_worker->context);
