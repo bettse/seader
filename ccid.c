@@ -78,16 +78,15 @@ void seader_ccid_GetSlotStatus(SeaderUartBridge* seader_uart, uint8_t slot) {
     furi_thread_flags_set(furi_thread_get_id(seader_uart->tx_thread), WorkerEvtSamRx);
 }
 
-void seader_ccid_SetParameters(Seader* seader, uint8_t slot, uint8_t* atr, size_t atr_len) {
+void seader_ccid_SetParameters(Seader* seader, uint8_t slot) {
     SeaderWorker* seader_worker = seader->worker;
     SeaderUartBridge* seader_uart = seader_worker->uart;
-    UNUSED(atr_len);
     FURI_LOG_D(TAG, "seader_ccid_SetParameters(%d)", slot);
 
     uint8_t payloadLen = 0;
     if(seader_uart->T == 0) {
         payloadLen = 5;
-    } else if(atr[4] == 0xB1 && seader_uart->T == 1) {
+    } else if(seader_uart->T == 1) {
         payloadLen = 7;
     }
     memset(seader_uart->tx_buf, 0, SEADER_UART_RX_BUF_SIZE);
@@ -101,20 +100,31 @@ void seader_ccid_SetParameters(Seader* seader, uint8_t slot, uint8_t* atr, size_
     seader_uart->tx_buf[2 + 8] = 0;
     seader_uart->tx_buf[2 + 9] = 0;
 
+    uint8_t* atr = seader->ATR;
+    seader_uart->IFSC = atr[5];
+
     if(seader_uart->T == 0) {
         // I'm leaving this here for completeness, but it was actually causing ICC_MUTE on the first apdu.
-        seader_uart->tx_buf[2 + 10] = 0x96; //atr[2]; //bmFindexDindex
+        seader_uart->tx_buf[2 + 10] = 0x11; //atr[2]; //bmFindexDindex
         seader_uart->tx_buf[2 + 11] = 0x00; //bmTCCKST1
         seader_uart->tx_buf[2 + 12] = 0x00; //bGuardTimeT0
         seader_uart->tx_buf[2 + 13] = 0x0a; //bWaitingIntegerT0
         seader_uart->tx_buf[2 + 14] = 0x00; //bClockStop
-    } else if(seader_uart->T == 1) {
+    } else if(atr[4] == 0xB1 && seader_uart->T == 1) {
         seader_uart->tx_buf[2 + 10] = atr[2]; //bmFindexDindex
         seader_uart->tx_buf[2 + 11] = 0x10; //bmTCCKST1
         seader_uart->tx_buf[2 + 12] = 0xfe; //bGuardTimeT1
         seader_uart->tx_buf[2 + 13] = atr[6]; //bWaitingIntegerT1
         seader_uart->tx_buf[2 + 14] = atr[8]; //bClockStop
-        seader_uart->tx_buf[2 + 15] = atr[5]; //bIFSC
+        seader_uart->tx_buf[2 + 15] = seader_uart->IFSC; //bIFSC
+        seader_uart->tx_buf[2 + 16] = 0x00; //bNadValue
+    } else if(seader_uart->T == 1) {
+        seader_uart->tx_buf[2 + 10] = 0x11; //atr[2]; //bmFindexDindex
+        seader_uart->tx_buf[2 + 11] = 0x10; //bmTCCKST1
+        seader_uart->tx_buf[2 + 12] = 0x00; //bGuardTimeT1
+        seader_uart->tx_buf[2 + 13] = 0x4d; //atr[6]; //bWaitingIntegerT1
+        seader_uart->tx_buf[2 + 14] = 0x00; //atr[8]; //bClockStop
+        seader_uart->tx_buf[2 + 15] = seader_uart->IFSC; //bIFSC
         seader_uart->tx_buf[2 + 16] = 0x00; //bNadValue
     }
 
@@ -373,27 +383,31 @@ size_t seader_ccid_process(Seader* seader, uint8_t* cmd, size_t cmd_len) {
                     FURI_LOG_I(TAG, "SAM ATR!");
                     hasSAM = true;
                     sam_slot = message.bSlot;
+                    seader->ATR_len = sizeof(SAM_ATR);
+                    memcpy(seader->ATR, message.payload, seader->ATR_len);
                     if(seader_uart->T == 0) {
                         seader_ccid_GetParameters(seader_uart);
                     } else if(seader_uart->T == 1) {
-                        seader_ccid_SetParameters(
-                            seader, sam_slot, message.payload, message.dwLength);
+                        seader_ccid_SetParameters(seader, sam_slot);
                     }
                 } else if(memcmp(SAM_ATR2, message.payload, sizeof(SAM_ATR2)) == 0) {
                     FURI_LOG_I(TAG, "SAM ATR2!");
                     hasSAM = true;
                     sam_slot = message.bSlot;
+                    seader->ATR_len = sizeof(SAM_ATR);
+                    memcpy(seader->ATR, message.payload, seader->ATR_len);
                     // I don't have an ATR2 to test with
                     seader_ccid_GetParameters(seader_uart);
                 } else if(memcmp(SAM_ATR3, message.payload, sizeof(SAM_ATR3)) == 0) {
                     FURI_LOG_I(TAG, "SAM ATR3!");
                     hasSAM = true;
                     sam_slot = message.bSlot;
+                    seader->ATR_len = sizeof(SAM_ATR);
+                    memcpy(seader->ATR, message.payload, seader->ATR_len);
                     if(seader_uart->T == 0) {
                         seader_ccid_GetParameters(seader_uart);
                     } else if(seader_uart->T == 1) {
-                        seader_ccid_SetParameters(
-                            seader, sam_slot, message.payload, message.dwLength);
+                        seader_ccid_SetParameters(seader, sam_slot);
                     }
                 } else {
                     FURI_LOG_W(TAG, "Unknown ATR");
