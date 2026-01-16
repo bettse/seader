@@ -178,7 +178,9 @@ bool seader_send_apdu(
     SeaderWorker* seader_worker = seader->worker;
     SeaderUartBridge* seader_uart = seader_worker->uart;
 
-    if(seader_uart->T == 1) {
+    bool extended = seader_uart->T == 1;
+
+    if(extended) {
         APDU_HEADER_LEN = 7;
     }
 
@@ -199,7 +201,7 @@ bool seader_send_apdu(
     apdu[2] = P1;
     apdu[3] = P2;
 
-    if(seader_uart->T == 1) {
+    if(extended) {
         apdu[4] = 0x00;
         apdu[5] = 0x00;
         apdu[6] = payloadLen;
