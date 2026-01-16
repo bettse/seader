@@ -35,7 +35,23 @@ void seader_ccid_IccPowerOn(SeaderUartBridge* seader_uart, uint8_t slot) {
 
     seader_uart->tx_buf[2 + 5] = slot;
     seader_uart->tx_buf[2 + 6] = getSequence(slot);
-    seader_uart->tx_buf[2 + 7] = 2; //power
+    seader_uart->tx_buf[2 + 7] = 1; //power
+
+    seader_uart->tx_len = seader_add_lrc(seader_uart->tx_buf, 2 + 10);
+    furi_thread_flags_set(furi_thread_get_id(seader_uart->tx_thread), WorkerEvtSamRx);
+}
+
+void seader_ccid_IccPowerOff(SeaderUartBridge* seader_uart, uint8_t slot) {
+    powered[slot] = false;
+
+    FURI_LOG_D(TAG, "Sending Power Off (%d)", slot);
+    memset(seader_uart->tx_buf, 0, SEADER_UART_RX_BUF_SIZE);
+    seader_uart->tx_buf[0] = SYNC;
+    seader_uart->tx_buf[1] = CTRL;
+    seader_uart->tx_buf[2 + 0] = CCID_MESSAGE_TYPE_PC_to_RDR_IccPowerOff;
+
+    seader_uart->tx_buf[2 + 5] = slot;
+    seader_uart->tx_buf[2 + 6] = getSequence(slot);
 
     seader_uart->tx_len = seader_add_lrc(seader_uart->tx_buf, 2 + 10);
     furi_thread_flags_set(furi_thread_get_id(seader_uart->tx_thread), WorkerEvtSamRx);
