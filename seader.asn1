@@ -96,10 +96,18 @@ FrameProtocol ::= ENUMERATED {
   iclass (4)
 }
 
+SamVerionDetails ::= SEQUENCE {
+  zero [0] OCTET STRING,
+  one [1] OCTET STRING,
+  two [2] OCTET STRING,
+  three [3] OCTET STRING
+}
+
 SamVersion ::= SEQUENCE {
   version [0] OCTET STRING,
   firmware [1] OCTET STRING,
-  type [2] OCTET STRING
+  type [2] OCTET STRING,
+  extra [5] SamVerionDetails OPTIONAL
 }
 
 -- Black Hat Asia 25: Dismantling-the-seos-protocol.
