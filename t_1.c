@@ -38,7 +38,6 @@ void seader_t_1_reset() {
 }
 
 void seader_t_1_set_IFSD(Seader* seader) {
-    FURI_LOG_D(TAG, "Setting IFSD to %02X", IFSD_VALUE);
     SeaderWorker* seader_worker = seader->worker;
     SeaderUartBridge* seader_uart = seader_worker->uart;
     uint8_t frame[5];
@@ -130,6 +129,8 @@ void seader_send_t1_chunk(Seader* seader, uint8_t PCB, uint8_t* chunk, size_t le
 }
 
 void seader_send_t1(Seader* seader, uint8_t* apdu, size_t len) {
+    SeaderWorker* seader_worker = seader->worker;
+    SeaderUartBridge* seader_uart = seader_worker->uart;
     uint8_t ifsc = seader_uart->IFSC;
 
     if(len > ifsc) {
