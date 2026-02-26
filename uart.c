@@ -138,12 +138,21 @@ size_t seader_uart_process_buffer_raw(Seader* seader, uint8_t* cmd, size_t cmd_l
 
     switch(sam_setup_state) {
     case SamSetupInit:
-        if(cmd_len < sizeof(SAM_ATR)) {
+        if(cmd_len < sizeof(SAM_ATR) && cmd_len < sizeof(SAM_ATR3)) {
             return cmd_len;
         }
 
         do {
             if(memcmp(SAM_ATR, cmd, sizeof(SAM_ATR)) == 0) {
+                FURI_LOG_I(TAG, "SAM ATR!");
+                sam_setup_state = SamSetupPPS;
+                seader_uart_send(seader_uart, PPS, sizeof(PPS));
+                return 0;
+            }
+
+            // Skipping SAM_ATR2 since I haven't seen one
+
+            if(memcmp(SAM_ATR3, cmd, sizeof(SAM_ATR3)) == 0) {
                 FURI_LOG_I(TAG, "SAM ATR!");
                 sam_setup_state = SamSetupPPS;
                 seader_uart_send(seader_uart, PPS, sizeof(PPS));
