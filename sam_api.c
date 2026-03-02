@@ -730,6 +730,12 @@ bool seader_parse_sam_response(Seader* seader, SamResponse_t* samResponse) {
         seader_log_hex_data(TAG, "Unknown samResponse", samResponse->buf, samResponse->size);
         view_dispatcher_send_custom_event(seader->view_dispatcher, SeaderCustomEventWorkerExit);
         break;
+    case SamCommand_PR_getItemKCV:
+        FURI_LOG_E(TAG, "samResponse SamCommand_PR_getItemKCV not implemented");
+        break;
+    case SamCommand_PR_processSNMPMessage:
+        FURI_LOG_E(TAG, "samResponse SamCommand_PR_processSNMPMessage not implemented");
+        break;
     case SamCommand_PR_requestPacs2:
         FURI_LOG_E(TAG, "samResponse SamCommand_PR_requestPacs2");
         break;
@@ -1276,7 +1282,7 @@ NfcCommand seader_worker_card_detect(
             &cardDetails->protocol, (const char*)protocol_bytes, sizeof(protocol_bytes));
         cardDetails->sak = &sak_string;
         // TODO: Update asn1 to change atqa to ats
-        cardDetails->atqa = &ats_string;
+        cardDetails->atsOrAtqbOrAtr = &ats_string;
     } else if(uid_len == 8) { // picopass
         protocol_bytes[1] = FrameProtocol_iclass;
         OCTET_STRING_fromBuf(
