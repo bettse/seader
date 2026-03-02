@@ -353,6 +353,13 @@ asn_encode_internal(const asn_codec_ctx_t *opt_codec_ctx,
         break;
 #endif  /* ASN_DISABLE_PER_SUPPORT */
 
+#ifdef  ASN_DISABLE_XER_SUPPORT
+    case ATS_BASIC_XER:
+    case ATS_CANONICAL_XER:
+        errno = ENOENT; /* XER is not defined. */
+        ASN__ENCODE_FAILED;
+        break;
+#else /* ASN_DISABLE_XER_SUPPORT */
     case ATS_BASIC_XER:
         /* CANONICAL-XER is a superset of BASIC-XER. */
         xer_flags &= ~XER_F_CANONICAL;
@@ -373,6 +380,7 @@ asn_encode_internal(const asn_codec_ctx_t *opt_codec_ctx,
             ASN__ENCODE_FAILED;
         }
         break;
+#endif /* ASN_DISABLE_XER_SUPPORT */
 
     default:
         errno = ENOENT;
@@ -397,6 +405,11 @@ asn_decode(const asn_codec_ctx_t *opt_codec_ctx,
         errno = ENOENT;
         ASN__DECODE_FAILED;
 
+#ifdef  ASN_DISABLE_RANDOM_FILL
+    case ATS_RANDOM:
+        errno = ENOENT;
+        ASN__DECODE_FAILED;
+#else
     case ATS_RANDOM:
         if(!td->op->random_fill) {
             ASN__DECODE_FAILED;
@@ -409,6 +422,7 @@ asn_decode(const asn_codec_ctx_t *opt_codec_ctx,
             }
         }
         break;
+#endif
 
     case ATS_DER:
     case ATS_BER:
@@ -432,9 +446,16 @@ asn_decode(const asn_codec_ctx_t *opt_codec_ctx,
         return uper_decode_complete(opt_codec_ctx, td, sptr, buffer, size);
 #endif
 
+#ifdef  ASN_DISABLE_XER_SUPPORT
+    case ATS_BASIC_XER:
+    case ATS_CANONICAL_XER:
+        errno = ENOENT;
+        ASN__DECODE_FAILED;
+#else
     case ATS_BASIC_XER:
     case ATS_CANONICAL_XER:
         return xer_decode(opt_codec_ctx, td, sptr, buffer, size);
+#endif
     }
 }
 

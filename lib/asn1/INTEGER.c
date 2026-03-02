@@ -20,8 +20,13 @@ asn_TYPE_operation_t asn_OP_INTEGER = {
 	INTEGER_compare,
 	ber_decode_primitive,
 	INTEGER_encode_der,
+#ifdef  ASN_DISABLE_XER_SUPPORT
+	0,
+	0,
+#else
 	INTEGER_decode_xer,
 	INTEGER_encode_xer,
+#endif  /* ASN_DISABLE_XER_SUPPORT */
 #ifdef  ASN_DISABLE_OER_SUPPORT
 	0,
 	0,
@@ -36,7 +41,11 @@ asn_TYPE_operation_t asn_OP_INTEGER = {
 	INTEGER_decode_uper,	/* Unaligned PER decoder */
 	INTEGER_encode_uper,	/* Unaligned PER encoder */
 #endif	/* ASN_DISABLE_PER_SUPPORT */
+#ifdef  ASN_DISABLE_RANDOM_FILL
+	0,
+#else
 	INTEGER_random_fill,
+#endif  /* ASN_DISABLE_RANDOM_FILL */
 	0	/* Use generic outmost tag fetcher */
 };
 asn_TYPE_descriptor_t asn_DEF_INTEGER = {

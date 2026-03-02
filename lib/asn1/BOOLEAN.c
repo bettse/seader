@@ -18,8 +18,13 @@ asn_TYPE_operation_t asn_OP_BOOLEAN = {
 	BOOLEAN_compare,
 	BOOLEAN_decode_ber,
 	BOOLEAN_encode_der,
+#ifdef  ASN_DISABLE_XER_SUPPORT
+	0,
+	0,
+#else
 	BOOLEAN_decode_xer,
 	BOOLEAN_encode_xer,
+#endif  /* ASN_DISABLE_XER_SUPPORT */
 #ifdef	ASN_DISABLE_OER_SUPPORT
 	0,
 	0,
@@ -34,7 +39,11 @@ asn_TYPE_operation_t asn_OP_BOOLEAN = {
 	BOOLEAN_decode_uper,	/* Unaligned PER decoder */
 	BOOLEAN_encode_uper,	/* Unaligned PER encoder */
 #endif	/* ASN_DISABLE_PER_SUPPORT */
+#ifdef  ASN_DISABLE_RANDOM_FILL
+	0,
+#else
 	BOOLEAN_random_fill,
+#endif  /* ASN_DISABLE_RANDOM_FILL */
 	0	/* Use generic outmost tag fetcher */
 };
 asn_TYPE_descriptor_t asn_DEF_BOOLEAN = {

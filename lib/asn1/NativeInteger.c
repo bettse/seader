@@ -25,8 +25,13 @@ asn_TYPE_operation_t asn_OP_NativeInteger = {
 	NativeInteger_compare,
 	NativeInteger_decode_ber,
 	NativeInteger_encode_der,
+#ifdef  ASN_DISABLE_XER_SUPPORT
+	0,
+	0,
+#else
 	NativeInteger_decode_xer,
 	NativeInteger_encode_xer,
+#endif  /* ASN_DISABLE_XER_SUPPORT */
 #ifdef	ASN_DISABLE_OER_SUPPORT
 	0,
 	0,
@@ -41,7 +46,11 @@ asn_TYPE_operation_t asn_OP_NativeInteger = {
 	NativeInteger_decode_uper,	/* Unaligned PER decoder */
 	NativeInteger_encode_uper,	/* Unaligned PER encoder */
 #endif	/* ASN_DISABLE_PER_SUPPORT */
+#ifdef  ASN_DISABLE_RANDOM_FILL
+	0,
+#else
 	NativeInteger_random_fill,
+#endif  /* ASN_DISABLE_RANDOM_FILL */
 	0	/* Use generic outmost tag fetcher */
 };
 asn_TYPE_descriptor_t asn_DEF_NativeInteger = {

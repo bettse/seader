@@ -34,6 +34,7 @@ typedef asn_random_fill_result_t(asn_random_fill_f)(
     const struct asn_encoding_constraints_s *memb_constraints,
     size_t max_length);
 
+#ifndef ASN_DISABLE_RANDOM_FILL
 /*
  * Returns 0 if the structure was properly initialized, -1 otherwise.
  * The (approx_max_length_limit) specifies the approximate limit of the
@@ -47,5 +48,6 @@ int asn_random_fill(const struct asn_TYPE_descriptor_s *td, void **struct_ptr,
  * Returns a random number between min and max.
  */
 intmax_t asn_random_between(intmax_t min, intmax_t max);
+#endif
 
 #endif	/* ASN_RANDOM_FILL */

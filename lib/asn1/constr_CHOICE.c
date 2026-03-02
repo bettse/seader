@@ -1319,8 +1319,13 @@ asn_TYPE_operation_t asn_OP_CHOICE = {
 	CHOICE_compare,
 	CHOICE_decode_ber,
 	CHOICE_encode_der,
+#ifdef  ASN_DISABLE_XER_SUPPORT
+	0,
+	0,
+#else
 	CHOICE_decode_xer,
 	CHOICE_encode_xer,
+#endif  /* ASN_DISABLE_XER_SUPPORT */
 #ifdef	ASN_DISABLE_OER_SUPPORT
 	0,
 	0,
@@ -1335,6 +1340,10 @@ asn_TYPE_operation_t asn_OP_CHOICE = {
 	CHOICE_decode_uper,
 	CHOICE_encode_uper,
 #endif	/* ASN_DISABLE_PER_SUPPORT */
+#ifdef  ASN_DISABLE_RANDOM_FILL
+	0,
+#else
 	CHOICE_random_fill,
+#endif  /* ASN_DISABLE_RANDOM_FILL */
 	CHOICE_outmost_tag
 };

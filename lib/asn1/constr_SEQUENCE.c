@@ -1536,8 +1536,13 @@ asn_TYPE_operation_t asn_OP_SEQUENCE = {
 	SEQUENCE_compare,
 	SEQUENCE_decode_ber,
 	SEQUENCE_encode_der,
+#ifdef  ASN_DISABLE_XER_SUPPORT
+	0,
+	0,
+#else
 	SEQUENCE_decode_xer,
 	SEQUENCE_encode_xer,
+#endif  /* ASN_DISABLE_XER_SUPPORT */
 #ifdef	ASN_DISABLE_OER_SUPPORT
 	0,
 	0,
@@ -1552,7 +1557,11 @@ asn_TYPE_operation_t asn_OP_SEQUENCE = {
 	SEQUENCE_decode_uper,
 	SEQUENCE_encode_uper,
 #endif /* ASN_DISABLE_PER_SUPPORT */
+#ifdef  ASN_DISABLE_RANDOM_FILL
+	0,
+#else
 	SEQUENCE_random_fill,
+#endif  /* ASN_DISABLE_RANDOM_FILL */
 	0	/* Use generic outmost tag fetcher */
 };
 
