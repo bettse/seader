@@ -185,16 +185,28 @@ bool seader_send_apdu(
     bool extended = seader_uart->T == 1;
     uint8_t header_len = extended ? 7 : 5;
 
-    if(header_len + payloadLen > SEADER_UART_RX_BUF_SIZE) {
+    // Must account for MAX_FRAME_HEADERS headroom in scratchpad mode
+    if(MAX_FRAME_HEADERS + header_len + payloadLen > SEADER_UART_RX_BUF_SIZE) {
         FURI_LOG_E(TAG, "Cannot send message, too long: %d", header_len + payloadLen);
         return false;
     }
 
     uint8_t length = header_len + payloadLen;
     uint8_t* apdu;
+    bool must_free = false;
+    uintptr_t tx_start = (uintptr_t)seader_uart->tx_buf;
+    uintptr_t tx_end = tx_start + SEADER_UART_RX_BUF_SIZE;
+    uintptr_t payload_addr = (uintptr_t)payload;
+    bool scratchpad_payload = false;
 
-    if(in_scratchpad) {
-        apdu = payload - header_len;
+    // in_scratchpad is only valid when the full payload range is inside tx_buf.
+    if(in_scratchpad && payload_addr >= tx_start + header_len && payload_addr <= tx_end) {
+        size_t available = (size_t)(tx_end - payload_addr);
+        scratchpad_payload = payloadLen <= available;
+    }
+
+    if(scratchpad_payload) {
+        apdu = (uint8_t*)(payload_addr - header_len);
     } else {
         apdu = malloc(length);
         if(!apdu) {
@@ -202,6 +214,7 @@ bool seader_send_apdu(
             return false;
         }
         memcpy(apdu + header_len, payload, payloadLen);
+        must_free = true;
     }
 
     apdu[0] = CLA;
@@ -225,7 +238,7 @@ bool seader_send_apdu(
         seader_ccid_XfrBlock(seader_uart, apdu, length);
     }
 
-    if(!in_scratchpad) {
+    if(must_free) {
         free(apdu);
     }
 
@@ -257,9 +270,41 @@ void seader_send_payload(
 
     uint8_t* scratchpad = seader_uart->tx_buf + MAX_FRAME_HEADERS;
     size_t scratchpad_size = SEADER_UART_RX_BUF_SIZE - MAX_FRAME_HEADERS;
+    size_t max_der_len = UINT8_MAX - ASN1_PREFIX;
+    uint8_t* payload_buf = scratchpad;
+    bool payload_in_scratchpad = true;
 
     asn_enc_rval_t er =
-        der_encode_to_buffer(&asn_DEF_Payload, payload, scratchpad + ASN1_PREFIX, scratchpad_size - ASN1_PREFIX);
+        der_encode_to_buffer(
+            &asn_DEF_Payload, payload, scratchpad + ASN1_PREFIX, scratchpad_size - ASN1_PREFIX);
+
+    if(er.encoded < 0 || ((size_t)er.encoded + ASN1_PREFIX) > UINT8_MAX) {
+        payload_buf = malloc(ASN1_PREFIX + max_der_len);
+        if(!payload_buf) {
+            FURI_LOG_E(TAG, "Failed to allocate DER fallback buffer");
+            return;
+        }
+        payload_in_scratchpad = false;
+
+        er = der_encode_to_buffer(&asn_DEF_Payload, payload, payload_buf + ASN1_PREFIX, max_der_len);
+    }
+
+    if(er.encoded < 0) {
+        FURI_LOG_E(TAG, "Failed to encode payload");
+        if(!payload_in_scratchpad) {
+            free(payload_buf);
+        }
+        return;
+    }
+
+    size_t apdu_payload_len = ASN1_PREFIX + (size_t)er.encoded;
+    if(apdu_payload_len > UINT8_MAX) {
+        FURI_LOG_E(TAG, "Encoded payload too large for APDU: %d", (int)apdu_payload_len);
+        if(!payload_in_scratchpad) {
+            free(payload_buf);
+        }
+        return;
+    }
 
 #ifdef ASN1_DEBUG
     if(er.encoded > -1) {
@@ -277,14 +322,26 @@ void seader_send_payload(
 #endif
     //0xa0, 0xda, 0x02, 0x63, 0x00, 0x00, 0x0a,
     //0x44, 0x0a, 0x44, 0x00, 0x00, 0x00, 0xa0, 0x02, 0x96, 0x00
-    scratchpad[0] = from;
-    scratchpad[1] = to;
-    scratchpad[2] = replyTo;
-    scratchpad[3] = 0x00;
-    scratchpad[4] = 0x00;
-    scratchpad[5] = 0x00;
+    payload_buf[0] = from;
+    payload_buf[1] = to;
+    payload_buf[2] = replyTo;
+    payload_buf[3] = 0x00;
+    payload_buf[4] = 0x00;
+    payload_buf[5] = 0x00;
 
-    seader_send_apdu(seader, 0xA0, 0xDA, 0x02, 0x63, scratchpad, 6 + er.encoded, true);
+    seader_send_apdu(
+        seader,
+        0xA0,
+        0xDA,
+        0x02,
+        0x63,
+        payload_buf,
+        (uint8_t)apdu_payload_len,
+        payload_in_scratchpad);
+
+    if(!payload_in_scratchpad) {
+        free(payload_buf);
+    }
 }
 
 void seader_send_process_config_card(Seader* seader) {

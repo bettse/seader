@@ -1,5 +1,3 @@
-
-
 all: gitsub asn1 build
 
 gitsub:

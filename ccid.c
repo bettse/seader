@@ -158,16 +158,35 @@ void seader_ccid_XfrBlockToSlot(
     uint8_t slot,
     uint8_t* data,
     size_t len) {
-    bool in_scratchpad = (data >= seader_uart->tx_buf && data < seader_uart->tx_buf + SEADER_UART_RX_BUF_SIZE);
     uint8_t header_len = 2 + 10;
+    if(len > ((size_t)SEADER_UART_RX_BUF_SIZE - header_len)) {
+        FURI_LOG_E(TAG, "CCID frame too long: %d", (int)(header_len + len));
+        return;
+    }
+
+    uintptr_t tx_start = (uintptr_t)seader_uart->tx_buf;
+    uintptr_t tx_end = tx_start + SEADER_UART_RX_BUF_SIZE;
+    uintptr_t data_addr = (uintptr_t)data;
+    bool in_scratchpad = false;
+    if(data_addr >= tx_start + header_len && data_addr <= tx_end) {
+        size_t available = (size_t)(tx_end - data_addr);
+        in_scratchpad = len <= available;
+    }
     uint8_t* frame;
 
     if(in_scratchpad) {
         frame = data - header_len;
+        seader_uart->tx_len = header_len + len;
+        // Shift frame to start of tx_buf for UART worker
+        if(frame != seader_uart->tx_buf) {
+            memmove(seader_uart->tx_buf, frame, seader_uart->tx_len);
+            frame = seader_uart->tx_buf;
+        }
     } else {
         frame = seader_uart->tx_buf;
         memset(frame, 0, header_len);
         memcpy(frame + header_len, data, len);
+        seader_uart->tx_len = header_len + len;
     }
 
     frame[0] = SYNC;
@@ -183,7 +202,6 @@ void seader_ccid_XfrBlockToSlot(
     frame[2 + 8] = 0;
     frame[2 + 9] = 0;
 
-    seader_uart->tx_len = header_len + len;
     seader_uart->tx_len = seader_add_lrc(frame, seader_uart->tx_len);
 
     /*
