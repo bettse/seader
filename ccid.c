@@ -158,29 +158,42 @@ void seader_ccid_XfrBlockToSlot(
     uint8_t slot,
     uint8_t* data,
     size_t len) {
-    memset(seader_uart->tx_buf, 0, SEADER_UART_RX_BUF_SIZE);
-    seader_uart->tx_buf[0] = SYNC;
-    seader_uart->tx_buf[1] = CTRL;
-    seader_uart->tx_buf[2 + 0] = CCID_MESSAGE_TYPE_PC_to_RDR_XfrBlock;
-    seader_uart->tx_buf[2 + 1] = (len >> 0) & 0xff;
-    seader_uart->tx_buf[2 + 2] = (len >> 8) & 0xff;
-    seader_uart->tx_buf[2 + 5] = slot;
-    seader_uart->tx_buf[2 + 6] = getSequence(slot);
-    seader_uart->tx_buf[2 + 7] = 5;
-    seader_uart->tx_buf[2 + 8] = 0;
-    seader_uart->tx_buf[2 + 9] = 0;
-
+    bool in_scratchpad = (data >= seader_uart->tx_buf && data < seader_uart->tx_buf + SEADER_UART_RX_BUF_SIZE);
     uint8_t header_len = 2 + 10;
-    memcpy(seader_uart->tx_buf + header_len, data, len);
-    seader_uart->tx_len = header_len + len;
-    seader_uart->tx_len = seader_add_lrc(seader_uart->tx_buf, seader_uart->tx_len);
+    uint8_t* frame;
 
+    if(in_scratchpad) {
+        frame = data - header_len;
+    } else {
+        frame = seader_uart->tx_buf;
+        memset(frame, 0, header_len);
+        memcpy(frame + header_len, data, len);
+    }
+
+    frame[0] = SYNC;
+    frame[1] = CTRL;
+    frame[2 + 0] = CCID_MESSAGE_TYPE_PC_to_RDR_XfrBlock;
+    frame[2 + 1] = (len >> 0) & 0xff;
+    frame[2 + 2] = (len >> 8) & 0xff;
+    frame[2 + 3] = (len >> 16) & 0xff;
+    frame[2 + 4] = (len >> 24) & 0xff;
+    frame[2 + 5] = slot;
+    frame[2 + 6] = getSequence(slot);
+    frame[2 + 7] = 5;
+    frame[2 + 8] = 0;
+    frame[2 + 9] = 0;
+
+    seader_uart->tx_len = header_len + len;
+    seader_uart->tx_len = seader_add_lrc(frame, seader_uart->tx_len);
+
+    /*
     char* display = malloc(seader_uart->tx_len * 2 + 1);
     for(uint8_t i = 0; i < seader_uart->tx_len; i++) {
-        snprintf(display + (i * 2), sizeof(display), "%02x", seader_uart->tx_buf[i]);
+        snprintf(display + (i * 2), sizeof(display), "%02x", frame[i]);
     }
     FURI_LOG_D(TAG, "seader_ccid_XfrBlockToSlot(%d) %d: %s", slot, seader_uart->tx_len, display);
     free(display);
+    */
 
     furi_thread_flags_set(furi_thread_get_id(seader_uart->tx_thread), WorkerEvtSamRx);
 }

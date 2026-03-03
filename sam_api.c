@@ -170,7 +170,6 @@ void seader_virtual_picopass_state_machine(Seader* seader, uint8_t* buffer, size
     bit_buffer_free(rx_buffer);
 }
 
-uint8_t APDU_HEADER_LEN = 5;
 bool seader_send_apdu(
     Seader* seader,
     uint8_t CLA,
@@ -178,26 +177,31 @@ bool seader_send_apdu(
     uint8_t P1,
     uint8_t P2,
     uint8_t* payload,
-    uint8_t payloadLen) {
+    uint8_t payloadLen,
+    bool in_scratchpad) {
     SeaderWorker* seader_worker = seader->worker;
     SeaderUartBridge* seader_uart = seader_worker->uart;
 
     bool extended = seader_uart->T == 1;
+    uint8_t header_len = extended ? 7 : 5;
 
-    if(extended) {
-        APDU_HEADER_LEN = 7;
-    }
-
-    if(APDU_HEADER_LEN + payloadLen > SEADER_UART_RX_BUF_SIZE) {
-        FURI_LOG_E(TAG, "Cannot send message, too long: %d", APDU_HEADER_LEN + payloadLen);
+    if(header_len + payloadLen > SEADER_UART_RX_BUF_SIZE) {
+        FURI_LOG_E(TAG, "Cannot send message, too long: %d", header_len + payloadLen);
         return false;
     }
 
-    uint8_t length = APDU_HEADER_LEN + payloadLen;
-    uint8_t* apdu = malloc(length);
-    if(!apdu) {
-        FURI_LOG_E(TAG, "Failed to allocate memory for apdu in seader_send_apdu");
-        return false;
+    uint8_t length = header_len + payloadLen;
+    uint8_t* apdu;
+
+    if(in_scratchpad) {
+        apdu = payload - header_len;
+    } else {
+        apdu = malloc(length);
+        if(!apdu) {
+            FURI_LOG_E(TAG, "Failed to allocate memory for apdu in seader_send_apdu");
+            return false;
+        }
+        memcpy(apdu + header_len, payload, payloadLen);
     }
 
     apdu[0] = CLA;
@@ -213,8 +217,6 @@ bool seader_send_apdu(
         apdu[4] = payloadLen;
     }
 
-    memcpy(apdu + APDU_HEADER_LEN, payload, payloadLen);
-
     seader_log_hex_data(TAG, "seader_send_apdu", apdu, length);
 
     if(seader_uart->T == 1) {
@@ -222,7 +224,10 @@ bool seader_send_apdu(
     } else {
         seader_ccid_XfrBlock(seader_uart, apdu, length);
     }
-    free(apdu);
+
+    if(!in_scratchpad) {
+        free(apdu);
+    }
 
     return true;
 }
@@ -247,14 +252,18 @@ void seader_send_payload(
     uint8_t from,
     uint8_t to,
     uint8_t replyTo) {
-    uint8_t rBuffer[SEADER_UART_RX_BUF_SIZE] = {0};
+    SeaderWorker* seader_worker = seader->worker;
+    SeaderUartBridge* seader_uart = seader_worker->uart;
 
-    asn_enc_rval_t er = der_encode_to_buffer(
-        &asn_DEF_Payload, payload, rBuffer + ASN1_PREFIX, sizeof(rBuffer) - ASN1_PREFIX);
+    uint8_t* scratchpad = seader_uart->tx_buf + MAX_FRAME_HEADERS;
+    size_t scratchpad_size = SEADER_UART_RX_BUF_SIZE - MAX_FRAME_HEADERS;
+
+    asn_enc_rval_t er =
+        der_encode_to_buffer(&asn_DEF_Payload, payload, scratchpad + ASN1_PREFIX, scratchpad_size - ASN1_PREFIX);
 
 #ifdef ASN1_DEBUG
     if(er.encoded > -1) {
-        char payloadDebug[1024] = {0};
+        char payloadDebug[384] = {0};
         memset(payloadDebug, 0, sizeof(payloadDebug));
         (&asn_DEF_Payload)
             ->op->print_struct(
@@ -268,11 +277,14 @@ void seader_send_payload(
 #endif
     //0xa0, 0xda, 0x02, 0x63, 0x00, 0x00, 0x0a,
     //0x44, 0x0a, 0x44, 0x00, 0x00, 0x00, 0xa0, 0x02, 0x96, 0x00
-    rBuffer[0] = from;
-    rBuffer[1] = to;
-    rBuffer[2] = replyTo;
+    scratchpad[0] = from;
+    scratchpad[1] = to;
+    scratchpad[2] = replyTo;
+    scratchpad[3] = 0x00;
+    scratchpad[4] = 0x00;
+    scratchpad[5] = 0x00;
 
-    seader_send_apdu(seader, 0xA0, 0xDA, 0x02, 0x63, rBuffer, 6 + er.encoded);
+    seader_send_apdu(seader, 0xA0, 0xDA, 0x02, 0x63, scratchpad, 6 + er.encoded, true);
 }
 
 void seader_send_process_config_card(Seader* seader) {
