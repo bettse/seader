@@ -112,7 +112,11 @@ void seader_send_t1_chunk(SeaderUartBridge* seader_uart, uint8_t PCB, uint8_t* c
     free(frame);
 }
 
-void seader_send_t1_scratchpad(SeaderUartBridge* seader_uart, uint8_t PCB, uint8_t* apdu, size_t len) {
+void seader_send_t1_scratchpad(
+    SeaderUartBridge* seader_uart,
+    uint8_t PCB,
+    uint8_t* apdu,
+    size_t len) {
     uint8_t* frame = apdu - 3;
     frame[0] = NAD;
     frame[1] = PCB;
@@ -125,8 +129,8 @@ void seader_send_t1_scratchpad(SeaderUartBridge* seader_uart, uint8_t PCB, uint8
 void seader_send_t1(SeaderUartBridge* seader_uart, uint8_t* apdu, size_t len) {
     uint8_t ifsc = seader_uart->IFSC;
 
-    bool in_scratchpad = (apdu >= seader_uart->tx_buf + 3 &&
-                          apdu < seader_uart->tx_buf + SEADER_UART_RX_BUF_SIZE);
+    bool in_scratchpad =
+        (apdu >= seader_uart->tx_buf + 3 && apdu < seader_uart->tx_buf + SEADER_UART_RX_BUF_SIZE);
 
     if(len > ifsc) {
         if(seader_t_1_tx_buffer == NULL) {

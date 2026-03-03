@@ -274,9 +274,8 @@ void seader_send_payload(
     uint8_t* payload_buf = scratchpad;
     bool payload_in_scratchpad = true;
 
-    asn_enc_rval_t er =
-        der_encode_to_buffer(
-            &asn_DEF_Payload, payload, scratchpad + ASN1_PREFIX, scratchpad_size - ASN1_PREFIX);
+    asn_enc_rval_t er = der_encode_to_buffer(
+        &asn_DEF_Payload, payload, scratchpad + ASN1_PREFIX, scratchpad_size - ASN1_PREFIX);
 
     if(er.encoded < 0 || ((size_t)er.encoded + ASN1_PREFIX) > UINT8_MAX) {
         payload_buf = malloc(ASN1_PREFIX + max_der_len);
@@ -286,7 +285,8 @@ void seader_send_payload(
         }
         payload_in_scratchpad = false;
 
-        er = der_encode_to_buffer(&asn_DEF_Payload, payload, payload_buf + ASN1_PREFIX, max_der_len);
+        er = der_encode_to_buffer(
+            &asn_DEF_Payload, payload, payload_buf + ASN1_PREFIX, max_der_len);
     }
 
     if(er.encoded < 0) {
@@ -384,7 +384,8 @@ void seader_send_request_pacs(Seader* seader) {
     payload.present = Payload_PR_samCommand;
     payload.choice.samCommand = samCommand;
 
-    seader_send_payload(seader, &payload, ExternalApplicationA, SAMInterface, ExternalApplicationA);
+    seader_send_payload(
+        seader, &payload, ExternalApplicationA, SAMInterface, ExternalApplicationA);
 }
 
 void seader_send_request_pacs2(Seader* seader) {
@@ -406,7 +407,8 @@ void seader_send_request_pacs2(Seader* seader) {
     payload.present = Payload_PR_samCommand;
     payload.choice.samCommand = samCommand;
 
-    seader_send_payload(seader, &payload, ExternalApplicationA, SAMInterface, ExternalApplicationA);
+    seader_send_payload(
+        seader, &payload, ExternalApplicationA, SAMInterface, ExternalApplicationA);
 }
 
 void seader_worker_send_serial_number(Seader* seader) {
@@ -418,7 +420,8 @@ void seader_worker_send_serial_number(Seader* seader) {
     payload.present = Payload_PR_samCommand;
     payload.choice.samCommand = samCommand;
 
-    seader_send_payload(seader, &payload, ExternalApplicationA, SAMInterface, ExternalApplicationA);
+    seader_send_payload(
+        seader, &payload, ExternalApplicationA, SAMInterface, ExternalApplicationA);
 }
 
 void seader_worker_send_version(Seader* seader) {
@@ -430,7 +433,8 @@ void seader_worker_send_version(Seader* seader) {
     payload.present = Payload_PR_samCommand;
     payload.choice.samCommand = samCommand;
 
-    seader_send_payload(seader, &payload, ExternalApplicationA, SAMInterface, ExternalApplicationA);
+    seader_send_payload(
+        seader, &payload, ExternalApplicationA, SAMInterface, ExternalApplicationA);
 }
 
 void seader_send_card_detected(Seader* seader, CardDetails_t* cardDetails) {
@@ -447,7 +451,8 @@ void seader_send_card_detected(Seader* seader, CardDetails_t* cardDetails) {
     payload.present = Payload_PR_samCommand;
     payload.choice.samCommand = samCommand;
 
-    seader_send_payload(seader, &payload, ExternalApplicationA, SAMInterface, ExternalApplicationA);
+    seader_send_payload(
+        seader, &payload, ExternalApplicationA, SAMInterface, ExternalApplicationA);
 }
 
 bool seader_unpack_pacs(Seader* seader, uint8_t* buf, size_t size) {
