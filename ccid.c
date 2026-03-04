@@ -164,9 +164,9 @@ void seader_ccid_XfrBlockToSlot(
         return;
     }
 
-    uintptr_t tx_start = (uintptr_t)seader_uart->tx_buf;
-    uintptr_t tx_end = tx_start + SEADER_UART_RX_BUF_SIZE;
-    uintptr_t data_addr = (uintptr_t)data;
+    uint8_t* tx_start = (uint8_t*)seader_uart->tx_buf;
+    uint8_t* tx_end = tx_start + SEADER_UART_RX_BUF_SIZE;
+    uint8_t* data_addr = (uint8_t*)data;
     bool in_scratchpad = false;
     if(data_addr >= tx_start + header_len && data_addr <= tx_end) {
         size_t available = (size_t)(tx_end - data_addr);
