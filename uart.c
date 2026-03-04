@@ -58,7 +58,6 @@ void seader_uart_set_baudrate(SeaderUartBridge* seader_uart, uint32_t baudrate) 
 }
 
 size_t seader_uart_process_buffer(Seader* seader, uint8_t* cmd, size_t cmd_len) {
-    SeaderUartBridge* seader_uart = seader->uart;
     if(cmd_len < 2) {
         return cmd_len;
     }
@@ -73,7 +72,6 @@ size_t seader_uart_process_buffer(Seader* seader, uint8_t* cmd, size_t cmd_len) 
             if(cmd_len > 0) {
                 memmove(cmd, cmd + consumed, cmd_len);
             }
-            seader_uart->st.rx_cnt += consumed;
 
             /*
             memset(display, 0, SEADER_UART_RX_BUF_SIZE);
@@ -188,7 +186,6 @@ int32_t seader_uart_tx_thread(void* context) {
                     snprintf(display + (i * 2), sizeof(display), "%02x", seader_uart->tx_buf[i]);
                 }
                 // FURI_LOG_I(TAG, "SEND %d bytes: %s", seader_uart->tx_len, display);
-                seader_uart->st.tx_cnt += seader_uart->tx_len;
                 furi_hal_serial_tx(
                     seader_uart->serial_handle, seader_uart->tx_buf, seader_uart->tx_len);
             }
