@@ -22,12 +22,12 @@
  */
 
 // TODO: rename/renumber
-#define CCID_SLOT_0_MASK         0x03
-#define CCID_SLOT_0_CARD_OUT     0x02
-#define CCID_SLOT_0_CARD_IN      0x03
-#define CCID_SLOT_1_MASK         0x0C
-#define CCID_SLOT_1_CARD_IN      0x04
-#define CCID_SLOT_1_CARD_OUT     0x0C
+#define CCID_SLOT_0_MASK     0x03
+#define CCID_SLOT_0_CARD_OUT 0x02
+#define CCID_SLOT_0_CARD_IN  0x03
+#define CCID_SLOT_1_MASK     0x0C
+#define CCID_SLOT_1_CARD_IN  0x04
+#define CCID_SLOT_1_CARD_OUT 0x0C
 
 /*
  *  * BULK_OUT messages from PC to Reader

@@ -98,10 +98,8 @@ static void seader_trace_mfc_packed_frame(const char* prefix, const uint8_t* buf
     seader_trace(TAG, "mfc tx parity bits=%s", parity_bits);
 }
 
-static void seader_trace_mfc_bitbuffer(
-    const char* prefix,
-    BitBuffer* buffer,
-    bool include_parity) {
+static void
+    seader_trace_mfc_bitbuffer(const char* prefix, BitBuffer* buffer, bool include_parity) {
     if(!buffer) {
         seader_trace(TAG, "%s <null>", prefix);
         return;
@@ -139,10 +137,8 @@ static void seader_trace_mfc_packed_frame(const char* prefix, const uint8_t* buf
     (void)len;
 }
 
-static void seader_trace_mfc_bitbuffer(
-    const char* prefix,
-    BitBuffer* buffer,
-    bool include_parity) {
+static void
+    seader_trace_mfc_bitbuffer(const char* prefix, BitBuffer* buffer, bool include_parity) {
     (void)prefix;
     (void)buffer;
     (void)include_parity;
@@ -196,10 +192,9 @@ bool seader_sam_can_accept_card(const Seader* seader) {
 }
 
 bool seader_sam_has_active_card(const Seader* seader) {
-    return
-        seader->sam_state == SeaderSamStateDetectPending ||
-        seader->sam_state == SeaderSamStateConversation ||
-        seader->sam_state == SeaderSamStateFinishing;
+    return seader->sam_state == SeaderSamStateDetectPending ||
+           seader->sam_state == SeaderSamStateConversation ||
+           seader->sam_state == SeaderSamStateFinishing;
 }
 
 PicopassError seader_worker_fake_epurse_update(BitBuffer* tx_buffer, BitBuffer* rx_buffer) {
@@ -825,11 +820,7 @@ bool seader_parse_serial_number(Seader* seader, uint8_t* buf, size_t size) {
 
 static void seader_abort_active_read(Seader* seader) {
     SeaderWorker* seader_worker = seader->worker;
-    FURI_LOG_W(
-        TAG,
-        "Abort active read stage=%d sam=%d",
-        seader_worker->stage,
-        seader->samCommand);
+    FURI_LOG_W(TAG, "Abort active read stage=%d sam=%d", seader_worker->stage, seader->samCommand);
     seader_trace(
         TAG,
         "abort stage=%d sam=%d state=%d intent=%d",
@@ -839,7 +830,8 @@ static void seader_abort_active_read(Seader* seader) {
         seader->sam_intent);
     seader_worker->stage = SeaderPollerEventTypeFail;
     if(!seader_sam_has_active_card(seader) && seader->sam_state != SeaderSamStateClearPending) {
-        seader_sam_set_state(seader, SeaderSamStateIdle, SeaderSamIntentNone, SamCommand_PR_NOTHING);
+        seader_sam_set_state(
+            seader, SeaderSamStateIdle, SeaderSamIntentNone, SamCommand_PR_NOTHING);
     }
     view_dispatcher_send_custom_event(seader->view_dispatcher, SeaderCustomEventWorkerExit);
 }
@@ -869,7 +861,8 @@ bool seader_parse_sam_response2(Seader* seader, SamResponse2_t* samResponse) {
         if(seader_unpack_pacs(seader, buffer, pacs->size + 2)) {
             view_dispatcher_send_custom_event(
                 seader->view_dispatcher, SeaderCustomEventPollerSuccess);
-            seader_sam_set_state(seader, SeaderSamStateIdle, SeaderSamIntentNone, SamCommand_PR_NOTHING);
+            seader_sam_set_state(
+                seader, SeaderSamStateIdle, SeaderSamIntentNone, SamCommand_PR_NOTHING);
         }
         break;
     case SamResponse2_PR_NOTHING:
@@ -896,12 +889,14 @@ bool seader_parse_sam_response(Seader* seader, SamResponse_t* samResponse) {
             if(seader_unpack_pacs(seader, samResponse->buf, samResponse->size)) {
                 view_dispatcher_send_custom_event(
                     seader->view_dispatcher, SeaderCustomEventPollerSuccess);
-                seader_sam_set_state(seader, SeaderSamStateIdle, SeaderSamIntentNone, SamCommand_PR_NOTHING);
+                seader_sam_set_state(
+                    seader, SeaderSamStateIdle, SeaderSamIntentNone, SamCommand_PR_NOTHING);
             }
         } else if(seader->sam_intent == SeaderSamIntentConfig) {
             FURI_LOG_I(TAG, "samResponse config");
             seader_worker->stage = SeaderPollerEventTypeFail;
-            seader_sam_set_state(seader, SeaderSamStateIdle, SeaderSamIntentNone, SamCommand_PR_NOTHING);
+            seader_sam_set_state(
+                seader, SeaderSamStateIdle, SeaderSamIntentNone, SamCommand_PR_NOTHING);
         } else {
             FURI_LOG_W(TAG, "Unexpected samResponse intent=%d", seader->sam_intent);
             seader_abort_active_read(seader);
@@ -915,7 +910,8 @@ bool seader_parse_sam_response(Seader* seader, SamResponse_t* samResponse) {
     case SeaderSamStateSerialPending:
         FURI_LOG_I(TAG, "samResponse serial");
         seader_parse_serial_number(seader, samResponse->buf, samResponse->size);
-        seader_sam_set_state(seader, SeaderSamStateIdle, SeaderSamIntentNone, SamCommand_PR_NOTHING);
+        seader_sam_set_state(
+            seader, SeaderSamStateIdle, SeaderSamIntentNone, SamCommand_PR_NOTHING);
         break;
     case SeaderSamStateDetectPending:
         FURI_LOG_I(TAG, "samResponse cardDetected");
@@ -933,7 +929,8 @@ bool seader_parse_sam_response(Seader* seader, SamResponse_t* samResponse) {
     case SeaderSamStateClearPending:
         FURI_LOG_I(TAG, "samResponse clear-detected-card ack");
         seader_trace(TAG, "cardDetected ack clear stage=%d", seader_worker->stage);
-        seader_sam_set_state(seader, SeaderSamStateIdle, SeaderSamIntentNone, SamCommand_PR_NOTHING);
+        seader_sam_set_state(
+            seader, SeaderSamStateIdle, SeaderSamIntentNone, SamCommand_PR_NOTHING);
         break;
     case SeaderSamStateIdle:
         FURI_LOG_W(TAG, "Unexpected samResponse while idle");
@@ -1165,10 +1162,9 @@ void seader_mfc_transmit(
             format[1],
             format[2],
             (unsigned)len);
-        if(
-            (format[0] == 0x00 && format[1] == 0x00 && format[2] == 0x40) ||
-            (format[0] == 0x00 && format[1] == 0x00 && format[2] == 0x24) ||
-            (format[0] == 0x00 && format[1] == 0x00 && format[2] == 0x44)) {
+        if((format[0] == 0x00 && format[1] == 0x00 && format[2] == 0x40) ||
+           (format[0] == 0x00 && format[1] == 0x00 && format[2] == 0x24) ||
+           (format[0] == 0x00 && format[1] == 0x00 && format[2] == 0x44)) {
             seader_trace_mfc_packed_frame("mfc tx raw", buffer, len);
         } else {
             seader_trace_hex(TAG, "mfc tx raw", buffer, len);
@@ -1240,9 +1236,8 @@ void seader_mfc_transmit(
             if(error != MfClassicErrorNone) {
                 FURI_LOG_W(TAG, "mf_classic_poller_send_encrypted_frame error %d", error);
                 seader_trace(TAG, "mfc send_custom_parity error=%d", error);
-                if(
-                    error == MfClassicErrorTimeout &&
-                    seader->credential->type == SeaderCredentialTypeMifareClassic) {
+                if(error == MfClassicErrorTimeout &&
+                   seader->credential->type == SeaderCredentialTypeMifareClassic) {
                     snprintf(
                         seader->read_error,
                         sizeof(seader->read_error),
@@ -1317,11 +1312,7 @@ void seader_mfc_transmit(
         } else {
             FURI_LOG_W(TAG, "UNHANDLED FORMAT");
             seader_trace(
-                TAG,
-                "mfc unhandled format=%02x%02x%02x",
-                format[0],
-                format[1],
-                format[2]);
+                TAG, "mfc unhandled format=%02x%02x%02x", format[0], format[1], format[2]);
         }
 
         seader_send_nfc_rx(
@@ -1385,11 +1376,10 @@ void seader_parse_nfc_off(Seader* seader) {
     response.choice.nfcResponse = nfcResponse;
 
     seader_send_response(seader, &response, ExternalApplicationA, SAMInterface, 0);
-    if(
-        seader->sam_state == SeaderSamStateConversation &&
-        (seader->sam_intent == SeaderSamIntentReadPacs ||
-         seader->sam_intent == SeaderSamIntentReadPacs2 ||
-         seader->sam_intent == SeaderSamIntentConfig)) {
+    if(seader->sam_state == SeaderSamStateConversation &&
+       (seader->sam_intent == SeaderSamIntentReadPacs ||
+        seader->sam_intent == SeaderSamIntentReadPacs2 ||
+        seader->sam_intent == SeaderSamIntentConfig)) {
         seader_sam_set_state(
             seader, SeaderSamStateFinishing, seader->sam_intent, seader->samCommand);
     }

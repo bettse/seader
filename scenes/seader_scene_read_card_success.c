@@ -67,10 +67,18 @@ void seader_scene_read_card_success_on_enter(void* context) {
 
     if(credential->bit_length > 0) {
         widget_add_button_element(
-            widget, GuiButtonTypeRight, "More", seader_scene_read_card_success_widget_callback, seader);
+            widget,
+            GuiButtonTypeRight,
+            "More",
+            seader_scene_read_card_success_widget_callback,
+            seader);
     } else {
         widget_add_button_element(
-            widget, GuiButtonTypeRight, "Back", seader_scene_read_card_success_widget_callback, seader);
+            widget,
+            GuiButtonTypeRight,
+            "Back",
+            seader_scene_read_card_success_widget_callback,
+            seader);
     }
 
     if(plugin && credential->bit_length > 0) {

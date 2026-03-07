@@ -156,11 +156,7 @@ bool seader_process_success_response(Seader* seader, uint8_t* apdu, size_t len) 
             seader_worker->stage,
             seader->samCommand);
         seader_trace(
-            TAG,
-            "enqueue len=%d stage=%d sam=%d",
-            len,
-            seader_worker->stage,
-            seader->samCommand);
+            TAG, "enqueue len=%d stage=%d sam=%d", len, seader_worker->stage, seader->samCommand);
         uint32_t space = furi_message_queue_get_space(seader_worker->messages);
         if(space > 0) {
             SeaderAPDU seaderApdu = {};

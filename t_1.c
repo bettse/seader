@@ -145,8 +145,7 @@ void seader_send_t1(SeaderUartBridge* seader_uart, uint8_t* apdu, size_t len) {
             t1->tx_buffer = bit_buffer_alloc(768);
             bit_buffer_copy_bytes(t1->tx_buffer, apdu, len);
         }
-        size_t remaining =
-            (bit_buffer_get_size_bytes(t1->tx_buffer) - t1->tx_buffer_offset);
+        size_t remaining = (bit_buffer_get_size_bytes(t1->tx_buffer) - t1->tx_buffer_offset);
         size_t copy_length = remaining > ifsc ? ifsc : remaining;
 
         uint8_t* chunk = (uint8_t*)bit_buffer_get_data(t1->tx_buffer) + t1->tx_buffer_offset;

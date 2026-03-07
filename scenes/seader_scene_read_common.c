@@ -7,7 +7,11 @@ void seader_scene_read_prepare(Seader* seader) {
     furi_assert(seader);
     FURI_LOG_D("SceneRead", "Prepare session sam=%d", seader->samCommand);
     seader_trace(
-        "SceneRead", "prepare sam=%d state=%d intent=%d", seader->samCommand, seader->sam_state, seader->sam_intent);
+        "SceneRead",
+        "prepare sam=%d state=%d intent=%d",
+        seader->samCommand,
+        seader->sam_state,
+        seader->sam_intent);
     if(seader->sam_state == SeaderSamStateIdle) {
         seader->samCommand = SamCommand_PR_NOTHING;
     }
@@ -19,7 +23,11 @@ void seader_scene_read_cleanup(Seader* seader) {
     furi_assert(seader);
     FURI_LOG_D("SceneRead", "Cleanup session sam=%d", seader->samCommand);
     seader_trace(
-        "SceneRead", "cleanup sam=%d state=%d intent=%d", seader->samCommand, seader->sam_state, seader->sam_intent);
+        "SceneRead",
+        "cleanup sam=%d state=%d intent=%d",
+        seader->samCommand,
+        seader->sam_state,
+        seader->sam_intent);
     seader_worker_cancel_poller_session(seader->worker);
 
     if(seader_sam_has_active_card(seader)) {
