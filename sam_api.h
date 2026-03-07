@@ -26,6 +26,9 @@ NfcCommand seader_worker_card_detect(
     uint8_t* ats,
     uint8_t ats_len);
 
+void seader_send_no_card_detected(Seader* seader);
+bool seader_sam_can_accept_card(const Seader* seader);
+
 bool seader_process_success_response_i(
     Seader* seader,
     uint8_t* apdu,
