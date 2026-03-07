@@ -57,7 +57,7 @@ void seader_scene_read_card_success_on_enter(void* context) {
 
         SeaderWorker* seader_worker = seader->worker;
         SeaderUartBridge* seader_uart = seader_worker->uart;
-        seader_t_1_reset();
+        seader_t_1_reset(seader->uart);
         seader_ccid_check_for_sam(seader_uart);
     }
 
