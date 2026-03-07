@@ -28,6 +28,7 @@ NfcCommand seader_worker_card_detect(
 
 void seader_send_no_card_detected(Seader* seader);
 bool seader_sam_can_accept_card(const Seader* seader);
+bool seader_sam_has_active_card(const Seader* seader);
 
 bool seader_process_success_response_i(
     Seader* seader,

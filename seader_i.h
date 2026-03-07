@@ -133,6 +133,7 @@ struct Seader {
     size_t ATR_len;
 
     char text_store[SEADER_TEXT_STORE_SIZE + 1];
+    char read_error[SEADER_TEXT_STORE_SIZE + 1];
     FuriString* text_box_store;
 
     // Reusable strings to optimize scene string allocations

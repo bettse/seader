@@ -1,5 +1,7 @@
 #include "trace_log.h"
 
+#ifdef SEADER_ENABLE_TRACE_LOG
+
 #include <storage/storage.h>
 #include <toolbox/stream/buffered_file_stream.h>
 
@@ -33,3 +35,28 @@ void seader_trace(const char* tag, const char* fmt, ...) {
     snprintf(line, sizeof(line), "[%s] %s\n", tag, message);
     seader_trace_write(FSOM_OPEN_ALWAYS, line);
 }
+
+void seader_trace_hex(const char* tag, const char* prefix, const uint8_t* data, size_t len) {
+    if(!data || len == 0) {
+        seader_trace(tag, "%s <empty>", prefix);
+        return;
+    }
+
+    /* Keep trace lines bounded; enough to diagnose short RF exchanges. */
+    const size_t max_bytes = 32;
+    size_t trace_len = len > max_bytes ? max_bytes : len;
+
+    char hex[(max_bytes * 2) + 1];
+    for(size_t i = 0; i < trace_len; i++) {
+        snprintf(hex + (i * 2), sizeof(hex) - (i * 2), "%02x", data[i]);
+    }
+    hex[trace_len * 2] = '\0';
+
+    if(trace_len < len) {
+        seader_trace(tag, "%s len=%u data=%s...", prefix, (unsigned)len, hex);
+    } else {
+        seader_trace(tag, "%s len=%u data=%s", prefix, (unsigned)len, hex);
+    }
+}
+
+#endif

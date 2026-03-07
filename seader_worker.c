@@ -496,9 +496,14 @@ NfcCommand seader_worker_poller_callback_mfc(NfcGenericEvent event, void* contex
         } else if(seader_worker->stage == SeaderPollerEventTypeComplete) {
             ret = NfcCommandStop;
         } else if(seader_worker->stage == SeaderPollerEventTypeFail) {
+            seader_trace(TAG, "mfc ready in Fail");
+            view_dispatcher_send_custom_event(
+                seader->view_dispatcher, SeaderCustomEventWorkerExit);
             ret = NfcCommandStop;
         }
     } else if(mfc_event->type == MfClassicPollerEventTypeFail) {
+        seader_trace(TAG, "mfc poller event fail");
+        view_dispatcher_send_custom_event(seader->view_dispatcher, SeaderCustomEventWorkerExit);
         ret = NfcCommandStop;
     }
 

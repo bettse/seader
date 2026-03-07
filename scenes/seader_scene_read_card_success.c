@@ -54,6 +54,7 @@ void seader_scene_read_card_success_on_enter(void* context) {
         }
     } else {
         furi_string_set(type_str, "Read error");
+        furi_string_set(bitlength_str, seader->read_error[0] ? seader->read_error : "Read failed");
 
         SeaderWorker* seader_worker = seader->worker;
         SeaderUartBridge* seader_uart = seader_worker->uart;
@@ -64,10 +65,15 @@ void seader_scene_read_card_success_on_enter(void* context) {
     widget_add_button_element(
         widget, GuiButtonTypeLeft, "Retry", seader_scene_read_card_success_widget_callback, seader);
 
-    widget_add_button_element(
-        widget, GuiButtonTypeRight, "More", seader_scene_read_card_success_widget_callback, seader);
+    if(credential->bit_length > 0) {
+        widget_add_button_element(
+            widget, GuiButtonTypeRight, "More", seader_scene_read_card_success_widget_callback, seader);
+    } else {
+        widget_add_button_element(
+            widget, GuiButtonTypeRight, "Back", seader_scene_read_card_success_widget_callback, seader);
+    }
 
-    if(plugin) {
+    if(plugin && credential->bit_length > 0) {
         size_t format_count = plugin->count(credential->bit_length, credential->credential);
         if(format_count > 0) {
             widget_add_button_element(
@@ -127,7 +133,12 @@ bool seader_scene_read_card_success_on_event(void* context, SceneManagerEvent ev
         if(event.event == GuiButtonTypeLeft) {
             consumed = scene_manager_previous_scene(seader->scene_manager);
         } else if(event.event == GuiButtonTypeRight) {
-            scene_manager_next_scene(seader->scene_manager, SeaderSceneCardMenu);
+            if(seader->credential->bit_length > 0) {
+                scene_manager_next_scene(seader->scene_manager, SeaderSceneCardMenu);
+            } else {
+                scene_manager_search_and_switch_to_previous_scene(
+                    seader->scene_manager, SeaderSceneSamPresent);
+            }
             consumed = true;
         } else if(event.event == GuiButtonTypeCenter) {
             scene_manager_next_scene(seader->scene_manager, SeaderSceneFormats);

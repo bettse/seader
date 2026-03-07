@@ -51,6 +51,105 @@ static void
     }
 }
 
+#ifdef SEADER_ENABLE_TRACE_LOG
+
+static void seader_trace_mfc_packed_frame(const char* prefix, const uint8_t* buffer, size_t len) {
+    if(!buffer || len == 0) {
+        seader_trace(TAG, "%s <empty>", prefix);
+        return;
+    }
+
+    if(len < 2) {
+        seader_trace_hex(TAG, prefix, buffer, len);
+        return;
+    }
+
+    uint8_t packed[SEADER_POLLER_MAX_BUFFER_SIZE] = {0};
+    if(len > sizeof(packed)) {
+        seader_trace_hex(TAG, prefix, buffer, len);
+        return;
+    }
+    memcpy(packed, buffer, len);
+
+    uint8_t parity = 0;
+    size_t decoded_len = len - 1;
+    uint8_t decoded[SEADER_POLLER_MAX_BUFFER_SIZE] = {0};
+    char parity_bits[SEADER_POLLER_MAX_BUFFER_SIZE + 1] = {0};
+
+    for(size_t i = 0; i < len; i++) {
+        bit_lib_reverse_bits(packed + i, 0, 8);
+    }
+
+    for(size_t i = 0; i < decoded_len; i++) {
+        bool val = bit_lib_get_bit(packed + i + 1, i);
+        bit_lib_set_bit(&parity, i, val);
+    }
+
+    for(size_t i = 0; i < decoded_len; i++) {
+        packed[i] = (packed[i] << i) | (packed[i + 1] >> (8 - i));
+        bit_lib_reverse_bits(packed + i, 0, 8);
+        decoded[i] = packed[i];
+        parity_bits[i] = bit_lib_get_bit(&parity, i) ? '1' : '0';
+    }
+    parity_bits[decoded_len] = '\0';
+
+    seader_trace_hex(TAG, prefix, buffer, len);
+    seader_trace_hex(TAG, "mfc tx decoded", decoded, decoded_len);
+    seader_trace(TAG, "mfc tx parity bits=%s", parity_bits);
+}
+
+static void seader_trace_mfc_bitbuffer(
+    const char* prefix,
+    BitBuffer* buffer,
+    bool include_parity) {
+    if(!buffer) {
+        seader_trace(TAG, "%s <null>", prefix);
+        return;
+    }
+
+    size_t len = bit_buffer_get_size_bytes(buffer);
+    uint8_t bytes[SEADER_POLLER_MAX_BUFFER_SIZE] = {0};
+    char parity_bits[SEADER_POLLER_MAX_BUFFER_SIZE + 1] = {0};
+
+    if(len > sizeof(bytes)) len = sizeof(bytes);
+
+    for(size_t i = 0; i < len; i++) {
+        bytes[i] = bit_buffer_get_byte(buffer, i);
+        if(include_parity) {
+            const uint8_t* parity = bit_buffer_get_parity(buffer);
+            parity_bits[i] = bit_lib_get_bit(parity, i) ? '1' : '0';
+        }
+    }
+
+    if(include_parity) {
+        parity_bits[len] = '\0';
+    }
+
+    seader_trace_hex(TAG, prefix, bytes, len);
+    if(include_parity) {
+        seader_trace(TAG, "%s parity=%s", prefix, parity_bits);
+    }
+}
+
+#else
+
+static void seader_trace_mfc_packed_frame(const char* prefix, const uint8_t* buffer, size_t len) {
+    (void)prefix;
+    (void)buffer;
+    (void)len;
+}
+
+static void seader_trace_mfc_bitbuffer(
+    const char* prefix,
+    BitBuffer* buffer,
+    bool include_parity) {
+    (void)prefix;
+    (void)buffer;
+    (void)include_parity;
+}
+
+#endif
+
 uint8_t updateBlock2[] = {RFAL_PICOPASS_CMD_UPDATE, 0x02};
 
 uint8_t select_seos_app[] =
@@ -94,6 +193,13 @@ static SeaderSamIntent seader_sam_card_intent(const Seader* seader) {
 
 bool seader_sam_can_accept_card(const Seader* seader) {
     return seader->sam_state == SeaderSamStateIdle;
+}
+
+bool seader_sam_has_active_card(const Seader* seader) {
+    return
+        seader->sam_state == SeaderSamStateDetectPending ||
+        seader->sam_state == SeaderSamStateConversation ||
+        seader->sam_state == SeaderSamStateFinishing;
 }
 
 PicopassError seader_worker_fake_epurse_update(BitBuffer* tx_buffer, BitBuffer* rx_buffer) {
@@ -732,7 +838,9 @@ static void seader_abort_active_read(Seader* seader) {
         seader->sam_state,
         seader->sam_intent);
     seader_worker->stage = SeaderPollerEventTypeFail;
-    seader_sam_set_state(seader, SeaderSamStateIdle, SeaderSamIntentNone, SamCommand_PR_NOTHING);
+    if(!seader_sam_has_active_card(seader) && seader->sam_state != SeaderSamStateClearPending) {
+        seader_sam_set_state(seader, SeaderSamStateIdle, SeaderSamIntentNone, SamCommand_PR_NOTHING);
+    }
     view_dispatcher_send_custom_event(seader->view_dispatcher, SeaderCustomEventWorkerExit);
 }
 
@@ -1050,15 +1158,38 @@ void seader_mfc_transmit(
     BitBuffer* rx_buffer = bit_buffer_alloc(SEADER_POLLER_MAX_BUFFER_SIZE);
 
     do {
+        seader_trace(
+            TAG,
+            "mfc tx format=%02x%02x%02x len=%u",
+            format[0],
+            format[1],
+            format[2],
+            (unsigned)len);
+        if(
+            (format[0] == 0x00 && format[1] == 0x00 && format[2] == 0x40) ||
+            (format[0] == 0x00 && format[1] == 0x00 && format[2] == 0x24) ||
+            (format[0] == 0x00 && format[1] == 0x00 && format[2] == 0x44)) {
+            seader_trace_mfc_packed_frame("mfc tx raw", buffer, len);
+        } else {
+            seader_trace_hex(TAG, "mfc tx raw", buffer, len);
+        }
+
         if(format[0] == 0x00 && format[1] == 0xC0 && format[2] == 0x00) {
             bit_buffer_append_bytes(tx_buffer, buffer, len);
             MfClassicError error =
                 mf_classic_poller_send_frame(mfc_poller, tx_buffer, rx_buffer, MF_CLASSIC_FWT_FC);
             if(error != MfClassicErrorNone) {
                 FURI_LOG_W(TAG, "mf_classic_poller_send_frame error %d", error);
+                seader_trace(TAG, "mfc send_frame error=%d", error);
                 seader_worker->stage = SeaderPollerEventTypeFail;
                 break;
             }
+
+            seader_trace_hex(
+                TAG,
+                "mfc rx raw",
+                bit_buffer_get_data(rx_buffer),
+                bit_buffer_get_size_bytes(rx_buffer));
         } else if(
             (format[0] == 0x00 && format[1] == 0x00 && format[2] == 0x40) ||
             (format[0] == 0x00 && format[1] == 0x00 && format[2] == 0x24) ||
@@ -1090,6 +1221,7 @@ void seader_mfc_transmit(
                 bit_buffer_set_byte_with_parity(
                     tx_buffer, i, buffer[i], bit_lib_get_bit(&tx_parity, i));
             }
+            seader_trace_mfc_bitbuffer("mfc tx bitbuffer", tx_buffer, true);
 
             // Log the BitBuffer contents efficiently
             size_t tx_size = bit_buffer_get_size_bytes(tx_buffer);
@@ -1099,6 +1231,7 @@ void seader_mfc_transmit(
                     tx_data[i] = bit_buffer_get_byte(tx_buffer, i);
                 }
                 seader_log_hex_data(TAG, "NFC Send without parity", tx_data, tx_size);
+                seader_trace_hex(TAG, "mfc tx no parity", tx_data, tx_size);
                 free(tx_data);
             }
 
@@ -1106,12 +1239,22 @@ void seader_mfc_transmit(
                 mfc_poller, tx_buffer, rx_buffer, MF_CLASSIC_FWT_FC);
             if(error != MfClassicErrorNone) {
                 FURI_LOG_W(TAG, "mf_classic_poller_send_encrypted_frame error %d", error);
+                seader_trace(TAG, "mfc send_custom_parity error=%d", error);
+                if(
+                    error == MfClassicErrorTimeout &&
+                    seader->credential->type == SeaderCredentialTypeMifareClassic) {
+                    snprintf(
+                        seader->read_error,
+                        sizeof(seader->read_error),
+                        "Protected read timed out.\nNo supported data\nor wrong key.");
+                }
                 seader_worker->stage = SeaderPollerEventTypeFail;
                 break;
             }
 
             size_t length = bit_buffer_get_size_bytes(rx_buffer);
             const uint8_t* rx_parity = bit_buffer_get_parity(rx_buffer);
+            seader_trace_mfc_bitbuffer("mfc rx bitbuffer", rx_buffer, true);
 
             // Log the BitBuffer contents efficiently
             uint8_t* rx_data = malloc(length);
@@ -1120,6 +1263,7 @@ void seader_mfc_transmit(
                     rx_data[i] = bit_buffer_get_byte(rx_buffer, i);
                 }
                 seader_log_hex_data(TAG, "NFC Response without parity", rx_data, length);
+                seader_trace_hex(TAG, "mfc rx no parity", rx_data, length);
                 free(rx_data);
             }
 
@@ -1166,11 +1310,18 @@ void seader_mfc_transmit(
                     rx_data_parity[i] = bit_buffer_get_byte(rx_buffer, i);
                 }
                 seader_log_hex_data(TAG, "NFC Response with parity", rx_data_parity, length);
+                seader_trace_hex(TAG, "mfc rx parity", rx_data_parity, length);
                 free(rx_data_parity);
             }
 
         } else {
             FURI_LOG_W(TAG, "UNHANDLED FORMAT");
+            seader_trace(
+                TAG,
+                "mfc unhandled format=%02x%02x%02x",
+                format[0],
+                format[1],
+                format[2]);
         }
 
         seader_send_nfc_rx(
