@@ -110,7 +110,6 @@ typedef enum {
 
 typedef enum {
     SeaderSamIntentNone,
-    SeaderSamIntentReadPacs,
     SeaderSamIntentReadPacs2,
     SeaderSamIntentConfig,
     SeaderSamIntentMaintenance,

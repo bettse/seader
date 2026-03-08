@@ -180,10 +180,8 @@ static void seader_sam_set_state(
 static SeaderSamIntent seader_sam_card_intent(const Seader* seader) {
     if(seader->credential->type == SeaderCredentialTypeConfig) {
         return SeaderSamIntentConfig;
-    } else if(seader->is_debug_enabled) {
-        return SeaderSamIntentReadPacs2;
     } else {
-        return SeaderSamIntentReadPacs;
+        return SeaderSamIntentReadPacs2;
     }
 }
 
@@ -498,24 +496,6 @@ void seader_send_response(
     payload.choice.response = *response;
 
     seader_send_payload(seader, &payload, from, to, replyTo);
-}
-
-void seader_send_request_pacs(Seader* seader) {
-    RequestPacs_t requestPacs = {0};
-    requestPacs.contentElementTag = ContentElementTag_implicitFormatPhysicalAccessBits;
-
-    SamCommand_t samCommand = {0};
-    samCommand.present = SamCommand_PR_requestPacs;
-    seader_sam_set_state(
-        seader, SeaderSamStateConversation, SeaderSamIntentReadPacs, samCommand.present);
-    samCommand.choice.requestPacs = requestPacs;
-
-    Payload_t payload = {0};
-    payload.present = Payload_PR_samCommand;
-    payload.choice.samCommand = samCommand;
-
-    seader_send_payload(
-        seader, &payload, ExternalApplicationA, SAMInterface, ExternalApplicationA);
 }
 
 void seader_send_request_pacs2(Seader* seader) {
@@ -884,15 +864,7 @@ bool seader_parse_sam_response(Seader* seader, SamResponse_t* samResponse) {
     switch(seader->sam_state) {
     case SeaderSamStateConversation:
     case SeaderSamStateFinishing:
-        if(seader->sam_intent == SeaderSamIntentReadPacs) {
-            FURI_LOG_I(TAG, "samResponse read PACS");
-            if(seader_unpack_pacs(seader, samResponse->buf, samResponse->size)) {
-                view_dispatcher_send_custom_event(
-                    seader->view_dispatcher, SeaderCustomEventPollerSuccess);
-                seader_sam_set_state(
-                    seader, SeaderSamStateIdle, SeaderSamIntentNone, SamCommand_PR_NOTHING);
-            }
-        } else if(seader->sam_intent == SeaderSamIntentConfig) {
+        if(seader->sam_intent == SeaderSamIntentConfig) {
             FURI_LOG_I(TAG, "samResponse config");
             seader_worker->stage = SeaderPollerEventTypeFail;
             seader_sam_set_state(
@@ -919,8 +891,6 @@ bool seader_parse_sam_response(Seader* seader, SamResponse_t* samResponse) {
             seader_send_process_config_card(seader);
         } else if(seader->sam_intent == SeaderSamIntentReadPacs2) {
             seader_send_request_pacs2(seader);
-        } else if(seader->sam_intent == SeaderSamIntentReadPacs) {
-            seader_send_request_pacs(seader);
         } else {
             FURI_LOG_W(TAG, "Unexpected detect intent=%d", seader->sam_intent);
             seader_abort_active_read(seader);
@@ -1377,8 +1347,7 @@ void seader_parse_nfc_off(Seader* seader) {
 
     seader_send_response(seader, &response, ExternalApplicationA, SAMInterface, 0);
     if(seader->sam_state == SeaderSamStateConversation &&
-       (seader->sam_intent == SeaderSamIntentReadPacs ||
-        seader->sam_intent == SeaderSamIntentReadPacs2 ||
+       (seader->sam_intent == SeaderSamIntentReadPacs2 ||
         seader->sam_intent == SeaderSamIntentConfig)) {
         seader_sam_set_state(
             seader, SeaderSamStateFinishing, seader->sam_intent, seader->samCommand);
