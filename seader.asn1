@@ -22,7 +22,6 @@ ErrorResponse ::= SEQUENCE {
 }
 
 SamCommand ::= CHOICE {
-  requestPacs [1] RequestPacs,
   version [2] NULL,
   cardDetected [13] CardDetected,
   processSNMPMessage [20] OCTET STRING,
