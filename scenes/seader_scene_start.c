@@ -9,7 +9,7 @@ static void seader_scene_start_detect_callback(void* context) {
     view_dispatcher_send_custom_event(seader->view_dispatcher, SeaderWorkerEventSamMissing);
 }
 
-void seader_sam_check_worker_callback(SeaderWorkerEvent event, void* context) {
+void seader_sam_check_worker_callback(uint32_t event, void* context) {
     Seader* seader = context;
     view_dispatcher_send_custom_event(seader->view_dispatcher, event);
 }

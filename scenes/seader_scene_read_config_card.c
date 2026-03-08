@@ -2,7 +2,7 @@
 #include "seader_scene_read_common.h"
 #include <dolphin/dolphin.h>
 
-void seader_read_config_card_worker_callback(SeaderWorkerEvent event, void* context) {
+void seader_read_config_card_worker_callback(uint32_t event, void* context) {
     UNUSED(event);
     Seader* seader = context;
     view_dispatcher_send_custom_event(seader->view_dispatcher, SeaderCustomEventWorkerExit);
