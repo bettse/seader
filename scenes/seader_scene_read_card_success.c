@@ -83,6 +83,7 @@ void seader_scene_read_card_success_on_enter(void* context) {
 
     if(plugin && credential->bit_length > 0) {
         size_t format_count = plugin->count(credential->bit_length, credential->credential);
+        FURI_LOG_D(TAG, "Plugin present, bit_length=%d, format_count=%zu", credential->bit_length, format_count);
         if(format_count > 0) {
             widget_add_button_element(
                 seader->widget,
@@ -91,6 +92,8 @@ void seader_scene_read_card_success_on_enter(void* context) {
                 seader_scene_read_card_success_widget_callback,
                 seader);
         }
+    } else {
+        FURI_LOG_D(TAG, "Plugin=%p, bit_length=%d", plugin, credential->bit_length);
     }
 
     widget_add_string_element(

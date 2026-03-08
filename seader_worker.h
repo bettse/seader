@@ -21,6 +21,7 @@ typedef enum {
     SeaderWorkerStateCheckSam,
     SeaderWorkerStateVirtualCredential,
     SeaderWorkerStateAPDURunner,
+    SeaderWorkerStateReading,
     // Transition
     SeaderWorkerStateStop,
 } SeaderWorkerState;
@@ -51,7 +52,7 @@ typedef enum {
     SeaderPollerEventTypeFail,
 } SeaderPollerEventType;
 
-typedef void (*SeaderWorkerCallback)(SeaderWorkerEvent event, void* context);
+typedef void (*SeaderWorkerCallback)(uint32_t event, void* context);
 
 SeaderWorker* seader_worker_alloc();
 

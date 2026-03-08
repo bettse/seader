@@ -1,7 +1,7 @@
 #include "../seader_i.h"
 #include <dolphin/dolphin.h>
 
-void seader_virtual_credential_worker_callback(SeaderWorkerEvent event, void* context) {
+void seader_virtual_credential_worker_callback(uint32_t event, void* context) {
     Seader* seader = context;
     view_dispatcher_send_custom_event(seader->view_dispatcher, event);
 }

@@ -659,10 +659,12 @@ bool seader_unpack_pacs(Seader* seader, uint8_t* buf, size_t size) {
         if(pac.size <= sizeof(seader_credential->credential)) {
             // TODO: make credential into a 12 byte array
             seader_credential->bit_length = pac.size * 8 - pac.bits_unused;
-            memcpy(&seader_credential->credential, pac.buf, pac.size);
-            seader_credential->credential = __builtin_bswap64(seader_credential->credential);
-            seader_credential->credential = seader_credential->credential >>
-                                            (64 - seader_credential->bit_length);
+            uint64_t credential_val = 0;
+            memcpy(&credential_val, pac.buf, pac.size);
+            credential_val = __builtin_bswap64(credential_val);
+            // After bswap64, the bits are left-aligned in the 64-bit word
+            // We need to shift them right by (64 - bit_length) to get the value
+            seader_credential->credential = credential_val >> (64 - seader_credential->bit_length);
 
             FURI_LOG_D(
                 TAG,
