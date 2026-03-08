@@ -592,8 +592,8 @@ static bool seader_store_pacs_bits(
     const uint8_t* payload,
     size_t payload_size,
     uint8_t unused_bits) {
-    if(!credential || !payload || payload_size == 0 || payload_size > sizeof(credential->credential) ||
-       unused_bits > 7) {
+    if(!credential || !payload || payload_size == 0 ||
+       payload_size > sizeof(credential->credential) || unused_bits > 7) {
         return false;
     }
 
@@ -637,8 +637,8 @@ static bool seader_unpack_pacs2_bits(Seader* seader, const OCTET_STRING_t* pacs_
         if(rval.code == RC_OK) {
             FURI_LOG_D(TAG, "Decoded SIO");
             char sioDebug[384] = {0};
-            (&asn_DEF_SIO)->op->print_struct(
-                &asn_DEF_SIO, &sio, 1, seader_print_struct_callback, sioDebug);
+            (&asn_DEF_SIO)
+                ->op->print_struct(&asn_DEF_SIO, &sio, 1, seader_print_struct_callback, sioDebug);
             if(strlen(sioDebug) > 0) {
                 FURI_LOG_D(TAG, "SIO: %s", sioDebug);
             }

@@ -38,8 +38,7 @@ bool seader_scene_read_config_card_on_event(void* context, SceneManagerEvent eve
     bool consumed = false;
 
     if(event.type == SceneManagerEventTypeCustom) {
-        if(event.event == SeaderCustomEventWorkerExit || 
-           event.event == SeaderWorkerEventSuccess) {
+        if(event.event == SeaderCustomEventWorkerExit || event.event == SeaderWorkerEventSuccess) {
             scene_manager_next_scene(seader->scene_manager, SeaderSceneReadConfigCardSuccess);
             consumed = true;
         } else if(event.event == SeaderCustomEventPollerSuccess) {

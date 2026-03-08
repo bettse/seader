@@ -38,8 +38,9 @@ bool seader_scene_read_on_event(void* context, SceneManagerEvent event) {
             Popup* popup = seader->popup;
             popup_set_header(popup, "DON'T\nMOVE", 68, 30, AlignLeft, AlignTop);
             consumed = true;
-        } else if(event.event == SeaderCustomEventPollerSuccess || 
-                  event.event == SeaderWorkerEventSuccess) {
+        } else if(
+            event.event == SeaderCustomEventPollerSuccess ||
+            event.event == SeaderWorkerEventSuccess) {
             scene_manager_next_scene(seader->scene_manager, SeaderSceneReadCardSuccess);
             consumed = true;
         }

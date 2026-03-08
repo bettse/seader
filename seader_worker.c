@@ -318,8 +318,7 @@ void seader_worker_reading(Seader* seader) {
             seader->poller = nfc_poller_alloc(seader->nfc, NfcProtocolIso14443_4a);
             seader_worker->stage = SeaderPollerEventTypeCardDetect;
             seader->credential->type = SeaderCredentialType14A;
-            nfc_poller_start(
-                seader->poller, seader_worker_poller_callback_iso14443_4a, seader);
+            nfc_poller_start(seader->poller, seader_worker_poller_callback_iso14443_4a, seader);
             detected = true;
         } else {
             nfc_poller_free(poller_detect);
@@ -350,9 +349,10 @@ void seader_worker_reading(Seader* seader) {
             seader->picopass_poller = picopass_poller_alloc(seader->nfc);
             seader_worker->stage = SeaderPollerEventTypeCardDetect;
             seader->credential->type = SeaderCredentialTypePicopass;
-            
-            picopass_poller_start(seader->picopass_poller, seader_worker_poller_callback_picopass, seader);
-            
+
+            picopass_poller_start(
+                seader->picopass_poller, seader_worker_poller_callback_picopass, seader);
+
             // Wait up to 100ms for picopass detection
             for(int i = 0; i < 10; i++) {
                 if(seader_worker->stage != SeaderPollerEventTypeCardDetect) {
@@ -370,7 +370,7 @@ void seader_worker_reading(Seader* seader) {
 
         if(detected) {
             // Wait for conversation to finish
-            while(seader_worker->stage != SeaderPollerEventTypeComplete && 
+            while(seader_worker->stage != SeaderPollerEventTypeComplete &&
                   seader_worker->stage != SeaderPollerEventTypeFail &&
                   seader_worker->state == SeaderWorkerStateReading) {
                 // The conversation is handled by the poller callback thread.
@@ -396,7 +396,7 @@ void seader_worker_reading(Seader* seader) {
                 if(seader_worker->callback) {
                     seader_worker->callback(SeaderWorkerEventSuccess, seader_worker->context);
                 }
-                break; 
+                break;
             }
         }
 
@@ -415,16 +415,15 @@ void seader_worker_reading(Seader* seader) {
 
 void seader_worker_poller_conversation(Seader* seader, SeaderPollerContainer* spc) {
     SeaderWorker* seader_worker = seader->worker;
-    
+
     furi_thread_set_current_priority(FuriThreadPriorityHighest);
-    
-    while(seader_worker->stage == SeaderPollerEventTypeConversation && 
+
+    while(seader_worker->stage == SeaderPollerEventTypeConversation &&
           seader_worker->state == SeaderWorkerStateReading) {
-        
         SeaderAPDU seaderApdu = {};
         // Short wait for SAM message
         FuriStatus status = furi_message_queue_get(seader_worker->messages, &seaderApdu, 100);
-        
+
         if(status == FuriStatusOk) {
             FURI_LOG_D(TAG, "Dequeue SAM message [%d bytes]", seaderApdu.len);
             if(seader_process_success_response_i(

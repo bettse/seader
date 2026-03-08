@@ -23,11 +23,7 @@ void seader_scene_sam_present_on_update(void* context) {
     submenu_reset(submenu);
 
     submenu_add_item(
-        submenu,
-        "Read HF",
-        SubmenuIndexRead,
-        seader_scene_sam_present_submenu_callback,
-        seader);
+        submenu, "Read HF", SubmenuIndexRead, seader_scene_sam_present_submenu_callback, seader);
     submenu_add_item(
         submenu, "Saved", SubmenuIndexSaved, seader_scene_sam_present_submenu_callback, seader);
 
