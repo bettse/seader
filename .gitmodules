@@ -1,6 +1,6 @@
 [submodule "plugin"]
 	path = plugin
 	url = https://gitlab.com/bettse/flipper-wiegand-plugin.git
-[submodule "tests/host/vendor/munit"]
-	path = tests/host/vendor/munit
+[submodule "lib/host_tests/vendor/munit"]
+	path = lib/host_tests/vendor/munit
 	url = https://github.com/nemequ/munit.git

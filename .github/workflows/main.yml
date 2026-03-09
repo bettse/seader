@@ -17,7 +17,7 @@ jobs:
       - name: Run host tests
         run: make test-host
       - name: Lint sources
-        run: ufbt lint ARGS="!./tests/host/vendor/munit"
+        run: ufbt lint
       - name: Build with ufbt
         uses: flipperdevices/flipperzero-ufbt-action@v0.1.2
         id: build-app
