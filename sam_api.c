@@ -99,8 +99,7 @@ static void seader_start_snmp_probe(Seader* seader) {
     }
 
     seader_uhf_snmp_probe_init(&seader->snmp_probe);
-    seader_uhf_status_label_format(
-        false, false, false, false, seader->uhf_status_label, sizeof(seader->uhf_status_label));
+    seader_update_uhf_status_label(seader);
     seader_sam_set_state(
         seader,
         SeaderSamStateCapabilityPending,
