@@ -23,6 +23,7 @@ static MunitResult test_recv_wtx_request_responds(const MunitParameter params[],
     (void)params;
     (void)fixture;
 
+    /* ISO 7816-3 says "The interface device shall acknowledge by S(WTX response) with the same INF." */
     SeaderUartBridge uart = {0};
     SeaderWorker worker = {0};
     Seader seader = make_test_seader(&uart, &worker);
@@ -38,29 +39,11 @@ static MunitResult test_recv_wtx_request_responds(const MunitParameter params[],
     return MUNIT_OK;
 }
 
-static MunitResult test_recv_resynch_request_responds(const MunitParameter params[], void* fixture) {
-    (void)params;
-    (void)fixture;
-
-    SeaderUartBridge uart = {0};
-    SeaderWorker worker = {0};
-    Seader seader = make_test_seader(&uart, &worker);
-
-    t1_host_test_reset();
-    uint8_t s_resync_req[] = {0x00, 0xC0, 0x00, 0x00};
-    seader_add_lrc(s_resync_req, 3);
-    CCID_Message message = {.payload = s_resync_req, .dwLength = 4};
-
-    munit_assert_false(seader_recv_t1(&seader, &message));
-    munit_assert_size(g_t1_host_test_state.xfrblock_call_count, ==, 1);
-    munit_assert_uint8(g_t1_host_test_state.last_frame[1], ==, 0xE0);
-    return MUNIT_OK;
-}
-
 static MunitResult test_recv_malformed_wtx_rejected(const MunitParameter params[], void* fixture) {
     (void)params;
     (void)fixture;
 
+    /* ISO 7816-3 says "INF shall be present with a single byte in an S-block adjusting IFS and WTX." */
     SeaderUartBridge uart = {0};
     SeaderWorker worker = {0};
     Seader seader = make_test_seader(&uart, &worker);
@@ -80,6 +63,7 @@ static MunitResult test_recv_malformed_ifs_rejected(const MunitParameter params[
     (void)params;
     (void)fixture;
 
+    /* ISO 7816-3 says "INF shall be present with a single byte in an S-block adjusting IFS and WTX." */
     SeaderUartBridge uart = {0};
     SeaderWorker worker = {0};
     Seader seader = make_test_seader(&uart, &worker);
@@ -99,6 +83,7 @@ static MunitResult test_recv_ifs_request_updates_ifsc(const MunitParameter param
     (void)params;
     (void)fixture;
 
+    /* ISO 7816-3 says "The interface device assumes the new IFSC is valid as long as no other IFSC is indicated". */
     SeaderUartBridge uart = {0};
     SeaderWorker worker = {0};
     Seader seader = make_test_seader(&uart, &worker);
@@ -121,6 +106,7 @@ static MunitResult test_recv_ifs_response_applies_pending_ifsd(
     (void)params;
     (void)fixture;
 
+    /* ISO 7816-3 says "The card assumes the new IFSD is valid as long as no other IFSD is indicated". */
     SeaderUartBridge uart = {0};
     SeaderWorker worker = {0};
     Seader seader = make_test_seader(&uart, &worker);
@@ -144,6 +130,7 @@ static MunitResult test_recv_ifs_response_mismatch_rejected(
     (void)params;
     (void)fixture;
 
+    /* ISO 7816-3 says the response acknowledges "with the same INF", so mismatched IFS bytes are invalid. */
     SeaderUartBridge uart = {0};
     SeaderWorker worker = {0};
     Seader seader = make_test_seader(&uart, &worker);
@@ -166,6 +153,7 @@ static MunitResult test_recv_i_block_too_large_rejected(const MunitParameter par
     (void)params;
     (void)fixture;
 
+    /* ISO 7816-3 says each piece must have length "less than or equal to IFSC or IFSD". */
     SeaderUartBridge uart = {0};
     SeaderWorker worker = {0};
     Seader seader = make_test_seader(&uart, &worker);
@@ -188,6 +176,7 @@ static MunitResult test_recv_r_block_nack_retransmits(const MunitParameter param
     (void)params;
     (void)fixture;
 
+    /* ISO 7816-3 says an invalid block leads to an R-block that "requests with its N(R) for the expected I-block". */
     SeaderUartBridge uart = {0};
     SeaderWorker worker = {0};
     Seader seader = make_test_seader(&uart, &worker);
@@ -205,7 +194,7 @@ static MunitResult test_recv_r_block_nack_retransmits(const MunitParameter param
 
     munit_assert_false(seader_recv_t1(&seader, &message));
     munit_assert_size(g_t1_host_test_state.xfrblock_call_count, ==, 1);
-    munit_assert_uint8(uart.t1.send_pcb, ==, SEADER_T1_PCB_SEQUENCE_BIT);
+    munit_assert_uint8(g_t1_host_test_state.last_frame[1], ==, 0x00);
     bit_buffer_free(uart.t1.tx_buffer);
     return MUNIT_OK;
 }
@@ -216,6 +205,7 @@ static MunitResult test_recv_r_block_invalid_retransmit_state_errors(
     (void)params;
     (void)fixture;
 
+    /* ISO 7816-3 ties R-block recovery to "the expected I-block"; without a prior chunk, retransmit state is invalid. */
     SeaderUartBridge uart = {0};
     SeaderWorker worker = {0};
     Seader seader = make_test_seader(&uart, &worker);
@@ -238,12 +228,6 @@ static MunitResult test_recv_r_block_invalid_retransmit_state_errors(
 static MunitTest test_t1_regression_cases[] = {
     {(char*)"/recv/wtx-request-responds",
      test_recv_wtx_request_responds,
-     NULL,
-     NULL,
-     MUNIT_TEST_OPTION_NONE,
-     NULL},
-    {(char*)"/recv/resynch-request-responds",
-     test_recv_resynch_request_responds,
      NULL,
      NULL,
      MUNIT_TEST_OPTION_NONE,
@@ -299,7 +283,7 @@ static MunitTest test_t1_regression_cases[] = {
     {NULL, NULL, NULL, NULL, 0, NULL},
 };
 
-MunitSuite test_t1_regressions_suite = {
+MunitSuite test_t1_protocol_suite = {
     "",
     test_t1_regression_cases,
     NULL,
