@@ -33,6 +33,9 @@ Seader* seader_alloc() {
     seader->samCommand = SamCommand_PR_NOTHING;
     seader->sam_state = SeaderSamStateIdle;
     seader->sam_intent = SeaderSamIntentNone;
+    memset(seader->detected_card_types, 0, sizeof(seader->detected_card_types));
+    seader->detected_card_type_count = 0;
+    seader->selected_read_type = SeaderCredentialTypeNone;
 
     seader->worker = seader_worker_alloc();
     seader->view_dispatcher = view_dispatcher_alloc();

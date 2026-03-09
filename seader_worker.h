@@ -38,6 +38,7 @@ typedef enum {
     SeaderWorkerEventSamMissing,
     SeaderWorkerEventNoCardDetected,
     SeaderWorkerEventStartReading,
+    SeaderWorkerEventSelectCardType,
     SeaderWorkerEventAPDURunnerUpdate,
     SeaderWorkerEventAPDURunnerSuccess,
     SeaderWorkerEventAPDURunnerError,

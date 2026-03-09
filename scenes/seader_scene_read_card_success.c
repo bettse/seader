@@ -20,6 +20,9 @@ void seader_scene_read_card_success_on_enter(void* context) {
     SeaderCredential* credential = seader->credential;
     PluginWiegand* plugin = seader->plugin_wiegand;
     Widget* widget = seader->widget;
+    seader->selected_read_type = SeaderCredentialTypeNone;
+    seader->detected_card_type_count = 0;
+    memset(seader->detected_card_types, 0, sizeof(seader->detected_card_types));
 
     // Use reusable strings instead of allocating new ones
     FuriString* type_str = seader->temp_string1;
