@@ -31,16 +31,23 @@ typedef enum {
     SEADER_T1_PCB_R_BLOCK = 0x80,
     SEADER_T1_PCB_S_BLOCK = 0xC0,
     SEADER_T1_R_BLOCK_SEQUENCE_MASK = 0x10,
+    SEADER_T1_S_BLOCK_RESPONSE_BIT = 0x20,
+    SEADER_T1_S_BLOCK_RESYNCH = 0x00,
     SEADER_T1_S_BLOCK_IFS = 0x01,
+    SEADER_T1_S_BLOCK_ABORT = 0x02,
+    SEADER_T1_S_BLOCK_WTX = 0x03,
 } SeaderT1Constant;
 
 typedef struct {
     uint8_t ifsc;
+    uint8_t ifsd;
+    uint8_t ifsd_pending;
     uint8_t nad;
     uint8_t send_pcb;
     uint8_t recv_pcb;
     BitBuffer* tx_buffer;
     size_t tx_buffer_offset;
+    size_t last_tx_len;
     BitBuffer* rx_buffer;
 } SeaderT1State;
 
