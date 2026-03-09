@@ -34,7 +34,7 @@ bool seader_scene_virtual_credential_on_event(void* context, SceneManagerEvent e
             seader->credential->type = SeaderCredentialTypeVirtual;
             scene_manager_next_scene(seader->scene_manager, SeaderSceneReadCardSuccess);
             consumed = true;
-        } else if(event.event == SeaderCustomEventPollerSuccess) {
+        } else if(event.event == SeaderWorkerEventSuccess) {
             seader->credential->type = SeaderCredentialTypeVirtual;
             scene_manager_next_scene(seader->scene_manager, SeaderSceneReadCardSuccess);
             consumed = true;

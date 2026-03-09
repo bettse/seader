@@ -839,9 +839,12 @@ bool seader_parse_sam_response2(Seader* seader, SamResponse2_t* samResponse) {
         Pacs2_t pacs2 = samResponse->choice.pacs;
         OCTET_STRING_t* pacs = pacs2.bits;
 
+        seader->credential->has_pacs_media_type = pacs2.type != NULL;
+        seader->credential->pacs_media_type = pacs2.type ? (SeaderPacsMediaType)(*pacs2.type) :
+                                                           SeaderPacsMediaTypeUnknown;
+
         if(seader_unpack_pacs2_bits(seader, pacs)) {
-            view_dispatcher_send_custom_event(
-                seader->view_dispatcher, SeaderCustomEventPollerSuccess);
+            seader->worker->stage = SeaderPollerEventTypeComplete;
             seader_sam_set_state(
                 seader, SeaderSamStateIdle, SeaderSamIntentNone, SamCommand_PR_NOTHING);
         } else {
