@@ -185,7 +185,6 @@ static MunitResult test_probe_stages(const MunitParameter params[], void* fixtur
     munit_assert_true(probe.has_monza4qt);
     munit_assert_true(probe.has_higgs3);
     munit_assert_int(probe.stage, ==, SeaderUhfSnmpProbeStageReadMonza4QtKey);
-    munit_assert_size(probe.tag_config_value.len, >, 80);
 
     munit_assert_true(seader_uhf_snmp_probe_consume_error(
         &probe, 0x06U, (const uint8_t*)"\x69\x82", 2U));

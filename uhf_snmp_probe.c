@@ -162,15 +162,12 @@ bool seader_uhf_snmp_probe_consume_response(
 
     switch(probe->stage) {
     case SeaderUhfSnmpProbeStageDiscovery:
-        probe->engine_id = view.context_engine_id;
         probe->usm_engine_id_len = view.usm_engine_id.len;
         if(probe->usm_engine_id_len > sizeof(probe->usm_engine_id_storage)) {
             probe->stage = SeaderUhfSnmpProbeStageFailed;
             return false;
         }
         memcpy(probe->usm_engine_id_storage, view.usm_engine_id.ptr, probe->usm_engine_id_len);
-        probe->usm_engine_id =
-            (SeaderBytesView){probe->usm_engine_id_storage, probe->usm_engine_id_len};
 
         probe->usm_username_len = view.usm_username.len;
         if(probe->usm_username_len > sizeof(probe->usm_username_storage)) {
@@ -178,8 +175,6 @@ bool seader_uhf_snmp_probe_consume_response(
             return false;
         }
         memcpy(probe->usm_username_storage, view.usm_username.ptr, probe->usm_username_len);
-        probe->usm_username =
-            (SeaderBytesView){probe->usm_username_storage, probe->usm_username_len};
         probe->usm_engine_boots = view.usm_engine_boots;
         probe->usm_engine_time = view.usm_engine_time;
         probe->stage = SeaderUhfSnmpProbeStageReadIce;
@@ -198,7 +193,6 @@ bool seader_uhf_snmp_probe_consume_response(
             return false;
         }
         memcpy(probe->ice_value_storage, value.ptr, probe->ice_value_len);
-        probe->ice_value = value;
         probe->stage = SeaderUhfSnmpProbeStageReadTagConfig;
         return true;
     case SeaderUhfSnmpProbeStageReadTagConfig:
@@ -209,7 +203,6 @@ bool seader_uhf_snmp_probe_consume_response(
             probe->stage = SeaderUhfSnmpProbeStageFailed;
             return false;
         }
-        probe->tag_config_value = value;
         {
             SeaderUhfTagConfigView tag_config = {0};
             if(!seader_uhf_tag_config_parse(value, &tag_config)) {
