@@ -587,81 +587,86 @@ void seader_send_no_card_detected(Seader* seader) {
     ASN_STRUCT_FREE_CONTENTS_ONLY(asn_DEF_CardDetails, &cardDetails);
 }
 
-bool seader_unpack_pacs(Seader* seader, uint8_t* buf, size_t size) {
-    SeaderCredential* seader_credential = seader->credential;
-    PAC_t pac = {0};
-    PAC_t* pac_p = &pac;
-    bool rtn = false;
-
-    asn_dec_rval_t rval = asn_decode(0, ATS_DER, &asn_DEF_PAC, (void**)&pac_p, buf, size);
-
-    if(rval.code == RC_OK) {
-#ifdef ASN1_DEBUG
-        char pacDebug[384] = {0};
-        (&asn_DEF_PAC)
-            ->op->print_struct(&asn_DEF_PAC, &pac, 1, seader_print_struct_callback, pacDebug);
-        if(strlen(pacDebug) > 0) {
-            FURI_LOG_D(TAG, "Received pac: %s", pacDebug);
-        }
-#endif
-
-        if(seader_credential->sio[0] == 0x30) {
-            seader_log_hex_data(TAG, "SIO", seader_credential->sio, seader_credential->sio_len);
-
-#ifdef ASN1_DEBUG
-            SIO_t sio = {0};
-            SIO_t* sio_p = &sio;
-            rval = asn_decode(
-                0,
-                ATS_DER,
-                &asn_DEF_SIO,
-                (void**)&sio_p,
-                seader_credential->sio,
-                seader_credential->sio_len);
-
-            if(rval.code == RC_OK) {
-                FURI_LOG_D(TAG, "Decoded SIO");
-                char sioDebug[384] = {0};
-                (&asn_DEF_SIO)
-                    ->op->print_struct(
-                        &asn_DEF_SIO, &sio, 1, seader_print_struct_callback, sioDebug);
-                if(strlen(sioDebug) > 0) {
-                    FURI_LOG_D(TAG, "SIO: %s", sioDebug);
-                }
-            } else {
-                FURI_LOG_W(TAG, "Failed to decode SIO %d consumed", rval.consumed);
-            }
-
-            ASN_STRUCT_FREE_CONTENTS_ONLY(asn_DEF_SIO, &sio);
-#endif
-        }
-
-        if(pac.size <= sizeof(seader_credential->credential)) {
-            // TODO: make credential into a 12 byte array
-            seader_credential->bit_length = pac.size * 8 - pac.bits_unused;
-            memcpy(&seader_credential->credential, pac.buf, pac.size);
-            seader_credential->credential = __builtin_bswap64(seader_credential->credential);
-            seader_credential->credential = seader_credential->credential >>
-                                            (64 - seader_credential->bit_length);
-
-            FURI_LOG_D(
-                TAG,
-                "credential (%d) %016llx",
-                seader_credential->bit_length,
-                seader_credential->credential);
-
-            rtn = true;
-        } else {
-            // PACS too big (probably bad data)
-            seader_abort_active_read(seader);
-        }
-    } else {
-        FURI_LOG_W(TAG, "Failed to decode PAC %d consumed, size %d", rval.consumed, size);
-        seader_abort_active_read(seader);
+static bool seader_store_pacs_bits(
+    SeaderCredential* credential,
+    const uint8_t* payload,
+    size_t payload_size,
+    uint8_t unused_bits) {
+    if(!credential || !payload || payload_size == 0 ||
+       payload_size > sizeof(credential->credential) || unused_bits > 7) {
+        return false;
     }
 
-    ASN_STRUCT_FREE_CONTENTS_ONLY(asn_DEF_PAC, &pac);
-    return rtn;
+    const uint8_t bit_length = payload_size * 8 - unused_bits;
+    if(bit_length == 0) {
+        return false;
+    }
+
+    uint64_t credential_val = 0;
+    memcpy(&credential_val, payload, payload_size);
+    credential_val = __builtin_bswap64(credential_val);
+
+    credential->bit_length = bit_length;
+    credential->credential = credential_val >> (64 - bit_length);
+    return true;
+}
+
+static bool seader_unpack_pacs2_bits(Seader* seader, const OCTET_STRING_t* pacs_bits) {
+    SeaderCredential* seader_credential = seader->credential;
+    if(!pacs_bits || !pacs_bits->buf || pacs_bits->size < 2) {
+        FURI_LOG_W(TAG, "Malformed pacs2 bits");
+        return false;
+    }
+
+    seader_log_hex_data(TAG, "PACS2 bits", pacs_bits->buf, pacs_bits->size);
+
+    if(seader_credential->sio[0] == 0x30) {
+        seader_log_hex_data(TAG, "SIO", seader_credential->sio, seader_credential->sio_len);
+#ifdef ASN1_DEBUG
+        asn_dec_rval_t rval;
+        SIO_t sio = {0};
+        SIO_t* sio_p = &sio;
+        rval = asn_decode(
+            0,
+            ATS_DER,
+            &asn_DEF_SIO,
+            (void**)&sio_p,
+            seader_credential->sio,
+            seader_credential->sio_len);
+
+        if(rval.code == RC_OK) {
+            FURI_LOG_D(TAG, "Decoded SIO");
+            char sioDebug[384] = {0};
+            (&asn_DEF_SIO)
+                ->op->print_struct(&asn_DEF_SIO, &sio, 1, seader_print_struct_callback, sioDebug);
+            if(strlen(sioDebug) > 0) {
+                FURI_LOG_D(TAG, "SIO: %s", sioDebug);
+            }
+        } else {
+            FURI_LOG_W(TAG, "Failed to decode SIO %d consumed", rval.consumed);
+        }
+
+        ASN_STRUCT_FREE_CONTENTS_ONLY(asn_DEF_SIO, &sio);
+#endif
+    }
+
+    const uint8_t unused_bits = pacs_bits->buf[0];
+    const uint8_t* payload = pacs_bits->buf + 1;
+    const size_t payload_size = pacs_bits->size - 1;
+    FURI_LOG_D(TAG, "PACS2 unused_bits=%u payload_size=%zu", unused_bits, payload_size);
+
+    if(!seader_store_pacs_bits(seader_credential, payload, payload_size, unused_bits)) {
+        FURI_LOG_W(TAG, "Failed to store PACS2 bits");
+        return false;
+    }
+
+    FURI_LOG_D(
+        TAG,
+        "credential (%d) %016llx",
+        seader_credential->bit_length,
+        seader_credential->credential);
+
+    return true;
 }
 
 //    800201298106683d052026b6820101
@@ -817,7 +822,6 @@ static void seader_abort_active_read(Seader* seader) {
 }
 
 bool seader_parse_sam_response2(Seader* seader, SamResponse2_t* samResponse) {
-    uint8_t buffer[10];
     switch(samResponse->present) {
     case SamResponse2_PR_pacs:
         FURI_LOG_I(TAG, "samResponse2 SamResponse2_PR_pacs");
@@ -835,14 +839,13 @@ bool seader_parse_sam_response2(Seader* seader, SamResponse2_t* samResponse) {
         Pacs2_t pacs2 = samResponse->choice.pacs;
         OCTET_STRING_t* pacs = pacs2.bits;
 
-        buffer[0] = 0x03;
-        buffer[1] = pacs->size & 0xFF;
-        memcpy(buffer + 2, pacs->buf, pacs->size);
-        if(seader_unpack_pacs(seader, buffer, pacs->size + 2)) {
+        if(seader_unpack_pacs2_bits(seader, pacs)) {
             view_dispatcher_send_custom_event(
                 seader->view_dispatcher, SeaderCustomEventPollerSuccess);
             seader_sam_set_state(
                 seader, SeaderSamStateIdle, SeaderSamIntentNone, SamCommand_PR_NOTHING);
+        } else {
+            seader_abort_active_read(seader);
         }
         break;
     case SamResponse2_PR_NOTHING:

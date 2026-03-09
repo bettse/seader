@@ -39,18 +39,6 @@ void seader_scene_read_cleanup(Seader* seader) {
         seader_send_no_card_detected(seader);
     }
 
-    if(seader->poller) {
-        nfc_poller_stop(seader->poller);
-        nfc_poller_free(seader->poller);
-        seader->poller = NULL;
-    }
-
-    if(seader->picopass_poller) {
-        picopass_poller_stop(seader->picopass_poller);
-        picopass_poller_free(seader->picopass_poller);
-        seader->picopass_poller = NULL;
-    }
-
     popup_reset(seader->popup);
     seader_worker_reset_poller_session(seader->worker);
     if(seader->sam_state == SeaderSamStateIdle) {
