@@ -20,11 +20,6 @@ typedef enum {
 
 typedef struct {
     SeaderUhfSnmpProbeStage stage;
-    SeaderBytesView engine_id;
-    SeaderBytesView usm_engine_id;
-    SeaderBytesView usm_username;
-    SeaderBytesView ice_value;
-    SeaderBytesView tag_config_value;
     uint32_t usm_engine_boots;
     uint32_t usm_engine_time;
     bool has_monza4qt;

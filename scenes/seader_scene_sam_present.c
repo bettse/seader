@@ -76,7 +76,8 @@ bool seader_scene_sam_present_on_event(void* context, SceneManagerEvent event) {
 
     if(event.type == SceneManagerEventTypeCustom) {
         if(event.event == SubmenuIndexRead) {
-            scene_manager_set_scene_state(seader->scene_manager, SeaderSceneSamPresent, event.event);
+            scene_manager_set_scene_state(
+                seader->scene_manager, SeaderSceneSamPresent, event.event);
             scene_manager_next_scene(seader->scene_manager, SeaderSceneRead);
             consumed = true;
         } else if(event.event == SubmenuIndexReadConfigCard) {
@@ -85,18 +86,21 @@ bool seader_scene_sam_present_on_event(void* context, SceneManagerEvent event) {
             scene_manager_next_scene(seader->scene_manager, SeaderSceneReadConfigCard);
             consumed = true;
         } else if(event.event == SubmenuIndexSamInfo) {
-            scene_manager_set_scene_state(seader->scene_manager, SeaderSceneSamPresent, event.event);
+            scene_manager_set_scene_state(
+                seader->scene_manager, SeaderSceneSamPresent, event.event);
             scene_manager_next_scene(seader->scene_manager, SeaderSceneSamInfo);
             consumed = true;
         } else if(event.event == SubmenuIndexSaved) {
-            scene_manager_set_scene_state(seader->scene_manager, SeaderSceneSamPresent, event.event);
+            scene_manager_set_scene_state(
+                seader->scene_manager, SeaderSceneSamPresent, event.event);
             scene_manager_next_scene(seader->scene_manager, SeaderSceneFileSelect);
             consumed = true;
         } else if(event.event == SeaderWorkerEventSamMissing) {
             scene_manager_next_scene(seader->scene_manager, SeaderSceneSamMissing);
             consumed = true;
         } else if(event.event == SubmenuIndexAPDURunner) {
-            scene_manager_set_scene_state(seader->scene_manager, SeaderSceneSamPresent, event.event);
+            scene_manager_set_scene_state(
+                seader->scene_manager, SeaderSceneSamPresent, event.event);
             scene_manager_next_scene(seader->scene_manager, SeaderSceneAPDURunner);
             consumed = true;
         } else if(event.event == SeaderCustomEventSamStatusUpdated) {
