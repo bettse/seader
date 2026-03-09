@@ -9,11 +9,26 @@ asn1:
 build:
 	ufbt
 
+test-host:
+	mkdir -p build/host_tests
+	cc -std=c11 -Wall -Wextra -Werror -DSEADER_HOST_TEST -Itests/host/vendor/munit -Itests/host -I. \
+		tests/host/vendor/munit/munit.c \
+		tests/host/test_main.c \
+		tests/host/test_lrc.c \
+		tests/host/test_t1_existing.c \
+		tests/host/t1_test_stubs.c \
+		tests/host/bit_buffer_mock.c \
+		lrc.c \
+		t_1.c \
+		-o build/host_tests/seader_tests
+	./build/host_tests/seader_tests
+
 launch:
 	ufbt launch
 
 format:
-	ufbt format
+	ufbt format ARGS="!./tests/host/vendor/munit"
 
 clean:
 	rm -rf dist
+	rm -rf build/host_tests
