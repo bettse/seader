@@ -3,6 +3,11 @@
 #include "../seader_i.h"
 #include "../trace_log.h"
 
+void seader_sam_check_worker_callback(uint32_t event, void* context) {
+    Seader* seader = context;
+    view_dispatcher_send_custom_event(seader->view_dispatcher, event);
+}
+
 void seader_scene_read_prepare(Seader* seader) {
     furi_assert(seader);
     FURI_LOG_D("SceneRead", "Prepare session sam=%d", seader->samCommand);
