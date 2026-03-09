@@ -19,6 +19,135 @@ void seader_send_card_detected(SeaderUartBridge* seader_uart, CardDetails_t* car
 void seader_worker_reading(Seader* seader);
 void seader_worker_poller_conversation(Seader* seader, SeaderPollerContainer* spc);
 
+typedef struct {
+    bool done;
+    bool detected;
+} SeaderPicopassDetectContext;
+
+static NfcCommand
+    seader_worker_picopass_detect_callback(PicopassPollerEvent event, void* context) {
+    SeaderPicopassDetectContext* detect_context = context;
+
+    if(event.type == PicopassPollerEventTypeCardDetected ||
+       event.type == PicopassPollerEventTypeSuccess) {
+        detect_context->detected = true;
+        detect_context->done = true;
+        return NfcCommandStop;
+    } else if(event.type == PicopassPollerEventTypeFail) {
+        detect_context->done = true;
+        return NfcCommandStop;
+    }
+
+    return NfcCommandContinue;
+}
+
+static bool seader_worker_detect_picopass(Nfc* nfc) {
+    bool detected = false;
+    PicopassPoller* poller = picopass_poller_alloc(nfc);
+    SeaderPicopassDetectContext detect_context = {0};
+
+    picopass_poller_start(poller, seader_worker_picopass_detect_callback, &detect_context);
+
+    for(uint8_t i = 0; i < 10 && !detect_context.done; i++) {
+        furi_delay_ms(10);
+    }
+
+    detected = detect_context.detected;
+    picopass_poller_stop(poller);
+    picopass_poller_free(poller);
+
+    return detected;
+}
+
+static void seader_worker_add_detected_type(
+    SeaderCredentialType* detected_types,
+    size_t* detected_type_count,
+    SeaderCredentialType type) {
+    for(size_t i = 0; i < *detected_type_count; i++) {
+        if(detected_types[i] == type) {
+            return;
+        }
+    }
+
+    if(*detected_type_count < SEADER_MAX_DETECTED_CARD_TYPES) {
+        detected_types[*detected_type_count] = type;
+        (*detected_type_count)++;
+    }
+}
+
+static size_t seader_worker_detect_supported_types(
+    Seader* seader,
+    SeaderCredentialType* detected_types,
+    size_t detected_capacity) {
+    UNUSED(detected_capacity);
+    size_t detected_type_count = 0;
+    NfcPoller* poller_detect = nfc_poller_alloc(seader->nfc, NfcProtocolIso14443_4a);
+    if(nfc_poller_detect(poller_detect)) {
+        seader_worker_add_detected_type(
+            detected_types, &detected_type_count, SeaderCredentialType14A);
+    }
+    nfc_poller_free(poller_detect);
+
+    poller_detect = nfc_poller_alloc(seader->nfc, NfcProtocolMfClassic);
+    if(nfc_poller_detect(poller_detect)) {
+        seader_worker_add_detected_type(
+            detected_types, &detected_type_count, SeaderCredentialTypeMifareClassic);
+    }
+    nfc_poller_free(poller_detect);
+
+    if(seader_worker_detect_picopass(seader->nfc)) {
+        seader_worker_add_detected_type(
+            detected_types, &detected_type_count, SeaderCredentialTypePicopass);
+    }
+
+    return detected_type_count;
+}
+
+static bool seader_worker_start_read_for_type(Seader* seader, SeaderCredentialType type) {
+    NfcPoller* poller_detect = NULL;
+
+    if(type == SeaderCredentialType14A) {
+        poller_detect = nfc_poller_alloc(seader->nfc, NfcProtocolIso14443_4a);
+        if(!nfc_poller_detect(poller_detect)) {
+            nfc_poller_free(poller_detect);
+            return false;
+        }
+        FURI_LOG_I(TAG, "Detected ISO14443-4A card");
+        nfc_poller_free(poller_detect);
+        seader->poller = nfc_poller_alloc(seader->nfc, NfcProtocolIso14443_4a);
+        seader->worker->stage = SeaderPollerEventTypeCardDetect;
+        seader->credential->type = SeaderCredentialType14A;
+        nfc_poller_start(seader->poller, seader_worker_poller_callback_iso14443_4a, seader);
+        return true;
+    } else if(type == SeaderCredentialTypeMifareClassic) {
+        poller_detect = nfc_poller_alloc(seader->nfc, NfcProtocolMfClassic);
+        if(!nfc_poller_detect(poller_detect)) {
+            nfc_poller_free(poller_detect);
+            return false;
+        }
+        FURI_LOG_I(TAG, "Detected Mifare Classic card");
+        nfc_poller_free(poller_detect);
+        seader->poller = nfc_poller_alloc(seader->nfc, NfcProtocolMfClassic);
+        seader->worker->stage = SeaderPollerEventTypeCardDetect;
+        seader->credential->type = SeaderCredentialTypeMifareClassic;
+        nfc_poller_start(seader->poller, seader_worker_poller_callback_mfc, seader);
+        return true;
+    } else if(type == SeaderCredentialTypePicopass) {
+        if(!seader_worker_detect_picopass(seader->nfc)) {
+            return false;
+        }
+        FURI_LOG_I(TAG, "Detected Picopass card");
+        seader->picopass_poller = picopass_poller_alloc(seader->nfc);
+        seader->worker->stage = SeaderPollerEventTypeCardDetect;
+        seader->credential->type = SeaderCredentialTypePicopass;
+        picopass_poller_start(
+            seader->picopass_poller, seader_worker_poller_callback_picopass, seader);
+        return true;
+    }
+
+    return false;
+}
+
 /***************************** Seader Worker API *******************************/
 
 SeaderWorker* seader_worker_alloc() {
@@ -265,7 +394,11 @@ void seader_worker_virtual_credential(Seader* seader) {
         running = (seader_worker->stage != SeaderPollerEventTypeComplete);
     }
 
-    if(dead_loops > 0) {
+    if(dead_loops > 0 && seader_worker->stage == SeaderPollerEventTypeComplete) {
+        if(seader_worker->callback) {
+            seader_worker->callback(SeaderWorkerEventSuccess, seader_worker->context);
+        }
+    } else if(dead_loops > 0) {
         FURI_LOG_D(TAG, "Final dead loops: %d", dead_loops);
     } else {
         view_dispatcher_send_custom_event(seader->view_dispatcher, SeaderCustomEventWorkerExit);
@@ -307,65 +440,31 @@ void seader_worker_reading(Seader* seader) {
     while(seader_worker->state == SeaderWorkerStateReading) {
         bool detected = false;
         SeaderPollerEventType result_stage = SeaderPollerEventTypeFail;
+        SeaderCredentialType type_to_read = seader->selected_read_type;
 
-        // 1. HF Discovery (ISO14443-4A)
-        NfcPoller* poller_detect = nfc_poller_alloc(seader->nfc, NfcProtocolIso14443_4a);
-        if(nfc_poller_detect(poller_detect)) {
-            FURI_LOG_I(TAG, "Detected ISO14443-4A card");
-            nfc_poller_free(poller_detect);
-            poller_detect = NULL;
+        if(type_to_read == SeaderCredentialTypeNone) {
+            SeaderCredentialType detected_types[SEADER_MAX_DETECTED_CARD_TYPES] = {0};
+            const size_t detected_type_count = seader_worker_detect_supported_types(
+                seader, detected_types, COUNT_OF(detected_types));
 
-            seader->poller = nfc_poller_alloc(seader->nfc, NfcProtocolIso14443_4a);
-            seader_worker->stage = SeaderPollerEventTypeCardDetect;
-            seader->credential->type = SeaderCredentialType14A;
-            nfc_poller_start(seader->poller, seader_worker_poller_callback_iso14443_4a, seader);
-            detected = true;
-        } else {
-            nfc_poller_free(poller_detect);
-            poller_detect = NULL;
-        }
-
-        // 2. HF Discovery (Mifare Classic)
-        if(!detected) {
-            poller_detect = nfc_poller_alloc(seader->nfc, NfcProtocolMfClassic);
-            if(nfc_poller_detect(poller_detect)) {
-                FURI_LOG_I(TAG, "Detected Mifare Classic card");
-                nfc_poller_free(poller_detect);
-                poller_detect = NULL;
-
-                seader->poller = nfc_poller_alloc(seader->nfc, NfcProtocolMfClassic);
-                seader_worker->stage = SeaderPollerEventTypeCardDetect;
-                seader->credential->type = SeaderCredentialTypeMifareClassic;
-                nfc_poller_start(seader->poller, seader_worker_poller_callback_mfc, seader);
-                detected = true;
-            } else {
-                nfc_poller_free(poller_detect);
-                poller_detect = NULL;
-            }
-        }
-
-        // 3. HF Discovery (Picopass/iCLASS)
-        if(!detected) {
-            seader->picopass_poller = picopass_poller_alloc(seader->nfc);
-            seader_worker->stage = SeaderPollerEventTypeCardDetect;
-            seader->credential->type = SeaderCredentialTypePicopass;
-
-            picopass_poller_start(
-                seader->picopass_poller, seader_worker_poller_callback_picopass, seader);
-
-            // Wait up to 100ms for picopass detection
-            for(int i = 0; i < 10; i++) {
-                if(seader_worker->stage != SeaderPollerEventTypeCardDetect) {
-                    detected = true;
-                    break;
+            if(detected_type_count > 1) {
+                memcpy(
+                    seader->detected_card_types,
+                    detected_types,
+                    sizeof(seader->detected_card_types));
+                seader->detected_card_type_count = detected_type_count;
+                if(seader_worker->callback) {
+                    seader_worker->callback(
+                        SeaderWorkerEventSelectCardType, seader_worker->context);
                 }
-                furi_delay_ms(10);
+                break;
+            } else if(detected_type_count == 1) {
+                type_to_read = detected_types[0];
             }
-            if(!detected) {
-                picopass_poller_stop(seader->picopass_poller);
-                picopass_poller_free(seader->picopass_poller);
-                seader->picopass_poller = NULL;
-            }
+        }
+
+        if(type_to_read != SeaderCredentialTypeNone) {
+            detected = seader_worker_start_read_for_type(seader, type_to_read);
         }
 
         if(detected) {
