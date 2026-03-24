@@ -1,7 +1,14 @@
 #include "../seader_i.h"
+#include "../credential_sio_label.h"
 #include <dolphin/dolphin.h>
 
 #define TAG "SeaderSceneReadCardSuccess"
+
+static bool seader_credential_is_picopass_sio_context(const SeaderCredential* credential) {
+    return credential && (credential->type == SeaderCredentialTypePicopass ||
+                          (credential->has_pacs_media_type &&
+                           credential->pacs_media_type == SeaderPacsMediaTypePicopass));
+}
 
 void seader_scene_read_card_success_widget_callback(
     GuiButtonType result,
@@ -106,19 +113,16 @@ void seader_scene_read_card_success_on_enter(void* context) {
         AlignCenter,
         FontSecondary,
         furi_string_get_cstr(credential_str));
-    if(credential->sio[0] == 0x30) {
-        switch(credential->sio_start_block) {
-        case 6:
-            furi_string_set(sio_str, "+SIO(SE)");
-            break;
-        case 10:
-            furi_string_set(sio_str, "+SIO(SR)");
-            break;
-        default:
+    if(seader_sio_label_format(
+           credential->sio[0] == 0x30,
+           seader_credential_is_picopass_sio_context(credential),
+           credential->sio_start_block,
+           seader->text_store,
+           sizeof(seader->text_store))) {
+        if(strcmp(seader->text_store, "+SIO(?)") == 0) {
             FURI_LOG_E(TAG, "Unknown SIO start block: %d", credential->sio_start_block);
-            furi_string_set(sio_str, "+SIO(?)");
-            break;
         }
+        furi_string_set(sio_str, seader->text_store);
         widget_add_string_element(
             widget, 64, 48, AlignCenter, AlignCenter, FontSecondary, furi_string_get_cstr(sio_str));
     }

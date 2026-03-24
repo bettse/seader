@@ -25,9 +25,8 @@ bool seader_card_details_build(
     if(ats != NULL) {
         protocol_bytes[1] = FrameProtocol_nfc;
         if(OCTET_STRING_fromBuf(
-               &card_details->protocol,
-               (const char*)protocol_bytes,
-               sizeof(protocol_bytes)) != 0) {
+               &card_details->protocol, (const char*)protocol_bytes, sizeof(protocol_bytes)) !=
+           0) {
             seader_card_details_reset(card_details);
             return false;
         }
@@ -42,18 +41,16 @@ bool seader_card_details_build(
     } else if(uid_len == 8U) {
         protocol_bytes[1] = FrameProtocol_iclass;
         if(OCTET_STRING_fromBuf(
-               &card_details->protocol,
-               (const char*)protocol_bytes,
-               sizeof(protocol_bytes)) != 0) {
+               &card_details->protocol, (const char*)protocol_bytes, sizeof(protocol_bytes)) !=
+           0) {
             seader_card_details_reset(card_details);
             return false;
         }
     } else {
         protocol_bytes[1] = FrameProtocol_nfc;
         if(OCTET_STRING_fromBuf(
-               &card_details->protocol,
-               (const char*)protocol_bytes,
-               sizeof(protocol_bytes)) != 0) {
+               &card_details->protocol, (const char*)protocol_bytes, sizeof(protocol_bytes)) !=
+           0) {
             seader_card_details_reset(card_details);
             return false;
         }

@@ -24,11 +24,13 @@ test-host:
 		lib/host_tests/test_t1_protocol.c \
 		lib/host_tests/test_snmp.c \
 		lib/host_tests/test_uhf_status_label.c \
+		lib/host_tests/test_credential_sio_label.c \
 		lib/host_tests/test_runtime_policy.c \
 		lib/host_tests/t1_test_stubs.c \
 		lib/host_tests/bit_buffer_mock.c \
 		lrc.c \
 		ccid_logic.c \
+		credential_sio_label.c \
 		t_1_logic.c \
 		t_1.c \
 		sam_key_label.c \

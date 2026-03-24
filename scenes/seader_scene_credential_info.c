@@ -1,7 +1,14 @@
 #include "../seader_i.h"
+#include "../credential_sio_label.h"
 #include <dolphin/dolphin.h>
 
 #define TAG "SeaderCredentialInfoScene"
+
+static bool seader_credential_is_picopass_sio_context(const SeaderCredential* credential) {
+    return credential && (credential->type == SeaderCredentialTypePicopass ||
+                          (credential->has_pacs_media_type &&
+                           credential->pacs_media_type == SeaderPacsMediaTypePicopass));
+}
 
 void seader_scene_credential_info_widget_callback(
     GuiButtonType result,
@@ -69,8 +76,13 @@ void seader_scene_credential_info_on_enter(void* context) {
         FontSecondary,
         furi_string_get_cstr(credential_str));
 
-    if(credential->sio[0] == 0x30) {
-        furi_string_set(sio_str, "+SIO");
+    if(seader_sio_label_format(
+           credential->sio[0] == 0x30,
+           seader_credential_is_picopass_sio_context(credential),
+           credential->sio_start_block,
+           seader->text_store,
+           sizeof(seader->text_store))) {
+        furi_string_set(sio_str, seader->text_store);
         widget_add_string_element(
             widget, 64, 48, AlignCenter, AlignCenter, FontSecondary, furi_string_get_cstr(sio_str));
     }

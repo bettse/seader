@@ -1,8 +1,6 @@
 #include "hf_release_sequence.h"
 
-static void seader_hf_release_callback_invoke(
-    SeaderHfReleaseCallback callback,
-    void* context) {
+static void seader_hf_release_callback_invoke(SeaderHfReleaseCallback callback, void* context) {
     if(callback) {
         callback(context);
     }
