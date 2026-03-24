@@ -1,4 +1,6 @@
 #include "seader_i.h"
+#include "runtime_policy.h"
+#include "hf_release_sequence.h"
 #include "trace_log.h"
 
 #define TAG                        "Seader"
@@ -372,6 +374,60 @@ static void seader_hf_session_force_unloaded(Seader* seader) {
     seader->hf_session_state = SeaderHfSessionStateUnloaded;
     if(seader->mode_runtime == SeaderModeRuntimeHF) {
         seader->mode_runtime = SeaderModeRuntimeNone;
+    }
+}
+
+static void seader_hf_release_plugin_stop(void* context) {
+    Seader* seader = context;
+    if(seader && seader->plugin_hf && seader->hf_plugin_ctx) {
+        seader->plugin_hf->stop(seader->hf_plugin_ctx);
+    }
+}
+
+static void seader_hf_release_host_poller(void* context) {
+    Seader* seader = context;
+    if(seader && seader->poller) {
+        FURI_LOG_I(TAG, "Stopping host NFC poller");
+        nfc_poller_stop(seader->poller);
+        nfc_poller_free(seader->poller);
+        seader->poller = NULL;
+    }
+}
+
+static void seader_hf_release_host_picopass(void* context) {
+    Seader* seader = context;
+    if(seader && seader->picopass_poller) {
+        FURI_LOG_I(TAG, "Stopping host Picopass poller");
+        picopass_poller_stop(seader->picopass_poller);
+        picopass_poller_free(seader->picopass_poller);
+        seader->picopass_poller = NULL;
+    }
+}
+
+static void seader_hf_release_plugin_free(void* context) {
+    Seader* seader = context;
+    if(seader && seader->plugin_hf && seader->hf_plugin_ctx) {
+        seader->plugin_hf->free(seader->hf_plugin_ctx);
+    }
+    if(seader) {
+        seader->hf_plugin_ctx = NULL;
+        seader->plugin_hf = NULL;
+    }
+}
+
+static void seader_hf_release_plugin_manager(void* context) {
+    Seader* seader = context;
+    if(seader && seader->hf_plugin_manager) {
+        FURI_LOG_I(TAG, "Unloading HF plugin");
+        plugin_manager_free(seader->hf_plugin_manager);
+        seader->hf_plugin_manager = NULL;
+    }
+}
+
+static void seader_hf_release_worker_reset(void* context) {
+    Seader* seader = context;
+    if(seader && seader->worker) {
+        seader_worker_reset_poller_session(seader->worker);
     }
 }
 
@@ -795,7 +851,7 @@ static void seader_hf_teardown_blocking(Seader* seader) {
         return;
     }
 
-    seader->hf_session_state = SeaderHfSessionStateTearingDown;
+    seader_runtime_begin_hf_teardown(&seader->hf_session_state);
     if(!seader_worker_acquire(seader) || !seader->worker || !seader->uart) {
         FURI_LOG_W(TAG, "HF blocking teardown fallback");
         seader_hf_plugin_release(seader);
@@ -810,47 +866,18 @@ static void seader_hf_teardown_blocking(Seader* seader) {
 
 void seader_hf_plugin_release(Seader* seader) {
     furi_assert(seader);
-
-    seader->hf_session_state = SeaderHfSessionStateTearingDown;
-
-    if(seader->plugin_hf && seader->hf_plugin_ctx) {
-        seader->plugin_hf->stop(seader->hf_plugin_ctx);
-    }
-
-    if(seader->poller) {
-        FURI_LOG_I(TAG, "Stopping host NFC poller");
-        nfc_poller_stop(seader->poller);
-        nfc_poller_free(seader->poller);
-        seader->poller = NULL;
-    }
-
-    if(seader->picopass_poller) {
-        FURI_LOG_I(TAG, "Stopping host Picopass poller");
-        picopass_poller_stop(seader->picopass_poller);
-        picopass_poller_free(seader->picopass_poller);
-        seader->picopass_poller = NULL;
-    }
-
-    if(seader->plugin_hf && seader->hf_plugin_ctx) {
-        seader->plugin_hf->free(seader->hf_plugin_ctx);
-    }
-    seader->hf_plugin_ctx = NULL;
-    seader->plugin_hf = NULL;
-
-    if(seader->hf_plugin_manager) {
-        FURI_LOG_I(TAG, "Unloading HF plugin");
-        plugin_manager_free(seader->hf_plugin_manager);
-        seader->hf_plugin_manager = NULL;
-    }
-
-    if(seader->worker) {
-        seader_worker_reset_poller_session(seader->worker);
-    }
-
-    if(seader->mode_runtime == SeaderModeRuntimeHF) {
-        seader->mode_runtime = SeaderModeRuntimeNone;
-    }
-    seader->hf_session_state = SeaderHfSessionStateUnloaded;
+    SeaderHfReleaseSequence release_sequence = {
+        .context = seader,
+        .hf_session_state = &seader->hf_session_state,
+        .mode_runtime = &seader->mode_runtime,
+        .plugin_stop = seader_hf_release_plugin_stop,
+        .host_poller_release = seader_hf_release_host_poller,
+        .host_picopass_release = seader_hf_release_host_picopass,
+        .plugin_free = seader_hf_release_plugin_free,
+        .plugin_manager_unload = seader_hf_release_plugin_manager,
+        .worker_reset = seader_hf_release_worker_reset,
+    };
+    seader_hf_release_sequence_run(&release_sequence);
 }
 
 bool seader_hf_finish_teardown_action(Seader* seader) {

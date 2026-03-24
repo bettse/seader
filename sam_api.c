@@ -4,6 +4,8 @@
 #include "sam_key_label.h"
 #include "trace_log.h"
 #include "uhf_snmp_probe.h"
+#include "runtime_policy.h"
+#include "card_details_builder.h"
 #include "uhf_status_label.h"
 #include <toolbox/path.h>
 #include <toolbox/version.h>
@@ -76,10 +78,11 @@ static void seader_reset_cached_sam_metadata(Seader* seader) {
         return;
     }
 
-    seader->sam_version[0] = 0U;
-    seader->sam_version[1] = 0U;
-    seader->uhf_status_label[0] = '\0';
-    seader_uhf_snmp_probe_init(&seader->snmp_probe);
+    seader_runtime_reset_cached_sam_metadata(
+        seader->sam_version,
+        seader->uhf_status_label,
+        sizeof(seader->uhf_status_label),
+        &seader->snmp_probe);
 }
 
 static bool seader_snmp_probe_send_next_request(Seader* seader) {
@@ -110,9 +113,7 @@ static void seader_snmp_probe_finish(Seader* seader) {
         return;
     }
 
-    if(seader->mode_runtime == SeaderModeRuntimeUHF) {
-        seader->mode_runtime = SeaderModeRuntimeNone;
-    }
+    seader_runtime_finish_uhf_probe(&seader->mode_runtime);
     seader_sam_set_state(seader, SeaderSamStateIdle, SeaderSamIntentNone, SamCommand_PR_NOTHING);
 }
 
@@ -121,8 +122,14 @@ static void seader_start_snmp_probe(Seader* seader) {
         return;
     }
 
-    seader->mode_runtime = SeaderModeRuntimeUHF;
-    seader_uhf_snmp_probe_init(&seader->snmp_probe);
+    if(!seader_runtime_begin_uhf_probe(
+           seader->sam_present,
+           &seader->mode_runtime,
+           seader->hf_session_state,
+           &seader->snmp_probe)) {
+        seader_snmp_probe_finish(seader);
+        return;
+    }
     seader_update_uhf_status_label(seader);
     seader_sam_set_state(
         seader,
@@ -1725,12 +1732,6 @@ NfcCommand seader_worker_card_detect(
     CardDetails_t cardDetails = {0};
     FURI_LOG_D(TAG, "Build card_detect sak=%02x uid_len=%u ats_len=%u", sak, uid_len, ats_len);
 
-    if(OCTET_STRING_fromBuf(&cardDetails.csn, (const char*)uid, uid_len) != 0) {
-        FURI_LOG_E(TAG, "Failed to encode CSN");
-        return NfcCommandStop;
-    }
-    uint8_t protocol_bytes[] = {0x00, 0x00};
-
     // this won't hold true for Seos cards, but then we won't see the SIO from Seos cards anyway
     // so it doesn't really matter
     size_t diversifier_len = uid_len;
@@ -1742,46 +1743,9 @@ NfcCommand seader_worker_card_detect(
     memcpy(credential->diversifier, uid, diversifier_len);
     credential->diversifier_len = diversifier_len;
 
-    if(ats != NULL) { // type 4
-        protocol_bytes[1] = FrameProtocol_nfc;
-        if(OCTET_STRING_fromBuf(
-               &cardDetails.protocol, (const char*)protocol_bytes, sizeof(protocol_bytes)) != 0) {
-            FURI_LOG_E(TAG, "Failed to encode 14A protocol");
-            ASN_STRUCT_FREE_CONTENTS_ONLY(asn_DEF_CardDetails, &cardDetails);
-            return NfcCommandStop;
-        }
-        cardDetails.sak = calloc(1, sizeof(*cardDetails.sak));
-        cardDetails.atsOrAtqbOrAtr = calloc(1, sizeof(*cardDetails.atsOrAtqbOrAtr));
-        if(!cardDetails.sak || !cardDetails.atsOrAtqbOrAtr ||
-           OCTET_STRING_fromBuf(cardDetails.sak, (const char*)&sak, 1) != 0 ||
-           OCTET_STRING_fromBuf(cardDetails.atsOrAtqbOrAtr, (const char*)ats, ats_len) != 0) {
-            FURI_LOG_E(TAG, "Failed to encode 14A optional card details");
-            ASN_STRUCT_FREE_CONTENTS_ONLY(asn_DEF_CardDetails, &cardDetails);
-            return NfcCommandStop;
-        }
-        // TODO: Update asn1 to change atqa to ats
-    } else if(uid_len == 8) { // picopass
-        protocol_bytes[1] = FrameProtocol_iclass;
-        if(OCTET_STRING_fromBuf(
-               &cardDetails.protocol, (const char*)protocol_bytes, sizeof(protocol_bytes)) != 0) {
-            FURI_LOG_E(TAG, "Failed to encode picopass protocol");
-            ASN_STRUCT_FREE_CONTENTS_ONLY(asn_DEF_CardDetails, &cardDetails);
-            return NfcCommandStop;
-        }
-    } else { // MFC
-        protocol_bytes[1] = FrameProtocol_nfc;
-        if(OCTET_STRING_fromBuf(
-               &cardDetails.protocol, (const char*)protocol_bytes, sizeof(protocol_bytes)) != 0) {
-            FURI_LOG_E(TAG, "Failed to encode MFC protocol");
-            ASN_STRUCT_FREE_CONTENTS_ONLY(asn_DEF_CardDetails, &cardDetails);
-            return NfcCommandStop;
-        }
-        cardDetails.sak = calloc(1, sizeof(*cardDetails.sak));
-        if(!cardDetails.sak || OCTET_STRING_fromBuf(cardDetails.sak, (const char*)&sak, 1) != 0) {
-            FURI_LOG_E(TAG, "Failed to encode MFC SAK");
-            ASN_STRUCT_FREE_CONTENTS_ONLY(asn_DEF_CardDetails, &cardDetails);
-            return NfcCommandStop;
-        }
+    if(!seader_card_details_build(&cardDetails, sak, uid, uid_len, ats, ats_len)) {
+        FURI_LOG_E(TAG, "Failed to build card details");
+        return NfcCommandStop;
     }
 
     seader_sam_set_state(
@@ -1800,6 +1764,6 @@ NfcCommand seader_worker_card_detect(
         version_get_version(version),
         FAP_VERSION);
 
-    ASN_STRUCT_FREE_CONTENTS_ONLY(asn_DEF_CardDetails, &cardDetails);
+    seader_card_details_reset(&cardDetails);
     return NfcCommandContinue;
 }
