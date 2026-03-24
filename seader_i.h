@@ -39,8 +39,8 @@
 #include <Payload.h>
 #include <FrameProtocol.h>
 
-#include "plugin/interface.h"
-#include "plugin/hf_interface.h"
+#include "hf_interface_fal/interface.h"
+#include "hf_interface_fal/hf_interface.h"
 #include <flipper_application/flipper_application.h>
 #include <flipper_application/plugins/plugin_manager.h>
 #include <loader/firmware_api/firmware_api.h>
@@ -190,7 +190,7 @@ struct Seader {
     SeaderModeRuntime mode_runtime;
     SeaderHfSessionState hf_session_state;
     SeaderHfTeardownAction hf_teardown_action;
-    bool hf_teardown_skip_read_cleanup;
+    bool loading_popup_enabled;
 
     APDULog* apdu_log;
     SeaderAPDURunnerContext apdu_runner_ctx;
@@ -220,6 +220,7 @@ void seader_blink_start(Seader* seader);
 
 void seader_blink_stop(Seader* seader);
 
+void seader_nfc_loading_callback(void* context, bool show);
 void seader_show_loading_popup(void* context, bool show);
 
 bool seader_hf_mode_activate(Seader* seader);

@@ -347,7 +347,6 @@ static const PluginHfHostApi seader_hf_plugin_host_api = {
     .picopass_stop = seader_hf_plugin_picopass_stop,
     .picopass_get_csn = seader_hf_plugin_picopass_get_csn,
     .picopass_transmit = seader_hf_plugin_picopass_transmit,
-    .show_loading_popup = seader_show_loading_popup,
     .set_read_error = seader_hf_plugin_set_read_error,
 };
 
@@ -358,6 +357,22 @@ static void seader_hf_worker_event_callback(uint32_t event, void* context) {
     }
 
     view_dispatcher_send_custom_event(seader->view_dispatcher, event);
+}
+
+static void seader_hf_session_force_unloaded(Seader* seader) {
+    if(!seader) {
+        return;
+    }
+
+    seader->hf_plugin_ctx = NULL;
+    seader->plugin_hf = NULL;
+    seader->hf_plugin_manager = NULL;
+    seader->poller = NULL;
+    seader->picopass_poller = NULL;
+    seader->hf_session_state = SeaderHfSessionStateUnloaded;
+    if(seader->mode_runtime == SeaderModeRuntimeHF) {
+        seader->mode_runtime = SeaderModeRuntimeNone;
+    }
 }
 
 bool seader_custom_event_callback(void* context, uint32_t event) {
@@ -483,7 +498,11 @@ Seader* seader_alloc() {
     seader->mode_runtime = SeaderModeRuntimeNone;
     seader->hf_session_state = SeaderHfSessionStateUnloaded;
     seader->hf_teardown_action = SeaderHfTeardownActionNone;
-    seader->hf_teardown_skip_read_cleanup = false;
+    seader->loading_popup_enabled = true;
+
+    if(seader->nfc_device) {
+        nfc_device_set_loading_callback(seader->nfc_device, seader_nfc_loading_callback, seader);
+    }
 
     return seader;
 }
@@ -495,6 +514,7 @@ void seader_free(Seader* seader) {
         furi_hal_power_disable_otg();
     }
 
+    seader->loading_popup_enabled = false;
     seader_hf_teardown_blocking(seader);
     seader_hf_mode_deactivate(seader);
     seader_worker_release(seader);
@@ -602,8 +622,20 @@ void seader_blink_stop(Seader* seader) {
     notification_message(seader->notifications, &seader_sequence_blink_stop);
 }
 
+void seader_nfc_loading_callback(void* context, bool show) {
+    Seader* seader = context;
+    if(!seader || !seader->loading_popup_enabled || !seader->view_dispatcher) {
+        return;
+    }
+
+    seader_show_loading_popup(seader, show);
+}
+
 void seader_show_loading_popup(void* context, bool show) {
     Seader* seader = context;
+    if(!seader || !seader->loading_popup_enabled || !seader->view_dispatcher) {
+        return;
+    }
 
     if(show) {
         // Raise timer priority so that animations can play
@@ -729,10 +761,7 @@ bool seader_hf_plugin_acquire(Seader* seader) {
        PluginManagerErrorNone) {
         FURI_LOG_E(TAG, "Failed to load HF plugin");
         plugin_manager_free(seader->hf_plugin_manager);
-        seader->hf_plugin_manager = NULL;
-        seader->plugin_hf = NULL;
-        seader->hf_plugin_ctx = NULL;
-        seader->hf_session_state = SeaderHfSessionStateUnloaded;
+        seader_hf_session_force_unloaded(seader);
         return false;
     }
 
@@ -741,9 +770,7 @@ bool seader_hf_plugin_acquire(Seader* seader) {
     if(!seader->plugin_hf) {
         FURI_LOG_E(TAG, "Failed to resolve HF plugin entry point");
         plugin_manager_free(seader->hf_plugin_manager);
-        seader->hf_plugin_manager = NULL;
-        seader->hf_plugin_ctx = NULL;
-        seader->hf_session_state = SeaderHfSessionStateUnloaded;
+        seader_hf_session_force_unloaded(seader);
         return false;
     }
 
@@ -751,9 +778,7 @@ bool seader_hf_plugin_acquire(Seader* seader) {
     if(!seader->hf_plugin_ctx) {
         FURI_LOG_E(TAG, "Failed to allocate HF plugin context");
         plugin_manager_free(seader->hf_plugin_manager);
-        seader->hf_plugin_manager = NULL;
-        seader->plugin_hf = NULL;
-        seader->hf_session_state = SeaderHfSessionStateUnloaded;
+        seader_hf_session_force_unloaded(seader);
         return false;
     }
 
@@ -795,10 +820,6 @@ static void seader_hf_teardown_blocking(Seader* seader) {
 void seader_hf_plugin_release(Seader* seader) {
     furi_assert(seader);
 
-    if(seader->nfc_device) {
-        nfc_device_set_loading_callback(seader->nfc_device, NULL, NULL);
-    }
-
     if(seader->plugin_hf && seader->hf_plugin_ctx) {
         seader->plugin_hf->stop(seader->hf_plugin_ctx);
         seader->plugin_hf->free(seader->hf_plugin_ctx);
@@ -839,7 +860,6 @@ bool seader_hf_finish_teardown_action(Seader* seader) {
 
     FURI_LOG_I(TAG, "HF teardown complete action=%d", seader->hf_teardown_action);
     seader_show_loading_popup(seader, false);
-    seader->hf_teardown_skip_read_cleanup = false;
     seader_hf_mode_set_selected_read_type(seader, SeaderCredentialTypeNone);
     seader_hf_mode_clear_detected_types(seader);
     seader_hf_mode_deactivate(seader);

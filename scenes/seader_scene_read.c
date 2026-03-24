@@ -57,7 +57,6 @@ bool seader_scene_read_on_event(void* context, SceneManagerEvent event) {
         }
     } else if(event.type == SceneManagerEventTypeBack) {
         seader_scene_read_abort_cleanup(seader);
-        seader->hf_teardown_skip_read_cleanup = true;
         consumed = seader_hf_request_teardown(seader, SeaderHfTeardownActionSamPresent);
     }
 
@@ -66,10 +65,6 @@ bool seader_scene_read_on_event(void* context, SceneManagerEvent event) {
 
 void seader_scene_read_on_exit(void* context) {
     Seader* seader = context;
-    if(seader->hf_teardown_skip_read_cleanup) {
-        seader->hf_teardown_skip_read_cleanup = false;
-        return;
-    }
     seader_scene_read_finish_cleanup(seader);
     seader_worker_release(seader);
 }

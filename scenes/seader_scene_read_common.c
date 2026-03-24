@@ -35,15 +35,8 @@ void seader_scene_read_cleanup(Seader* seader) {
         seader->samCommand,
         seader->sam_state,
         seader->sam_intent);
-    if(seader->worker) {
-        seader_worker_cancel_poller_session(seader->worker);
-    }
-
     seader_scene_read_abort_cleanup(seader);
-
-    if(seader->worker) {
-        seader_worker_reset_poller_session(seader->worker);
-    }
+    seader_scene_read_finish_cleanup(seader);
 }
 
 void seader_scene_read_abort_cleanup(Seader* seader) {
