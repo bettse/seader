@@ -24,6 +24,7 @@ typedef enum {
     SeaderWorkerStateVirtualCredential,
     SeaderWorkerStateAPDURunner,
     SeaderWorkerStateReading,
+    SeaderWorkerStateHfTeardown,
     // Transition
     SeaderWorkerStateStop,
 } SeaderWorkerState;
@@ -44,6 +45,7 @@ typedef enum {
     SeaderWorkerEventAPDURunnerUpdate,
     SeaderWorkerEventAPDURunnerSuccess,
     SeaderWorkerEventAPDURunnerError,
+    SeaderWorkerEventHfTeardownComplete,
 } SeaderWorkerEvent;
 
 typedef enum {
@@ -71,6 +73,7 @@ void seader_worker_start(
     void* context);
 
 void seader_worker_stop(SeaderWorker* seader_worker);
+void seader_worker_join(SeaderWorker* seader_worker);
 bool seader_worker_process_sam_message(Seader* seader, uint8_t* apdu, uint32_t len);
 void seader_worker_send_version(Seader* seader);
 void seader_worker_cancel_poller_session(SeaderWorker* seader_worker);

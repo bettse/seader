@@ -44,7 +44,9 @@ bool seader_scene_read_card_type_on_event(void* context, SceneManagerEvent event
 
     if(event.type == SceneManagerEventTypeCustom) {
         const SeaderCredentialType type = event.event;
-        if(type == SeaderCredentialType14A || type == SeaderCredentialTypeMifareClassic ||
+        if(event.event == SeaderWorkerEventHfTeardownComplete) {
+            consumed = seader_hf_finish_teardown_action(seader);
+        } else if(type == SeaderCredentialType14A || type == SeaderCredentialTypeMifareClassic ||
            type == SeaderCredentialTypePicopass) {
             seader_hf_mode_set_selected_read_type(seader, type);
             seader_hf_mode_clear_detected_types(seader);
@@ -52,13 +54,7 @@ bool seader_scene_read_card_type_on_event(void* context, SceneManagerEvent event
             consumed = true;
         }
     } else if(event.type == SceneManagerEventTypeBack) {
-        seader_hf_mode_set_selected_read_type(seader, SeaderCredentialTypeNone);
-        seader_hf_mode_clear_detected_types(seader);
-        seader_hf_mode_deactivate(seader);
-        seader_hf_plugin_release(seader);
-        scene_manager_search_and_switch_to_previous_scene(
-            seader->scene_manager, SeaderSceneSamPresent);
-        consumed = true;
+        consumed = seader_hf_request_teardown(seader, SeaderHfTeardownActionSamPresent);
     }
 
     return consumed;

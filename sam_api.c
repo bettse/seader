@@ -1717,8 +1717,6 @@ NfcCommand seader_worker_card_detect(
         FURI_LOG_E(TAG, "Failed to encode CSN");
         return NfcCommandStop;
     }
-    OCTET_STRING_t sak_string = {.buf = &sak, .size = 1};
-    OCTET_STRING_t ats_string = {.buf = ats, .size = ats_len};
     uint8_t protocol_bytes[] = {0x00, 0x00};
 
     // this won't hold true for Seos cards, but then we won't see the SIO from Seos cards anyway
@@ -1742,9 +1740,16 @@ NfcCommand seader_worker_card_detect(
             ASN_STRUCT_FREE_CONTENTS_ONLY(asn_DEF_CardDetails, &cardDetails);
             return NfcCommandStop;
         }
-        cardDetails.sak = &sak_string;
+        cardDetails.sak = calloc(1, sizeof(*cardDetails.sak));
+        cardDetails.atsOrAtqbOrAtr = calloc(1, sizeof(*cardDetails.atsOrAtqbOrAtr));
+        if(!cardDetails.sak || !cardDetails.atsOrAtqbOrAtr ||
+           OCTET_STRING_fromBuf(cardDetails.sak, (const char*)&sak, 1) != 0 ||
+           OCTET_STRING_fromBuf(cardDetails.atsOrAtqbOrAtr, (const char*)ats, ats_len) != 0) {
+            FURI_LOG_E(TAG, "Failed to encode 14A optional card details");
+            ASN_STRUCT_FREE_CONTENTS_ONLY(asn_DEF_CardDetails, &cardDetails);
+            return NfcCommandStop;
+        }
         // TODO: Update asn1 to change atqa to ats
-        cardDetails.atsOrAtqbOrAtr = &ats_string;
     } else if(uid_len == 8) { // picopass
         protocol_bytes[1] = FrameProtocol_iclass;
         if(OCTET_STRING_fromBuf(&cardDetails.protocol, (const char*)protocol_bytes, sizeof(protocol_bytes)) != 0) {
@@ -1759,7 +1764,12 @@ NfcCommand seader_worker_card_detect(
             ASN_STRUCT_FREE_CONTENTS_ONLY(asn_DEF_CardDetails, &cardDetails);
             return NfcCommandStop;
         }
-        cardDetails.sak = &sak_string;
+        cardDetails.sak = calloc(1, sizeof(*cardDetails.sak));
+        if(!cardDetails.sak || OCTET_STRING_fromBuf(cardDetails.sak, (const char*)&sak, 1) != 0) {
+            FURI_LOG_E(TAG, "Failed to encode MFC SAK");
+            ASN_STRUCT_FREE_CONTENTS_ONLY(asn_DEF_CardDetails, &cardDetails);
+            return NfcCommandStop;
+        }
     }
 
     seader_sam_set_state(

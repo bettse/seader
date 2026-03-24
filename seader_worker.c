@@ -18,10 +18,32 @@
 void seader_send_card_detected(SeaderUartBridge* seader_uart, CardDetails_t* cardDetails);
 void seader_worker_reading(Seader* seader);
 
+static void seader_worker_release_hf_session(Seader* seader) {
+    if(!seader) {
+        return;
+    }
+
+    seader_hf_plugin_release(seader);
+    if(seader->worker) {
+        seader_worker_reset_poller_session(seader->worker);
+    }
+}
+
 typedef struct {
-    bool done;
-    bool detected;
+    volatile bool done;
+    volatile bool detected;
 } SeaderPicopassDetectContext;
+
+static void seader_worker_clear_active_card(Seader* seader, const char* reason) {
+    if(!seader) {
+        return;
+    }
+
+    if(seader_sam_has_active_card(seader)) {
+        FURI_LOG_I(TAG, "Clear active SAM card (%s)", reason ? reason : "worker");
+        seader_send_no_card_detected(seader);
+    }
+}
 
 static NfcCommand
     seader_worker_picopass_detect_callback(PicopassPollerEvent event, void* context) {
@@ -45,14 +67,19 @@ static bool seader_worker_detect_picopass(Nfc* nfc) {
     PicopassPoller* poller = picopass_poller_alloc(nfc);
     SeaderPicopassDetectContext detect_context = {0};
 
+    if(!poller) {
+        FURI_LOG_W(TAG, "Failed to allocate Picopass detect poller");
+        return false;
+    }
+
     picopass_poller_start(poller, seader_worker_picopass_detect_callback, &detect_context);
 
     for(uint8_t i = 0; i < 10 && !detect_context.done; i++) {
         furi_delay_ms(10);
     }
 
-    detected = detect_context.detected;
     picopass_poller_stop(poller);
+    detected = detect_context.detected;
     picopass_poller_free(poller);
 
     return detected;
@@ -210,6 +237,15 @@ void seader_worker_stop(SeaderWorker* seader_worker) {
     }
 
     seader_worker->state = SeaderWorkerStateStop;
+    furi_thread_join(seader_worker->thread);
+}
+
+void seader_worker_join(SeaderWorker* seader_worker) {
+    furi_assert(seader_worker);
+    if(furi_thread_get_state(seader_worker->thread) == FuriThreadStateStopped) {
+        return;
+    }
+
     furi_thread_join(seader_worker->thread);
 }
 
@@ -427,6 +463,12 @@ int32_t seader_worker_task(void* context) {
         FURI_LOG_D(TAG, "APDU Runner");
         seader_apdu_runner_init(seader);
         return 0;
+    } else if(seader_worker->state == SeaderWorkerStateHfTeardown) {
+        FURI_LOG_I(TAG, "HF teardown started");
+        seader_worker_release_hf_session(seader);
+        if(seader_worker->callback) {
+            seader_worker->callback(SeaderWorkerEventHfTeardownComplete, seader_worker->context);
+        }
     } else if(seader_worker->state == SeaderWorkerStateReading) {
         FURI_LOG_D(TAG, "Reading mode started");
         seader_worker_reading(seader);
@@ -442,6 +484,7 @@ void seader_worker_reading(Seader* seader) {
 
     if(!seader_hf_plugin_acquire(seader) || !seader->plugin_hf || !seader->hf_plugin_ctx) {
         FURI_LOG_E(TAG, "HF plugin unavailable");
+        strlcpy(seader->read_error, "HF plugin unavailable", sizeof(seader->read_error));
         if(seader_worker->callback) {
             seader_worker->callback(SeaderWorkerEventFail, seader_worker->context);
         }
@@ -475,6 +518,9 @@ void seader_worker_reading(Seader* seader) {
         if(type_to_read != SeaderCredentialTypeNone) {
             FURI_LOG_I(TAG, "HF start read for type=%d", type_to_read);
             detected = seader->plugin_hf->start_read_for_type(seader->hf_plugin_ctx, type_to_read);
+            if(detected) {
+                seader->hf_session_state = SeaderHfSessionStateActive;
+            }
             FURI_LOG_I(TAG, "HF start read result=%d", detected);
         }
 
@@ -488,8 +534,9 @@ void seader_worker_reading(Seader* seader) {
                 furi_delay_ms(10);
             }
             result_stage = seader_worker->stage;
-
-            seader->plugin_hf->stop(seader->hf_plugin_ctx);
+            seader_worker_clear_active_card(
+                seader,
+                result_stage == SeaderPollerEventTypeComplete ? "read-complete" : "read-abort");
 
             if(result_stage == SeaderPollerEventTypeComplete) {
                 // Notify UI of success
@@ -504,7 +551,6 @@ void seader_worker_reading(Seader* seader) {
             furi_delay_ms(50);
         }
     }
-    seader->plugin_hf->stop(seader->hf_plugin_ctx);
 
     FURI_LOG_I(TAG, "Reading loop stopped");
 }

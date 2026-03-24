@@ -20,7 +20,6 @@ void seader_scene_read_card_success_on_enter(void* context) {
     SeaderCredential* credential = seader->credential;
     PluginWiegand* plugin = seader_wiegand_plugin_acquire(seader) ? seader->plugin_wiegand : NULL;
     Widget* widget = seader->widget;
-    seader_hf_mode_deactivate(seader);
 
     // Use reusable strings instead of allocating new ones
     FuriString* type_str = seader->temp_string1;
@@ -134,23 +133,25 @@ bool seader_scene_read_card_success_on_event(void* context, SceneManagerEvent ev
 
     if(event.type == SceneManagerEventTypeCustom) {
         if(event.event == GuiButtonTypeLeft) {
-            consumed = scene_manager_previous_scene(seader->scene_manager);
+            consumed = seader_hf_request_teardown(seader, SeaderHfTeardownActionRestartRead);
         } else if(event.event == GuiButtonTypeRight) {
             if(seader->credential->bit_length > 0) {
                 scene_manager_next_scene(seader->scene_manager, SeaderSceneCardMenu);
             } else {
-                scene_manager_search_and_switch_to_previous_scene(
-                    seader->scene_manager, SeaderSceneSamPresent);
+                consumed =
+                    seader_hf_request_teardown(seader, SeaderHfTeardownActionSamPresent);
             }
-            consumed = true;
+            if(seader->credential->bit_length > 0) {
+                consumed = true;
+            }
         } else if(event.event == GuiButtonTypeCenter) {
             scene_manager_next_scene(seader->scene_manager, SeaderSceneFormats);
             consumed = true;
+        } else if(event.event == SeaderWorkerEventHfTeardownComplete) {
+            consumed = seader_hf_finish_teardown_action(seader);
         }
     } else if(event.type == SceneManagerEventTypeBack) {
-        scene_manager_search_and_switch_to_previous_scene(
-            seader->scene_manager, SeaderSceneSamPresent);
-        consumed = true;
+        consumed = seader_hf_request_teardown(seader, SeaderHfTeardownActionSamPresent);
     }
     return consumed;
 }

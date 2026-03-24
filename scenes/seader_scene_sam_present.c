@@ -9,14 +9,9 @@ enum SubmenuIndex {
 
 static uint8_t fwChecks = 3;
 
-void seader_scene_sam_present_submenu_callback(void* context, uint32_t index) {
-    Seader* seader = context;
-    view_dispatcher_send_custom_event(seader->view_dispatcher, index);
-}
+void seader_scene_sam_present_submenu_callback(void* context, uint32_t index);
 
-void seader_scene_sam_present_on_update(void* context) {
-    Seader* seader = context;
-
+static void seader_scene_sam_present_rebuild_menu(Seader* seader, uint32_t selected_item) {
     Submenu* submenu = seader->submenu;
     submenu_reset(submenu);
 
@@ -42,27 +37,30 @@ void seader_scene_sam_present_on_update(void* context) {
             seader_scene_sam_present_submenu_callback,
             seader);
     }
+    submenu_add_item(
+        submenu,
+        seader->sam_key_label,
+        SubmenuIndexSamInfo,
+        seader_scene_sam_present_submenu_callback,
+        seader);
+
     if(seader->sam_version[0] != 0 && seader->sam_version[1] != 0) {
-        submenu_add_item(
-            submenu,
-            seader->sam_key_label,
-            SubmenuIndexSamInfo,
-            seader_scene_sam_present_submenu_callback,
-            seader);
         fwChecks = 0;
-    } else {
-        submenu_add_item(
-            submenu,
-            seader->sam_key_label,
-            SubmenuIndexSamInfo,
-            seader_scene_sam_present_submenu_callback,
-            seader);
     }
 
-    submenu_set_selected_item(
-        submenu, scene_manager_get_scene_state(seader->scene_manager, SeaderSceneSamPresent));
-
+    submenu_set_selected_item(submenu, selected_item);
     view_dispatcher_switch_to_view(seader->view_dispatcher, SeaderViewMenu);
+}
+
+void seader_scene_sam_present_submenu_callback(void* context, uint32_t index) {
+    Seader* seader = context;
+    view_dispatcher_send_custom_event(seader->view_dispatcher, index);
+}
+
+void seader_scene_sam_present_on_update(void* context) {
+    Seader* seader = context;
+    seader_scene_sam_present_rebuild_menu(
+        seader, scene_manager_get_scene_state(seader->scene_manager, SeaderSceneSamPresent));
 }
 
 void seader_scene_sam_present_on_enter(void* context) {
@@ -102,18 +100,19 @@ bool seader_scene_sam_present_on_event(void* context, SceneManagerEvent event) {
                 seader->scene_manager, SeaderSceneSamPresent, event.event);
             scene_manager_next_scene(seader->scene_manager, SeaderSceneAPDURunner);
             consumed = true;
+        } else if(event.event == SeaderWorkerEventHfTeardownComplete) {
+            consumed = seader_hf_finish_teardown_action(seader);
         } else if(event.event == SeaderCustomEventSamStatusUpdated) {
-            seader_scene_sam_present_on_update(context);
+            seader_scene_sam_present_rebuild_menu(
+                seader, submenu_get_selected_item(seader->submenu));
             consumed = true;
         }
     } else if(event.type == SceneManagerEventTypeBack) {
-        scene_manager_stop(seader->scene_manager);
-        view_dispatcher_stop(seader->view_dispatcher);
-        consumed = true;
+        consumed = seader_hf_request_teardown(seader, SeaderHfTeardownActionStopApp);
     } else if(event.type == SceneManagerEventTypeTick) {
         if(fwChecks > 0 && seader->sam_version[0] != 0 && seader->sam_version[1] != 0) {
             fwChecks--;
-            seader_scene_sam_present_on_update(context);
+            seader_scene_sam_present_rebuild_menu(seader, submenu_get_selected_item(seader->submenu));
         }
     }
 

@@ -42,6 +42,10 @@ bool seader_scene_read_config_card_on_event(void* context, SceneManagerEvent eve
         if(event.event == SeaderCustomEventWorkerExit || event.event == SeaderWorkerEventSuccess) {
             scene_manager_next_scene(seader->scene_manager, SeaderSceneReadConfigCardSuccess);
             consumed = true;
+        } else if(event.event == SeaderWorkerEventFail) {
+            scene_manager_search_and_switch_to_previous_scene(
+                seader->scene_manager, SeaderSceneSamPresent);
+            consumed = true;
         }
     } else if(event.type == SceneManagerEventTypeBack) {
         scene_manager_search_and_switch_to_previous_scene(
