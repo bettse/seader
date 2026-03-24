@@ -79,7 +79,7 @@ Rules:
 | `HF` | `Loaded` | plugin manager, plugin EP, plugin ctx may be non-`NULL`; pollers may be `NULL` |
 | `HF` | `Active` | plugin manager, plugin EP, plugin ctx must be non-`NULL`; active pollers may be non-`NULL` |
 | `HF` | `TearingDown` | teardown owns all pointer mutation; no scene code may touch HF runtime |
-| `UHF` | `Unloaded` | all HF runtime pointers must be `NULL` |
+| `UHF` | `Unloaded` | all HF runtime pointers must be `NULL`; UHF maintenance/probe flow owns mode runtime |
 
 Invalid combinations are bugs:
 
@@ -92,14 +92,23 @@ Invalid combinations are bugs:
 
 ### HF startup
 
-1. Verify `mode_runtime == None`
-2. Verify `hf_session_state == Unloaded`
-3. Load `plugin_hf.fal`
-4. Resolve plugin entry point
-5. Allocate plugin context
-6. Set `hf_session_state = Loaded`
-7. Set `mode_runtime = HF`
-8. Start read and transition to `Active`
+Legal startup paths:
+
+1. Cold acquire:
+   - verify `mode_runtime == None`
+   - verify `hf_session_state == Unloaded`
+   - load `plugin_hf.fal`
+   - resolve plugin entry point
+   - allocate plugin context
+   - set `hf_session_state = Loaded`
+   - set `mode_runtime = HF`
+   - start read and transition to `Active`
+2. Fast-path re-acquire:
+   - allowed only when the existing HF runtime is already coherent
+   - preserve the existing `Loaded` or `Active` state
+   - do not unload/reload the plugin
+
+Any partial pointer/state combination must first normalize to `Unloaded`.
 
 ### HF teardown
 
@@ -113,7 +122,8 @@ Invalid combinations are bugs:
 8. Set `hf_session_state = Unloaded`
 9. Set `mode_runtime = None`
 
-This order must be implemented in one worker-owned path and nowhere else.
+The blocking fallback teardown path must use the same state machine and ordering.
+This order must be implemented in one worker-owned release primitive and nowhere else.
 
 ## Forbidden actions
 
@@ -125,17 +135,28 @@ This order must be implemented in one worker-owned path and nowhere else.
 - Starting UHF while HF session state is not `Unloaded`
 - Starting HF while `mode_runtime == UHF`
 
-## Plugin boundary
+## UHF runtime
 
-`hf_interface_fal/` is part of this repository. It is not a submodule.
+`SeaderModeRuntimeUHF` is active only while the SAM maintenance/SNMP probe flow is active.
 
 Rules:
 
-- HF plugin source must remain in-tree and follow this contract.
+- UHF runtime must be entered when the probe starts.
+- UHF runtime must be cleared when the probe finishes.
+- While UHF runtime is active, HF acquire must be rejected.
+- UHF runtime must not coexist with any live HF runtime pointer.
+
+## Plugin boundary
+
+`hf_interface_fal/` and `wiegand_interface_fal/` are part of this repository. They are not submodules.
+
+Rules:
+
+- HF and Wiegand plugin sources must remain in-tree and follow this contract.
 - The host/plugin boundary is narrow:
   - host owns orchestration, SAM transport, UI routing, and lifetime
-  - plugin owns HF protocol execution only
-- The plugin must not directly own scene transitions or global app teardown.
+  - each plugin owns only its protocol-specific execution
+- Plugins must not directly own scene transitions or global app teardown.
 
 ## Change checklist
 
@@ -147,4 +168,5 @@ Before merging a change that touches HF/UHF/session code, confirm:
 - no scene code mutates live HF runtime
 - no teardown path mutates app-lifetime callback wiring
 - all state-table invariants still hold
+- `OWNERSHIP_MODEL.md` changed in the same patch as any lifetime/order/state-machine change
 - this document still matches the implementation

@@ -799,13 +799,13 @@ static void seader_hf_teardown_blocking(Seader* seader) {
         return;
     }
 
+    seader->hf_session_state = SeaderHfSessionStateTearingDown;
     if(!seader_worker_acquire(seader) || !seader->worker || !seader->uart) {
         FURI_LOG_W(TAG, "HF blocking teardown fallback");
         seader_hf_plugin_release(seader);
         return;
     }
 
-    seader->hf_session_state = SeaderHfSessionStateTearingDown;
     seader_worker_stop(seader->worker);
     FURI_LOG_I(TAG, "HF teardown blocking");
     seader_worker_start(
@@ -820,12 +820,11 @@ static void seader_hf_teardown_blocking(Seader* seader) {
 void seader_hf_plugin_release(Seader* seader) {
     furi_assert(seader);
 
+    seader->hf_session_state = SeaderHfSessionStateTearingDown;
+
     if(seader->plugin_hf && seader->hf_plugin_ctx) {
         seader->plugin_hf->stop(seader->hf_plugin_ctx);
-        seader->plugin_hf->free(seader->hf_plugin_ctx);
     }
-    seader->hf_plugin_ctx = NULL;
-    seader->plugin_hf = NULL;
 
     if(seader->poller) {
         FURI_LOG_I(TAG, "Stopping host NFC poller");
@@ -841,10 +840,20 @@ void seader_hf_plugin_release(Seader* seader) {
         seader->picopass_poller = NULL;
     }
 
+    if(seader->plugin_hf && seader->hf_plugin_ctx) {
+        seader->plugin_hf->free(seader->hf_plugin_ctx);
+    }
+    seader->hf_plugin_ctx = NULL;
+    seader->plugin_hf = NULL;
+
     if(seader->hf_plugin_manager) {
         FURI_LOG_I(TAG, "Unloading HF plugin");
         plugin_manager_free(seader->hf_plugin_manager);
         seader->hf_plugin_manager = NULL;
+    }
+
+    if(seader->worker) {
+        seader_worker_reset_poller_session(seader->worker);
     }
 
     if(seader->mode_runtime == SeaderModeRuntimeHF) {

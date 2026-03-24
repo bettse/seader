@@ -24,9 +24,6 @@ static void seader_worker_release_hf_session(Seader* seader) {
     }
 
     seader_hf_plugin_release(seader);
-    if(seader->worker) {
-        seader_worker_reset_poller_session(seader->worker);
-    }
 }
 
 typedef struct {
@@ -222,7 +219,7 @@ void seader_worker_start(
         seader_worker_stop(seader_worker);
     }
 
-    seader_worker->stage = SeaderPollerEventTypeCardDetect;
+    seader_worker_reset_poller_session(seader_worker);
     seader_worker->callback = callback;
     seader_worker->context = context;
     seader_worker->uart = uart;

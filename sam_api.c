@@ -71,6 +71,17 @@ static SeaderWorker* seader_get_active_worker(Seader* seader) {
     return seader ? seader->worker : NULL;
 }
 
+static void seader_reset_cached_sam_metadata(Seader* seader) {
+    if(!seader) {
+        return;
+    }
+
+    seader->sam_version[0] = 0U;
+    seader->sam_version[1] = 0U;
+    seader->uhf_status_label[0] = '\0';
+    seader_uhf_snmp_probe_init(&seader->snmp_probe);
+}
+
 static bool seader_snmp_probe_send_next_request(Seader* seader) {
     SeaderUartBridge* seader_uart = seader_get_uart(seader);
     uint8_t* scratch = seader_uart ? (seader_uart->tx_buf + MAX_FRAME_HEADERS) : NULL;
@@ -99,6 +110,9 @@ static void seader_snmp_probe_finish(Seader* seader) {
         return;
     }
 
+    if(seader->mode_runtime == SeaderModeRuntimeUHF) {
+        seader->mode_runtime = SeaderModeRuntimeNone;
+    }
     seader_sam_set_state(seader, SeaderSamStateIdle, SeaderSamIntentNone, SamCommand_PR_NOTHING);
 }
 
@@ -107,6 +121,7 @@ static void seader_start_snmp_probe(Seader* seader) {
         return;
     }
 
+    seader->mode_runtime = SeaderModeRuntimeUHF;
     seader_uhf_snmp_probe_init(&seader->snmp_probe);
     seader_update_uhf_status_label(seader);
     seader_sam_set_state(
@@ -648,6 +663,7 @@ void seader_worker_send_serial_number(Seader* seader) {
 void seader_worker_send_version(Seader* seader) {
     SamCommand_t samCommand = {0};
     samCommand.present = SamCommand_PR_version;
+    seader_reset_cached_sam_metadata(seader);
     seader->sam_present = true;
     seader_update_sam_key_label(seader, NULL, 0U);
     seader_sam_set_state(

@@ -21,9 +21,6 @@ void seader_scene_read_prepare(Seader* seader) {
         seader->samCommand = SamCommand_PR_NOTHING;
     }
     memset(seader->read_error, 0, sizeof(seader->read_error));
-    if(seader->worker) {
-        seader_worker_reset_poller_session(seader->worker);
-    }
 }
 
 void seader_scene_read_cleanup(Seader* seader) {

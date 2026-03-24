@@ -39,7 +39,7 @@
 #include <Payload.h>
 #include <FrameProtocol.h>
 
-#include "hf_interface_fal/interface.h"
+#include "wiegand_interface_fal/interface.h"
 #include "hf_interface_fal/hf_interface.h"
 #include <flipper_application/flipper_application.h>
 #include <flipper_application/plugins/plugin_manager.h>
