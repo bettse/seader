@@ -63,3 +63,12 @@ App(
     sources=["plugin/wiegand.c"],
     fal_embedded=True,
 )
+
+App(
+    appid="plugin_hf",
+    apptype=FlipperAppType.PLUGIN,
+    entry_point="plugin_hf_ep",
+    requires=["seader"],
+    sources=["plugin/hf.c"],
+    fal_embedded=True,
+)

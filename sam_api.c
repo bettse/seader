@@ -1,4 +1,6 @@
 #include "sam_api.h"
+#include "seader_i.h"
+#include "protocol/rfal_picopass.h"
 #include "sam_key_label.h"
 #include "trace_log.h"
 #include "uhf_snmp_probe.h"
@@ -265,7 +267,6 @@ void* calloc(size_t count, size_t size) {
 }
 
 // Forward declarations
-void seader_send_nfc_rx(Seader* seader, uint8_t* buffer, size_t len);
 static void seader_abort_active_read(Seader* seader);
 
 static void seader_sam_set_state(
@@ -681,6 +682,15 @@ bool seader_worker_send_process_snmp_message(
 }
 
 void seader_send_card_detected(Seader* seader, CardDetails_t* cardDetails) {
+    if(!seader || !cardDetails || !cardDetails->csn.buf) {
+        FURI_LOG_E(
+            TAG,
+            "Drop cardDetected invalid input seader=%p details=%p csn=%p",
+            (void*)seader,
+            (void*)cardDetails,
+            cardDetails ? (void*)cardDetails->csn.buf : NULL);
+        return;
+    }
     CardDetected_t cardDetected = {
         .detectedCardDetails = *cardDetails,
     };
@@ -694,6 +704,13 @@ void seader_send_card_detected(Seader* seader, CardDetails_t* cardDetails) {
     payload.choice.samCommand = samCommand;
     seader_trace(
         TAG, "send cardDetected state=%d intent=%d", seader->sam_state, seader->sam_intent);
+    FURI_LOG_D(
+        TAG,
+        "Send cardDetected csn_len=%zu has_sak=%d has_ats=%d protocol_len=%zu",
+        cardDetails->csn.size,
+        cardDetails->sak != NULL,
+        cardDetails->atsOrAtqbOrAtr != NULL,
+        cardDetails->protocol.size);
 
     seader_send_payload(
         seader, &payload, ExternalApplicationA, SAMInterface, ExternalApplicationA);
@@ -1215,15 +1232,23 @@ void seader_iso14443a_transmit(
     UNUSED(timeout);
     UNUSED(format);
 
-    furi_assert(seader);
-    furi_assert(buffer);
-    furi_assert(iso14443_4a_poller);
+    if(!seader || !buffer || !iso14443_4a_poller) {
+        FURI_LOG_W(TAG, "Skip 14A transmit invalid input");
+        return;
+    }
     SeaderWorker* seader_worker = seader_get_active_worker(seader);
     SeaderCredential* credential = seader->credential;
 
     BitBuffer* tx_buffer =
         bit_buffer_alloc(len + 1); // extra byte to allow for appending a Le byte sometimes
     BitBuffer* rx_buffer = bit_buffer_alloc(SEADER_POLLER_MAX_BUFFER_SIZE);
+    if(!tx_buffer || !rx_buffer) {
+        FURI_LOG_E(TAG, "Failed to allocate 14A tx/rx buffers");
+        if(tx_buffer) bit_buffer_free(tx_buffer);
+        if(rx_buffer) bit_buffer_free(rx_buffer);
+        if(seader_worker) seader_worker->stage = SeaderPollerEventTypeFail;
+        return;
+    }
 
     do {
         bit_buffer_append_bytes(tx_buffer, buffer, len);
@@ -1289,13 +1314,21 @@ void seader_mfc_transmit(
     uint8_t format[3]) {
     UNUSED(timeout);
 
-    furi_assert(seader);
-    furi_assert(buffer);
-    furi_assert(mfc_poller);
+    if(!seader || !buffer || !mfc_poller) {
+        FURI_LOG_W(TAG, "Skip MFC transmit invalid input");
+        return;
+    }
     SeaderWorker* seader_worker = seader_get_active_worker(seader);
 
     BitBuffer* tx_buffer = bit_buffer_alloc(len);
     BitBuffer* rx_buffer = bit_buffer_alloc(SEADER_POLLER_MAX_BUFFER_SIZE);
+    if(!tx_buffer || !rx_buffer) {
+        FURI_LOG_E(TAG, "Failed to allocate MFC tx/rx buffers");
+        if(tx_buffer) bit_buffer_free(tx_buffer);
+        if(rx_buffer) bit_buffer_free(rx_buffer);
+        if(seader_worker) seader_worker->stage = SeaderPollerEventTypeFail;
+        return;
+    }
 
     do {
         seader_trace(
@@ -1472,43 +1505,48 @@ void seader_mfc_transmit(
     bit_buffer_free(rx_buffer);
 }
 
-void seader_parse_nfc_command_transmit(
-    Seader* seader,
-    NFCSend_t* nfcSend,
-    SeaderPollerContainer* spc) {
-    long timeOut = nfcSend->timeOut;
-    Protocol_t protocol = nfcSend->protocol;
-    FrameProtocol_t frameProtocol = protocol.buf[1];
-
+void seader_parse_nfc_command_transmit(Seader* seader, NFCSend_t* nfcSend) {
 #ifdef ASN1_DEBUG
     seader_log_hex_data(TAG, "Transmit data", nfcSend->data.buf, nfcSend->data.size);
 #endif
 
+    PluginHfAction action = {
+        .data = nfcSend->data.buf,
+        .len = nfcSend->data.size,
+        .timeout = nfcSend->timeOut,
+    };
+    if(nfcSend->format) {
+        const size_t raw_format_len = (size_t)nfcSend->format->size;
+        const size_t format_len =
+            raw_format_len < sizeof(action.format) ? raw_format_len : sizeof(action.format);
+        memcpy(action.format, nfcSend->format->buf, format_len);
+    }
+
     if(seader->credential->type == SeaderCredentialTypeVirtual) {
         seader_virtual_picopass_state_machine(seader, nfcSend->data.buf, nfcSend->data.size);
-    } else if(frameProtocol == FrameProtocol_iclass) {
-        seader_iso15693_transmit(
-            seader, spc->picopass_poller, nfcSend->data.buf, nfcSend->data.size);
-    } else if(frameProtocol == FrameProtocol_nfc) {
-        if(spc->iso14443_4a_poller) {
-            seader_iso14443a_transmit(
-                seader,
-                spc->iso14443_4a_poller,
-                nfcSend->data.buf,
-                nfcSend->data.size,
-                (uint16_t)timeOut,
-                nfcSend->format->buf);
-        } else if(spc->mfc_poller) {
-            seader_mfc_transmit(
-                seader,
-                spc->mfc_poller,
-                nfcSend->data.buf,
-                nfcSend->data.size,
-                (uint16_t)timeOut,
-                nfcSend->format->buf);
+    } else if(seader->plugin_hf && seader->hf_plugin_ctx) {
+        if(seader->credential->type == SeaderCredentialTypePicopass) {
+            action.type = PluginHfActionTypePicopassTx;
+        } else if(seader->credential->type == SeaderCredentialTypeMifareClassic) {
+            action.type = PluginHfActionTypeMfClassicTx;
+        } else {
+            action.type = PluginHfActionTypeIso14443Tx;
+        }
+        FURI_LOG_D(
+            TAG,
+            "Dispatch HF action type=%d len=%u timeout=%lu",
+            action.type,
+            action.len,
+            (unsigned long)action.timeout);
+        if(!seader->plugin_hf->handle_action(seader->hf_plugin_ctx, &action)) {
+            FURI_LOG_W(TAG, "HF plugin failed to handle action");
+            SeaderWorker* seader_worker = seader_get_active_worker(seader);
+            if(seader_worker) {
+                seader_worker->stage = SeaderPollerEventTypeFail;
+            }
         }
     } else {
-        FURI_LOG_W(TAG, "unknown frame protocol %lx", frameProtocol);
+        FURI_LOG_W(TAG, "No HF plugin available for nfcSend");
     }
 }
 
@@ -1534,8 +1572,7 @@ void seader_parse_nfc_off(Seader* seader) {
 void seader_parse_nfc_command(Seader* seader, NFCCommand_t* nfcCommand, SeaderPollerContainer* spc) {
     switch(nfcCommand->present) {
     case NFCCommand_PR_nfcSend:
-        furi_assert(spc);
-        seader_parse_nfc_command_transmit(seader, &nfcCommand->choice.nfcSend, spc);
+        seader_parse_nfc_command_transmit(seader, &nfcCommand->choice.nfcSend);
         break;
     case NFCCommand_PR_nfcOff:
         seader_parse_nfc_off(seader);
@@ -1661,35 +1698,67 @@ NfcCommand seader_worker_card_detect(
     uint8_t* ats,
     uint8_t ats_len) {
     UNUSED(atqa);
+    if(!seader || !seader->credential || !uid || uid_len == 0U) {
+        FURI_LOG_E(
+            TAG,
+            "Ignore card_detect invalid input seader=%p cred=%p uid=%p uid_len=%u",
+            (void*)seader,
+            seader ? (void*)seader->credential : NULL,
+            (const void*)uid,
+            uid_len);
+        return NfcCommandStop;
+    }
     SeaderCredential* credential = seader->credential;
 
     CardDetails_t cardDetails = {0};
+    FURI_LOG_D(TAG, "Build card_detect sak=%02x uid_len=%u ats_len=%u", sak, uid_len, ats_len);
 
-    OCTET_STRING_fromBuf(&cardDetails.csn, (const char*)uid, uid_len);
+    if(OCTET_STRING_fromBuf(&cardDetails.csn, (const char*)uid, uid_len) != 0) {
+        FURI_LOG_E(TAG, "Failed to encode CSN");
+        return NfcCommandStop;
+    }
     OCTET_STRING_t sak_string = {.buf = &sak, .size = 1};
     OCTET_STRING_t ats_string = {.buf = ats, .size = ats_len};
     uint8_t protocol_bytes[] = {0x00, 0x00};
 
     // this won't hold true for Seos cards, but then we won't see the SIO from Seos cards anyway
     // so it doesn't really matter
-    memcpy(credential->diversifier, uid, uid_len);
-    credential->diversifier_len = uid_len;
+    size_t diversifier_len = uid_len;
+    if(diversifier_len > sizeof(credential->diversifier)) {
+        FURI_LOG_W(
+            TAG,
+            "Clamp diversifier uid_len=%u to %zu",
+            uid_len,
+            sizeof(credential->diversifier));
+        diversifier_len = sizeof(credential->diversifier);
+    }
+    memcpy(credential->diversifier, uid, diversifier_len);
+    credential->diversifier_len = diversifier_len;
 
     if(ats != NULL) { // type 4
         protocol_bytes[1] = FrameProtocol_nfc;
-        OCTET_STRING_fromBuf(
-            &cardDetails.protocol, (const char*)protocol_bytes, sizeof(protocol_bytes));
+        if(OCTET_STRING_fromBuf(&cardDetails.protocol, (const char*)protocol_bytes, sizeof(protocol_bytes)) != 0) {
+            FURI_LOG_E(TAG, "Failed to encode 14A protocol");
+            ASN_STRUCT_FREE_CONTENTS_ONLY(asn_DEF_CardDetails, &cardDetails);
+            return NfcCommandStop;
+        }
         cardDetails.sak = &sak_string;
         // TODO: Update asn1 to change atqa to ats
         cardDetails.atsOrAtqbOrAtr = &ats_string;
     } else if(uid_len == 8) { // picopass
         protocol_bytes[1] = FrameProtocol_iclass;
-        OCTET_STRING_fromBuf(
-            &cardDetails.protocol, (const char*)protocol_bytes, sizeof(protocol_bytes));
+        if(OCTET_STRING_fromBuf(&cardDetails.protocol, (const char*)protocol_bytes, sizeof(protocol_bytes)) != 0) {
+            FURI_LOG_E(TAG, "Failed to encode picopass protocol");
+            ASN_STRUCT_FREE_CONTENTS_ONLY(asn_DEF_CardDetails, &cardDetails);
+            return NfcCommandStop;
+        }
     } else { // MFC
         protocol_bytes[1] = FrameProtocol_nfc;
-        OCTET_STRING_fromBuf(
-            &cardDetails.protocol, (const char*)protocol_bytes, sizeof(protocol_bytes));
+        if(OCTET_STRING_fromBuf(&cardDetails.protocol, (const char*)protocol_bytes, sizeof(protocol_bytes)) != 0) {
+            FURI_LOG_E(TAG, "Failed to encode MFC protocol");
+            ASN_STRUCT_FREE_CONTENTS_ONLY(asn_DEF_CardDetails, &cardDetails);
+            return NfcCommandStop;
+        }
         cardDetails.sak = &sak_string;
     }
 
@@ -1699,6 +1768,7 @@ NfcCommand seader_worker_card_detect(
         seader_sam_card_intent(seader),
         SamCommand_PR_cardDetected);
     seader_send_card_detected(seader, &cardDetails);
+    FURI_LOG_D(TAG, "cardDetected sent");
     // Print version information for app and firmware for later review in log
     const Version* version = version_get();
     FURI_LOG_I(

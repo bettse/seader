@@ -40,6 +40,7 @@
 #include <FrameProtocol.h>
 
 #include "plugin/interface.h"
+#include "plugin/hf_interface.h"
 #include <flipper_application/flipper_application.h>
 #include <flipper_application/plugins/plugin_manager.h>
 #include <loader/firmware_api/firmware_api.h>
@@ -183,6 +184,9 @@ struct Seader {
 
     PluginManager* plugin_manager;
     PluginWiegand* plugin_wiegand;
+    PluginManager* hf_plugin_manager;
+    PluginHf* plugin_hf;
+    void* hf_plugin_ctx;
 
     APDULog* apdu_log;
     SeaderAPDURunnerContext apdu_runner_ctx;

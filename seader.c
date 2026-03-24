@@ -3,6 +3,345 @@
 
 #define TAG "Seader"
 #define SEADER_PLUGIN_DIR APP_ASSETS_PATH("plugins")
+#define SEADER_WIEGAND_PLUGIN_PATH APP_ASSETS_PATH("plugins/plugin_wiegand.fal")
+#define SEADER_HF_PLUGIN_PATH APP_ASSETS_PATH("plugins/plugin_hf.fal")
+
+typedef struct {
+    bool done;
+    bool detected;
+} SeaderHfPicopassDetectContext;
+
+static NfcCommand seader_hf_picopass_detect_callback(PicopassPollerEvent event, void* context) {
+    SeaderHfPicopassDetectContext* detect_context = context;
+
+    if(event.type == PicopassPollerEventTypeCardDetected ||
+       event.type == PicopassPollerEventTypeSuccess) {
+        detect_context->detected = true;
+        detect_context->done = true;
+        return NfcCommandStop;
+    } else if(event.type == PicopassPollerEventTypeFail) {
+        detect_context->done = true;
+        return NfcCommandStop;
+    }
+
+    return NfcCommandContinue;
+}
+
+static void seader_hf_plugin_notify_event(void* host_ctx, uint32_t event) {
+    Seader* seader = host_ctx;
+    if(!seader || !seader->view_dispatcher) {
+        FURI_LOG_W(TAG, "Drop HF plugin event %lu without dispatcher", event);
+        return;
+    }
+    view_dispatcher_send_custom_event(seader->view_dispatcher, event);
+}
+
+static void seader_hf_plugin_notify_card_detected(void* host_ctx) {
+    seader_hf_plugin_notify_event(host_ctx, SeaderCustomEventPollerDetect);
+}
+
+static void seader_hf_plugin_notify_worker_exit(void* host_ctx) {
+    seader_hf_plugin_notify_event(host_ctx, SeaderCustomEventWorkerExit);
+}
+
+static bool seader_hf_plugin_sam_can_accept_card(void* host_ctx) {
+    return seader_sam_can_accept_card(host_ctx);
+}
+
+static void seader_hf_plugin_send_card_detected(
+    void* host_ctx,
+    uint8_t sak,
+    const uint8_t* uid,
+    uint8_t uid_len,
+    const uint8_t* ats,
+    uint8_t ats_len) {
+    Seader* seader = host_ctx;
+    if(!seader || !seader->worker || !seader->credential || !uid || uid_len == 0U) {
+        FURI_LOG_E(
+            TAG,
+            "Drop HF cardDetected invalid state seader=%p worker=%p cred=%p uid=%p uid_len=%u",
+            (void*)seader,
+            seader ? (void*)seader->worker : NULL,
+            seader ? (void*)seader->credential : NULL,
+            (const void*)uid,
+            uid_len);
+        return;
+    }
+    FURI_LOG_D(
+        TAG,
+        "HF plugin cardDetected sak=%02x uid_len=%u ats_len=%u stage=%d",
+        sak,
+        uid_len,
+        ats_len,
+        seader->worker->stage);
+    seader_worker_card_detect(seader, sak, NULL, uid, uid_len, (uint8_t*)ats, ats_len);
+}
+
+static void seader_hf_plugin_send_nfc_rx(void* host_ctx, uint8_t* buffer, size_t len) {
+    Seader* seader = host_ctx;
+    seader_send_nfc_rx(seader, buffer, len);
+}
+
+static void seader_hf_plugin_run_conversation(void* host_ctx) {
+    Seader* seader = host_ctx;
+    if(!seader || !seader->worker) {
+        FURI_LOG_W(TAG, "Skip HF conversation without worker");
+        return;
+    }
+    FURI_LOG_D(TAG, "HF plugin run conversation stage=%d", seader->worker->stage);
+    seader_worker_run_hf_conversation(seader);
+}
+
+static void seader_hf_plugin_set_stage(void* host_ctx, PluginHfStage stage) {
+    Seader* seader = host_ctx;
+    if(seader->worker) {
+        switch(stage) {
+        case PluginHfStageCardDetect:
+            seader->worker->stage = SeaderPollerEventTypeCardDetect;
+            break;
+        case PluginHfStageConversation:
+            seader->worker->stage = SeaderPollerEventTypeConversation;
+            break;
+        case PluginHfStageComplete:
+            seader->worker->stage = SeaderPollerEventTypeComplete;
+            break;
+        case PluginHfStageSuccess:
+            seader->worker->stage = SeaderPollerEventTypeSuccess;
+            break;
+        case PluginHfStageFail:
+        default:
+            seader->worker->stage = SeaderPollerEventTypeFail;
+            break;
+        }
+    }
+}
+
+static PluginHfStage seader_hf_plugin_get_stage(void* host_ctx) {
+    Seader* seader = host_ctx;
+    if(!seader->worker) {
+        return PluginHfStageFail;
+    }
+
+    switch(seader->worker->stage) {
+    case SeaderPollerEventTypeCardDetect:
+        return PluginHfStageCardDetect;
+    case SeaderPollerEventTypeConversation:
+        return PluginHfStageConversation;
+    case SeaderPollerEventTypeComplete:
+        return PluginHfStageComplete;
+    case SeaderPollerEventTypeSuccess:
+        return PluginHfStageSuccess;
+    case SeaderPollerEventTypeFail:
+    default:
+        return PluginHfStageFail;
+    }
+}
+
+static void seader_hf_plugin_set_credential_type(void* host_ctx, SeaderCredentialType type) {
+    Seader* seader = host_ctx;
+    seader->credential->type = type;
+    seader->credential->sio_len = 0U;
+    seader->credential->sio_start_block = 0U;
+    seader->credential->isDesfireEV2 = false;
+}
+
+static SeaderCredentialType seader_hf_plugin_get_credential_type(void* host_ctx) {
+    Seader* seader = host_ctx;
+    return seader->credential->type;
+}
+
+static bool seader_hf_plugin_get_desfire_ev2(void* host_ctx) {
+    Seader* seader = host_ctx;
+    return seader->credential->isDesfireEV2;
+}
+
+static void seader_hf_plugin_set_desfire_ev2(void* host_ctx, bool is_desfire_ev2) {
+    Seader* seader = host_ctx;
+    seader->credential->isDesfireEV2 = is_desfire_ev2;
+}
+
+static void seader_hf_plugin_append_picopass_sio(
+    void* host_ctx,
+    uint8_t block_num,
+    const uint8_t* data,
+    size_t len) {
+    Seader* seader = host_ctx;
+    SeaderCredential* credential = seader->credential;
+
+    if(!data || len == 0U || credential->type != SeaderCredentialTypePicopass) {
+        return;
+    }
+
+    if(credential->sio_len == 0U && data[0] == 0x30U) {
+        credential->sio_start_block = block_num;
+    }
+
+    const size_t offset = (size_t)(block_num - credential->sio_start_block) * PICOPASS_BLOCK_LEN;
+    if(offset >= sizeof(credential->sio)) {
+        return;
+    }
+
+    const size_t copy_len = MIN(len, sizeof(credential->sio) - offset);
+    memcpy(credential->sio + offset, data, copy_len);
+    credential->sio_len = MAX(credential->sio_len, offset + copy_len);
+}
+
+static void seader_hf_plugin_set_14a_sio(void* host_ctx, const uint8_t* data, size_t len) {
+    Seader* seader = host_ctx;
+    SeaderCredential* credential = seader->credential;
+
+    if(!data || credential->type != SeaderCredentialType14A) {
+        return;
+    }
+
+    const size_t copy_len = MIN(len, sizeof(credential->sio));
+    memcpy(credential->sio, data, copy_len);
+    credential->sio_len = copy_len;
+}
+
+static Nfc* seader_hf_plugin_get_nfc(void* host_ctx) {
+    Seader* seader = host_ctx;
+    return seader ? seader->nfc : NULL;
+}
+
+static NfcDevice* seader_hf_plugin_get_nfc_device(void* host_ctx) {
+    Seader* seader = host_ctx;
+    return seader ? seader->nfc_device : NULL;
+}
+
+static bool seader_hf_plugin_picopass_detect(void* host_ctx) {
+    Seader* seader = host_ctx;
+    bool detected = false;
+    PicopassPoller* poller = picopass_poller_alloc(seader->nfc);
+    SeaderHfPicopassDetectContext detect_context = {0};
+
+    picopass_poller_start(poller, seader_hf_picopass_detect_callback, &detect_context);
+    for(uint8_t i = 0; i < 10 && !detect_context.done; i++) {
+        furi_delay_ms(10);
+    }
+
+    detected = detect_context.detected;
+    picopass_poller_stop(poller);
+    picopass_poller_free(poller);
+
+    return detected;
+}
+
+static bool seader_hf_plugin_picopass_start(
+    void* host_ctx,
+    PicopassPollerCallback callback,
+    void* callback_ctx) {
+    Seader* seader = host_ctx;
+
+    if(seader->picopass_poller) {
+        picopass_poller_stop(seader->picopass_poller);
+        picopass_poller_free(seader->picopass_poller);
+        seader->picopass_poller = NULL;
+    }
+
+    seader->picopass_poller = picopass_poller_alloc(seader->nfc);
+    if(!seader->picopass_poller) {
+        return false;
+    }
+
+    picopass_poller_start(seader->picopass_poller, callback, callback_ctx);
+    return true;
+}
+
+static void seader_hf_plugin_picopass_stop(void* host_ctx) {
+    Seader* seader = host_ctx;
+
+    if(seader->picopass_poller) {
+        picopass_poller_stop(seader->picopass_poller);
+        picopass_poller_free(seader->picopass_poller);
+        seader->picopass_poller = NULL;
+    }
+}
+
+static uint8_t* seader_hf_plugin_picopass_get_csn(void* host_ctx) {
+    Seader* seader = host_ctx;
+    if(!seader->picopass_poller) {
+        return NULL;
+    }
+
+    return picopass_poller_get_csn(seader->picopass_poller);
+}
+
+static bool seader_hf_plugin_picopass_transmit(
+    void* host_ctx,
+    const uint8_t* tx_data,
+    size_t tx_len,
+    uint8_t* rx_data,
+    size_t rx_capacity,
+    size_t* rx_len,
+    uint32_t fwt_fc) {
+    Seader* seader = host_ctx;
+    if(!seader->picopass_poller || !tx_data || !rx_data || !rx_len) {
+        return false;
+    }
+
+    BitBuffer* tx_buffer = bit_buffer_alloc(tx_len);
+    BitBuffer* rx_buffer = bit_buffer_alloc(rx_capacity);
+    bool success = false;
+    if(!tx_buffer || !rx_buffer) {
+        FURI_LOG_E(TAG, "Failed to allocate picopass host tx/rx buffers");
+        if(tx_buffer) bit_buffer_free(tx_buffer);
+        if(rx_buffer) bit_buffer_free(rx_buffer);
+        return false;
+    }
+
+    bit_buffer_append_bytes(tx_buffer, tx_data, tx_len);
+    PicopassError error =
+        picopass_poller_send_frame(seader->picopass_poller, tx_buffer, rx_buffer, fwt_fc);
+    if(error == PicopassErrorIncorrectCrc) {
+        error = PicopassErrorNone;
+    }
+
+    if(error == PicopassErrorNone) {
+        *rx_len = bit_buffer_get_size_bytes(rx_buffer);
+        memcpy(rx_data, bit_buffer_get_data(rx_buffer), *rx_len);
+        success = true;
+    }
+
+    bit_buffer_free(tx_buffer);
+    bit_buffer_free(rx_buffer);
+    return success;
+}
+
+static void seader_hf_plugin_set_read_error(void* host_ctx, const char* text) {
+    Seader* seader = host_ctx;
+    if(!text) {
+        seader->read_error[0] = '\0';
+        return;
+    }
+    strlcpy(seader->read_error, text, sizeof(seader->read_error));
+}
+
+static const PluginHfHostApi seader_hf_plugin_host_api = {
+    .notify_card_detected = seader_hf_plugin_notify_card_detected,
+    .notify_worker_exit = seader_hf_plugin_notify_worker_exit,
+    .sam_can_accept_card = seader_hf_plugin_sam_can_accept_card,
+    .send_card_detected = seader_hf_plugin_send_card_detected,
+    .send_nfc_rx = seader_hf_plugin_send_nfc_rx,
+    .run_conversation = seader_hf_plugin_run_conversation,
+    .set_stage = seader_hf_plugin_set_stage,
+    .get_stage = seader_hf_plugin_get_stage,
+    .set_credential_type = seader_hf_plugin_set_credential_type,
+    .get_credential_type = seader_hf_plugin_get_credential_type,
+    .get_desfire_ev2 = seader_hf_plugin_get_desfire_ev2,
+    .set_desfire_ev2 = seader_hf_plugin_set_desfire_ev2,
+    .append_picopass_sio = seader_hf_plugin_append_picopass_sio,
+    .set_14a_sio = seader_hf_plugin_set_14a_sio,
+    .get_nfc = seader_hf_plugin_get_nfc,
+    .get_nfc_device = seader_hf_plugin_get_nfc_device,
+    .picopass_detect = seader_hf_plugin_picopass_detect,
+    .picopass_start = seader_hf_plugin_picopass_start,
+    .picopass_stop = seader_hf_plugin_picopass_stop,
+    .picopass_get_csn = seader_hf_plugin_picopass_get_csn,
+    .picopass_transmit = seader_hf_plugin_picopass_transmit,
+    .show_loading_popup = seader_show_loading_popup,
+    .set_read_error = seader_hf_plugin_set_read_error,
+};
 
 bool seader_custom_event_callback(void* context, uint32_t event) {
     furi_assert(context);
@@ -45,6 +384,8 @@ Seader* seader_alloc() {
     seader_uhf_status_label_format(
         false, false, false, false, seader->uhf_status_label, sizeof(seader->uhf_status_label));
     seader_uhf_snmp_probe_init(&seader->snmp_probe);
+    seader->nfc = NULL;
+    seader->nfc_device = NULL;
     seader->scratch.offset = 0U;
     seader->scratch.high_water = 0U;
     seader->hf_mode = NULL;
@@ -114,6 +455,9 @@ Seader* seader_alloc() {
 
     seader->plugin_manager = NULL;
     seader->plugin_wiegand = NULL;
+    seader->hf_plugin_manager = NULL;
+    seader->plugin_hf = NULL;
+    seader->hf_plugin_ctx = NULL;
 
     return seader;
 }
@@ -194,6 +538,7 @@ void seader_free(Seader* seader) {
     seader->notifications = NULL;
 
     seader_wiegand_plugin_release(seader);
+    seader_hf_plugin_release(seader);
 
     free(seader);
 }
@@ -260,8 +605,8 @@ bool seader_wiegand_plugin_acquire(Seader* seader) {
         }
     }
 
-    FURI_LOG_I(TAG, "Loading Wiegand plugin from %s", SEADER_PLUGIN_DIR);
-    if(plugin_manager_load_all(seader->plugin_manager, SEADER_PLUGIN_DIR) !=
+    FURI_LOG_I(TAG, "Loading Wiegand plugin from %s", SEADER_WIEGAND_PLUGIN_PATH);
+    if(plugin_manager_load_single(seader->plugin_manager, SEADER_WIEGAND_PLUGIN_PATH) !=
        PluginManagerErrorNone) {
         FURI_LOG_E(TAG, "Failed to load Wiegand plugin");
         plugin_manager_free(seader->plugin_manager);
@@ -276,15 +621,7 @@ bool seader_wiegand_plugin_acquire(Seader* seader) {
         return false;
     }
 
-    seader->plugin_wiegand = NULL;
-    const uint32_t plugin_count = plugin_manager_get_count(seader->plugin_manager);
-    for(uint32_t i = 0; i < plugin_count; i++) {
-        const PluginWiegand* plugin = plugin_manager_get_ep(seader->plugin_manager, i);
-        if(plugin && strcmp(plugin->name, "Plugin Wiegand") == 0) {
-            seader->plugin_wiegand = (PluginWiegand*)plugin;
-            break;
-        }
-    }
+    seader->plugin_wiegand = (PluginWiegand*)plugin_manager_get_ep(seader->plugin_manager, 0);
 
     if(!seader->plugin_wiegand) {
         FURI_LOG_E(TAG, "Failed to resolve Wiegand plugin entry point");
@@ -309,6 +646,102 @@ void seader_wiegand_plugin_release(Seader* seader) {
     seader->plugin_wiegand = NULL;
     plugin_manager_free(seader->plugin_manager);
     seader->plugin_manager = NULL;
+}
+
+bool seader_hf_plugin_acquire(Seader* seader) {
+    furi_assert(seader);
+
+    if(seader->plugin_hf && seader->hf_plugin_ctx) {
+        return true;
+    }
+
+    if(!seader->nfc) {
+        seader->nfc = nfc_alloc();
+        if(!seader->nfc) {
+            FURI_LOG_E(TAG, "Failed to allocate host NFC");
+            return false;
+        }
+    }
+
+    if(!seader->nfc_device) {
+        seader->nfc_device = nfc_device_alloc();
+        if(!seader->nfc_device) {
+            FURI_LOG_E(TAG, "Failed to allocate host NFC device");
+            nfc_free(seader->nfc);
+            seader->nfc = NULL;
+            return false;
+        }
+    }
+
+    if(!seader->hf_plugin_manager) {
+        seader->hf_plugin_manager =
+            plugin_manager_alloc(HF_PLUGIN_APP_ID, HF_PLUGIN_API_VERSION, firmware_api_interface);
+        if(!seader->hf_plugin_manager) {
+            FURI_LOG_E(TAG, "Failed to allocate HF plugin manager");
+            return false;
+        }
+    }
+
+    FURI_LOG_I(TAG, "Loading HF plugin from %s", SEADER_HF_PLUGIN_PATH);
+    if(plugin_manager_load_single(seader->hf_plugin_manager, SEADER_HF_PLUGIN_PATH) !=
+       PluginManagerErrorNone) {
+        FURI_LOG_E(TAG, "Failed to load HF plugin");
+        plugin_manager_free(seader->hf_plugin_manager);
+        seader->hf_plugin_manager = NULL;
+        return false;
+    }
+
+    seader->plugin_hf = (PluginHf*)plugin_manager_get_ep(seader->hf_plugin_manager, 0);
+
+    if(!seader->plugin_hf) {
+        FURI_LOG_E(TAG, "Failed to resolve HF plugin entry point");
+        plugin_manager_free(seader->hf_plugin_manager);
+        seader->hf_plugin_manager = NULL;
+        return false;
+    }
+
+    seader->hf_plugin_ctx = seader->plugin_hf->alloc(&seader_hf_plugin_host_api, seader);
+    if(!seader->hf_plugin_ctx) {
+        FURI_LOG_E(TAG, "Failed to allocate HF plugin context");
+        plugin_manager_free(seader->hf_plugin_manager);
+        seader->hf_plugin_manager = NULL;
+        seader->plugin_hf = NULL;
+        return false;
+    }
+
+    FURI_LOG_I(TAG, "HF plugin loaded: %s", seader->plugin_hf->name);
+    return true;
+}
+
+void seader_hf_plugin_release(Seader* seader) {
+    furi_assert(seader);
+
+    if(seader->nfc_device) {
+        nfc_device_set_loading_callback(seader->nfc_device, NULL, NULL);
+    }
+
+    if(seader->plugin_hf && seader->hf_plugin_ctx) {
+        seader->plugin_hf->stop(seader->hf_plugin_ctx);
+        seader->plugin_hf->free(seader->hf_plugin_ctx);
+    }
+    seader->hf_plugin_ctx = NULL;
+    seader->plugin_hf = NULL;
+
+    if(seader->hf_plugin_manager) {
+        FURI_LOG_I(TAG, "Unloading HF plugin");
+        plugin_manager_free(seader->hf_plugin_manager);
+        seader->hf_plugin_manager = NULL;
+    }
+
+    if(seader->nfc_device) {
+        nfc_device_free(seader->nfc_device);
+        seader->nfc_device = NULL;
+    }
+
+    if(seader->nfc) {
+        nfc_free(seader->nfc);
+        seader->nfc = NULL;
+    }
 }
 
 bool seader_worker_acquire(Seader* seader) {

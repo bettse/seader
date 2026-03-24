@@ -54,6 +54,7 @@ bool seader_scene_read_on_event(void* context, SceneManagerEvent event) {
         seader_hf_mode_set_selected_read_type(seader, SeaderCredentialTypeNone);
         seader_hf_mode_clear_detected_types(seader);
         seader_hf_mode_deactivate(seader);
+        seader_hf_plugin_release(seader);
         scene_manager_search_and_switch_to_previous_scene(
             seader->scene_manager, SeaderSceneSamPresent);
         consumed = true;

@@ -1,4 +1,9 @@
 #include "apdu_runner.h"
+#include "seader_i.h"
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #define TAG "APDU_Runner"
 
