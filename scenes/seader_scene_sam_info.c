@@ -23,8 +23,7 @@ void seader_scene_sam_info_on_enter(void* context) {
     furi_string_reset(info_str);
     furi_string_reset(uhf_str);
 
-    furi_string_cat_printf(
-        fw_str, "FW %d.%d", seader->sam_version[0], seader->sam_version[1]);
+    furi_string_cat_printf(fw_str, "FW %d.%d", seader->sam_version[0], seader->sam_version[1]);
     furi_string_set_str(info_str, seader->sam_key_label);
     furi_string_set_str(uhf_str, seader->uhf_status_label);
 

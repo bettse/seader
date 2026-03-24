@@ -58,10 +58,7 @@ typedef struct {
     Nfc* (*get_nfc)(void* host_ctx);
     NfcDevice* (*get_nfc_device)(void* host_ctx);
     bool (*picopass_detect)(void* host_ctx);
-    bool (*picopass_start)(
-        void* host_ctx,
-        PicopassPollerCallback callback,
-        void* callback_ctx);
+    bool (*picopass_start)(void* host_ctx, PicopassPollerCallback callback, void* callback_ctx);
     void (*picopass_stop)(void* host_ctx);
     uint8_t* (*picopass_get_csn)(void* host_ctx);
     bool (*picopass_transmit)(

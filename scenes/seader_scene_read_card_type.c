@@ -46,8 +46,9 @@ bool seader_scene_read_card_type_on_event(void* context, SceneManagerEvent event
         const SeaderCredentialType type = event.event;
         if(event.event == SeaderWorkerEventHfTeardownComplete) {
             consumed = seader_hf_finish_teardown_action(seader);
-        } else if(type == SeaderCredentialType14A || type == SeaderCredentialTypeMifareClassic ||
-           type == SeaderCredentialTypePicopass) {
+        } else if(
+            type == SeaderCredentialType14A || type == SeaderCredentialTypeMifareClassic ||
+            type == SeaderCredentialTypePicopass) {
             seader_hf_mode_set_selected_read_type(seader, type);
             seader_hf_mode_clear_detected_types(seader);
             scene_manager_next_scene(seader->scene_manager, SeaderSceneRead);

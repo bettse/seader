@@ -1,10 +1,10 @@
 #include "seader_i.h"
 #include "trace_log.h"
 
-#define TAG "Seader"
-#define SEADER_PLUGIN_DIR APP_ASSETS_PATH("plugins")
+#define TAG                        "Seader"
+#define SEADER_PLUGIN_DIR          APP_ASSETS_PATH("plugins")
 #define SEADER_WIEGAND_PLUGIN_PATH APP_ASSETS_PATH("plugins/plugin_wiegand.fal")
-#define SEADER_HF_PLUGIN_PATH APP_ASSETS_PATH("plugins/plugin_hf.fal")
+#define SEADER_HF_PLUGIN_PATH      APP_ASSETS_PATH("plugins/plugin_hf.fal")
 
 typedef struct {
     volatile bool done;
@@ -740,10 +740,7 @@ bool seader_hf_plugin_acquire(Seader* seader) {
 
     if(!seader->nfc || !seader->nfc_device) {
         FURI_LOG_E(
-            TAG,
-            "Host NFC objects unavailable nfc=%p device=%p",
-            seader->nfc,
-            seader->nfc_device);
+            TAG, "Host NFC objects unavailable nfc=%p device=%p", seader->nfc, seader->nfc_device);
         return false;
     }
 
@@ -789,9 +786,8 @@ bool seader_hf_plugin_acquire(Seader* seader) {
 }
 
 static bool seader_hf_has_runtime(const Seader* seader) {
-    return seader &&
-           (seader->hf_plugin_manager || seader->plugin_hf || seader->hf_plugin_ctx ||
-            seader->poller || seader->picopass_poller);
+    return seader && (seader->hf_plugin_manager || seader->plugin_hf || seader->hf_plugin_ctx ||
+                      seader->poller || seader->picopass_poller);
 }
 
 static void seader_hf_teardown_blocking(Seader* seader) {
@@ -808,12 +804,7 @@ static void seader_hf_teardown_blocking(Seader* seader) {
 
     seader_worker_stop(seader->worker);
     FURI_LOG_I(TAG, "HF teardown blocking");
-    seader_worker_start(
-        seader->worker,
-        SeaderWorkerStateHfTeardown,
-        seader->uart,
-        NULL,
-        seader);
+    seader_worker_start(seader->worker, SeaderWorkerStateHfTeardown, seader->uart, NULL, seader);
     seader_worker_join(seader->worker);
 }
 
@@ -1006,7 +997,8 @@ void seader_hf_mode_deactivate(Seader* seader) {
 }
 
 SeaderCredentialType seader_hf_mode_get_selected_read_type(const Seader* seader) {
-    return seader && seader->hf_mode ? seader->hf_mode->selected_read_type : SeaderCredentialTypeNone;
+    return seader && seader->hf_mode ? seader->hf_mode->selected_read_type :
+                                       SeaderCredentialTypeNone;
 }
 
 void seader_hf_mode_set_selected_read_type(Seader* seader, SeaderCredentialType type) {

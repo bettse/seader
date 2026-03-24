@@ -127,7 +127,7 @@ static size_t __attribute__((unused)) seader_worker_detect_supported_types(
 }
 
 static bool __attribute__((unused))
-    seader_worker_start_read_for_type(Seader* seader, SeaderCredentialType type) {
+seader_worker_start_read_for_type(Seader* seader, SeaderCredentialType type) {
     NfcPoller* poller_detect = NULL;
 
     if(type == SeaderCredentialType14A) {

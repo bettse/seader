@@ -867,11 +867,7 @@ bool seader_parse_version(Seader* seader, uint8_t* buf, size_t size) {
 #endif
         if(version.version.size == 2) {
             memcpy(seader->sam_version, version.version.buf, version.version.size);
-            FURI_LOG_I(
-                TAG,
-                "SAM Version: %d.%d",
-                seader->sam_version[0],
-                seader->sam_version[1]);
+            FURI_LOG_I(TAG, "SAM Version: %d.%d", seader->sam_version[0], seader->sam_version[1]);
         }
 
         rtn = true;
@@ -1533,8 +1529,8 @@ void seader_parse_nfc_command_transmit(Seader* seader, NFCSend_t* nfcSend) {
     };
     if(nfcSend->format) {
         const size_t raw_format_len = (size_t)nfcSend->format->size;
-        const size_t format_len =
-            raw_format_len < sizeof(action.format) ? raw_format_len : sizeof(action.format);
+        const size_t format_len = raw_format_len < sizeof(action.format) ? raw_format_len :
+                                                                           sizeof(action.format);
         memcpy(action.format, nfcSend->format->buf, format_len);
     }
 
@@ -1740,10 +1736,7 @@ NfcCommand seader_worker_card_detect(
     size_t diversifier_len = uid_len;
     if(diversifier_len > sizeof(credential->diversifier)) {
         FURI_LOG_W(
-            TAG,
-            "Clamp diversifier uid_len=%u to %zu",
-            uid_len,
-            sizeof(credential->diversifier));
+            TAG, "Clamp diversifier uid_len=%u to %zu", uid_len, sizeof(credential->diversifier));
         diversifier_len = sizeof(credential->diversifier);
     }
     memcpy(credential->diversifier, uid, diversifier_len);
@@ -1751,7 +1744,8 @@ NfcCommand seader_worker_card_detect(
 
     if(ats != NULL) { // type 4
         protocol_bytes[1] = FrameProtocol_nfc;
-        if(OCTET_STRING_fromBuf(&cardDetails.protocol, (const char*)protocol_bytes, sizeof(protocol_bytes)) != 0) {
+        if(OCTET_STRING_fromBuf(
+               &cardDetails.protocol, (const char*)protocol_bytes, sizeof(protocol_bytes)) != 0) {
             FURI_LOG_E(TAG, "Failed to encode 14A protocol");
             ASN_STRUCT_FREE_CONTENTS_ONLY(asn_DEF_CardDetails, &cardDetails);
             return NfcCommandStop;
@@ -1768,14 +1762,16 @@ NfcCommand seader_worker_card_detect(
         // TODO: Update asn1 to change atqa to ats
     } else if(uid_len == 8) { // picopass
         protocol_bytes[1] = FrameProtocol_iclass;
-        if(OCTET_STRING_fromBuf(&cardDetails.protocol, (const char*)protocol_bytes, sizeof(protocol_bytes)) != 0) {
+        if(OCTET_STRING_fromBuf(
+               &cardDetails.protocol, (const char*)protocol_bytes, sizeof(protocol_bytes)) != 0) {
             FURI_LOG_E(TAG, "Failed to encode picopass protocol");
             ASN_STRUCT_FREE_CONTENTS_ONLY(asn_DEF_CardDetails, &cardDetails);
             return NfcCommandStop;
         }
     } else { // MFC
         protocol_bytes[1] = FrameProtocol_nfc;
-        if(OCTET_STRING_fromBuf(&cardDetails.protocol, (const char*)protocol_bytes, sizeof(protocol_bytes)) != 0) {
+        if(OCTET_STRING_fromBuf(
+               &cardDetails.protocol, (const char*)protocol_bytes, sizeof(protocol_bytes)) != 0) {
             FURI_LOG_E(TAG, "Failed to encode MFC protocol");
             ASN_STRUCT_FREE_CONTENTS_ONLY(asn_DEF_CardDetails, &cardDetails);
             return NfcCommandStop;

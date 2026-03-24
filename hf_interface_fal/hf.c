@@ -24,7 +24,7 @@
     } while(0)
 #endif
 
-#define HF_PLUGIN_POLLER_MAX_FWT         (200000U)
+#define HF_PLUGIN_POLLER_MAX_FWT (200000U)
 #define HF_PLUGIN_POLLER_MAX_BUFFER_SIZE (258U)
 
 // ATS bit definitions
@@ -44,9 +44,8 @@ typedef struct {
 } PluginHfContext;
 
 static const uint8_t plugin_hf_update_block2[] = {RFAL_PICOPASS_CMD_UPDATE, 0x02};
-static const uint8_t plugin_hf_select_seos_app[] = {
-    0x00, 0xa4, 0x04, 0x00, 0x0a, 0xa0, 0x00, 0x00,
-    0x04, 0x40, 0x00, 0x01, 0x01, 0x00, 0x01, 0x00};
+static const uint8_t plugin_hf_select_seos_app[] =
+    {0x00, 0xa4, 0x04, 0x00, 0x0a, 0xa0, 0x00, 0x00, 0x04, 0x40, 0x00, 0x01, 0x01, 0x00, 0x01, 0x00};
 static const uint8_t plugin_hf_select_desfire_app_no_le[] =
     {0x00, 0xA4, 0x04, 0x00, 0x07, 0xD2, 0x76, 0x00, 0x00, 0x85, 0x01, 0x00};
 static const uint8_t plugin_hf_file_not_found[] = {0x6a, 0x82};
@@ -101,10 +100,8 @@ static PicopassError plugin_hf_fake_epurse_update(BitBuffer* tx_buffer, BitBuffe
     return PicopassErrorNone;
 }
 
-static void plugin_hf_capture_sio(
-    PluginHfContext* ctx,
-    BitBuffer* tx_buffer,
-    BitBuffer* rx_buffer) {
+static void
+    plugin_hf_capture_sio(PluginHfContext* ctx, BitBuffer* tx_buffer, BitBuffer* rx_buffer) {
     if(!ctx || !ctx->api || !tx_buffer || !rx_buffer) return;
     const uint8_t* buffer = bit_buffer_get_data(tx_buffer);
     size_t len = bit_buffer_get_size_bytes(tx_buffer);
@@ -154,15 +151,14 @@ static void plugin_hf_iso15693_transmit(PluginHfContext* ctx, uint8_t* buffer, s
                 break;
             }
         } else {
-            if(!ctx->api->picopass_transmit ||
-               !ctx->api->picopass_transmit(
-                   ctx->host_ctx,
-                   buffer,
-                   len,
-                   rx_data,
-                   sizeof(rx_data),
-                   &rx_len,
-                   HF_PLUGIN_POLLER_MAX_FWT)) {
+            if(!ctx->api->picopass_transmit || !ctx->api->picopass_transmit(
+                                                   ctx->host_ctx,
+                                                   buffer,
+                                                   len,
+                                                   rx_data,
+                                                   sizeof(rx_data),
+                                                   &rx_len,
+                                                   HF_PLUGIN_POLLER_MAX_FWT)) {
                 ctx->api->set_stage(ctx->host_ctx, PluginHfStageFail);
                 break;
             }
@@ -307,9 +303,8 @@ static void plugin_hf_mfc_transmit(
                     tx_buffer, i, buffer[i], bit_lib_get_bit(&tx_parity, i));
             }
 
-            MfClassicError error =
-                mf_classic_poller_send_custom_parity_frame(
-                    ctx->mfc_poller, tx_buffer, rx_buffer, 60000);
+            MfClassicError error = mf_classic_poller_send_custom_parity_frame(
+                ctx->mfc_poller, tx_buffer, rx_buffer, 60000);
             if(error != MfClassicErrorNone) {
                 if(error == MfClassicErrorTimeout &&
                    ctx->api->get_credential_type(ctx->host_ctx) ==
@@ -441,11 +436,17 @@ static NfcCommand plugin_hf_poller_callback_iso14443_4a(NfcGenericEvent event, v
             }
             if(iso_data->ats_data.tl > 1) {
                 ats[ats_len++] = iso_data->ats_data.t0;
-                if(iso_data->ats_data.t0 & ISO14443_4A_ATS_T0_TA1) ats[ats_len++] = iso_data->ats_data.ta_1;
-                if(iso_data->ats_data.t0 & ISO14443_4A_ATS_T0_TB1) ats[ats_len++] = iso_data->ats_data.tb_1;
-                if(iso_data->ats_data.t0 & ISO14443_4A_ATS_T0_TC1) ats[ats_len++] = iso_data->ats_data.tc_1;
+                if(iso_data->ats_data.t0 & ISO14443_4A_ATS_T0_TA1)
+                    ats[ats_len++] = iso_data->ats_data.ta_1;
+                if(iso_data->ats_data.t0 & ISO14443_4A_ATS_T0_TB1)
+                    ats[ats_len++] = iso_data->ats_data.tb_1;
+                if(iso_data->ats_data.t0 & ISO14443_4A_ATS_T0_TC1)
+                    ats[ats_len++] = iso_data->ats_data.tc_1;
                 if(t1_tk_size != 0) {
-                    memcpy(ats + ats_len, simple_array_cget_data(iso_data->ats_data.t1_tk), t1_tk_size);
+                    memcpy(
+                        ats + ats_len,
+                        simple_array_cget_data(iso_data->ats_data.t1_tk),
+                        t1_tk_size);
                     ats_len += t1_tk_size;
                 }
             }
@@ -575,12 +576,13 @@ static NfcCommand plugin_hf_poller_callback_picopass(PicopassPollerEvent event, 
             if(!ctx->api->sam_can_accept_card(ctx->host_ctx)) {
                 return NfcCommandContinue;
             }
-            uint8_t* csn =
-                ctx->api->picopass_get_csn ? ctx->api->picopass_get_csn(ctx->host_ctx) : NULL;
+            uint8_t* csn = ctx->api->picopass_get_csn ? ctx->api->picopass_get_csn(ctx->host_ctx) :
+                                                        NULL;
             if(!csn) {
                 return NfcCommandStop;
             }
-            ctx->api->send_card_detected(ctx->host_ctx, 0, csn, sizeof(PicopassSerialNum), NULL, 0);
+            ctx->api->send_card_detected(
+                ctx->host_ctx, 0, csn, sizeof(PicopassSerialNum), NULL, 0);
             FURI_LOG_D(TAG, "Picopass cardDetected delivered");
             ctx->api->set_stage(ctx->host_ctx, PluginHfStageConversation);
         } else if(stage == PluginHfStageConversation) {
@@ -622,7 +624,11 @@ static void* plugin_hf_alloc(const PluginHfHostApi* api, void* host_ctx) {
     ctx->nfc = api->get_nfc ? api->get_nfc(host_ctx) : NULL;
     ctx->nfc_device = api->get_nfc_device ? api->get_nfc_device(host_ctx) : NULL;
     if(!ctx->nfc || !ctx->nfc_device) {
-        FURI_LOG_E(TAG, "Host NFC objects unavailable nfc=%p device=%p", (void*)ctx->nfc, (void*)ctx->nfc_device);
+        FURI_LOG_E(
+            TAG,
+            "Host NFC objects unavailable nfc=%p device=%p",
+            (void*)ctx->nfc,
+            (void*)ctx->nfc_device);
         free(ctx);
         return NULL;
     }
@@ -735,8 +741,7 @@ static bool plugin_hf_start_read_for_type(void* plugin_ctx, SeaderCredentialType
         ctx->api->set_credential_type(ctx->host_ctx, SeaderCredentialTypePicopass);
         ctx->api->set_stage(ctx->host_ctx, PluginHfStageCardDetect);
         return ctx->api->picopass_start &&
-               ctx->api->picopass_start(
-                   ctx->host_ctx, plugin_hf_poller_callback_picopass, ctx);
+               ctx->api->picopass_start(ctx->host_ctx, plugin_hf_poller_callback_picopass, ctx);
     }
 
     return false;
@@ -760,7 +765,8 @@ static bool plugin_hf_handle_action(void* plugin_ctx, const PluginHfAction* acti
         return true;
     } else if(action->type == PluginHfActionTypeMfClassicTx) {
         if(!ctx->poller) return false;
-        plugin_hf_mfc_transmit(ctx, action->data, action->len, action->timeout, (uint8_t*)action->format);
+        plugin_hf_mfc_transmit(
+            ctx, action->data, action->len, action->timeout, (uint8_t*)action->format);
         return true;
     } else if(action->type == PluginHfActionTypeIso14443Tx) {
         if(!ctx->poller) return false;

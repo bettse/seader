@@ -112,7 +112,8 @@ bool seader_scene_sam_present_on_event(void* context, SceneManagerEvent event) {
     } else if(event.type == SceneManagerEventTypeTick) {
         if(fwChecks > 0 && seader->sam_version[0] != 0 && seader->sam_version[1] != 0) {
             fwChecks--;
-            seader_scene_sam_present_rebuild_menu(seader, submenu_get_selected_item(seader->submenu));
+            seader_scene_sam_present_rebuild_menu(
+                seader, submenu_get_selected_item(seader->submenu));
         }
     }
 

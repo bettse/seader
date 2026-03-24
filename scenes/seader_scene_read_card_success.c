@@ -75,7 +75,8 @@ void seader_scene_read_card_success_on_enter(void* context) {
                 credential->bit_length,
                 format_count);
         } else {
-            FURI_LOG_D(TAG, "Parse available without plugin bit_length=%d", credential->bit_length);
+            FURI_LOG_D(
+                TAG, "Parse available without plugin bit_length=%d", credential->bit_length);
         }
         widget_add_button_element(
             seader->widget,
@@ -138,8 +139,7 @@ bool seader_scene_read_card_success_on_event(void* context, SceneManagerEvent ev
             if(seader->credential->bit_length > 0) {
                 scene_manager_next_scene(seader->scene_manager, SeaderSceneCardMenu);
             } else {
-                consumed =
-                    seader_hf_request_teardown(seader, SeaderHfTeardownActionSamPresent);
+                consumed = seader_hf_request_teardown(seader, SeaderHfTeardownActionSamPresent);
             }
             if(seader->credential->bit_length > 0) {
                 consumed = true;
