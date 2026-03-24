@@ -16,7 +16,6 @@ void seader_scene_sam_present_submenu_callback(void* context, uint32_t index) {
 
 void seader_scene_sam_present_on_update(void* context) {
     Seader* seader = context;
-    SeaderWorker* seader_worker = seader->worker;
 
     Submenu* submenu = seader->submenu;
     submenu_reset(submenu);
@@ -43,7 +42,7 @@ void seader_scene_sam_present_on_update(void* context) {
             seader_scene_sam_present_submenu_callback,
             seader);
     }
-    if(seader_worker->sam_version[0] != 0 && seader_worker->sam_version[1] != 0) {
+    if(seader->sam_version[0] != 0 && seader->sam_version[1] != 0) {
         submenu_add_item(
             submenu,
             seader->sam_key_label,
@@ -112,9 +111,7 @@ bool seader_scene_sam_present_on_event(void* context, SceneManagerEvent event) {
         view_dispatcher_stop(seader->view_dispatcher);
         consumed = true;
     } else if(event.type == SceneManagerEventTypeTick) {
-        SeaderWorker* seader_worker = seader->worker;
-        if(fwChecks > 0 && seader_worker->sam_version[0] != 0 &&
-           seader_worker->sam_version[1] != 0) {
+        if(fwChecks > 0 && seader->sam_version[0] != 0 && seader->sam_version[1] != 0) {
             fwChecks--;
             seader_scene_sam_present_on_update(context);
         }

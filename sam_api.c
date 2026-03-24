@@ -61,9 +61,16 @@ static void seader_update_uhf_status_label(Seader* seader) {
     seader_publish_sam_status(seader);
 }
 
+static SeaderUartBridge* seader_get_uart(Seader* seader) {
+    return seader ? seader->uart : NULL;
+}
+
+static SeaderWorker* seader_get_active_worker(Seader* seader) {
+    return seader ? seader->worker : NULL;
+}
+
 static bool seader_snmp_probe_send_next_request(Seader* seader) {
-    SeaderWorker* seader_worker = seader ? seader->worker : NULL;
-    SeaderUartBridge* seader_uart = seader_worker ? seader_worker->uart : NULL;
+    SeaderUartBridge* seader_uart = seader_get_uart(seader);
     uint8_t* scratch = seader_uart ? (seader_uart->tx_buf + MAX_FRAME_HEADERS) : NULL;
     uint8_t* message = seader_uart ? seader_uart->rx_buf : NULL;
     size_t message_len = 0U;
@@ -400,8 +407,11 @@ bool seader_send_apdu(
     uint8_t* payload,
     uint8_t payloadLen,
     bool in_scratchpad) {
-    SeaderWorker* seader_worker = seader->worker;
-    SeaderUartBridge* seader_uart = seader_worker->uart;
+    SeaderUartBridge* seader_uart = seader_get_uart(seader);
+    if(!seader_uart) {
+        FURI_LOG_E(TAG, "Cannot send APDU without UART");
+        return false;
+    }
 
     bool extended = seader_uart->T == 1;
     uint8_t header_len = extended ? 7 : 5;
@@ -486,8 +496,11 @@ void seader_send_payload(
     uint8_t from,
     uint8_t to,
     uint8_t replyTo) {
-    SeaderWorker* seader_worker = seader->worker;
-    SeaderUartBridge* seader_uart = seader_worker->uart;
+    SeaderUartBridge* seader_uart = seader_get_uart(seader);
+    if(!seader_uart) {
+        FURI_LOG_E(TAG, "Cannot send payload without UART");
+        return;
+    }
 
     uint8_t* scratchpad = seader_uart->tx_buf + MAX_FRAME_HEADERS;
     size_t scratchpad_size = SEADER_UART_RX_BUF_SIZE - MAX_FRAME_HEADERS;
@@ -791,7 +804,7 @@ static bool seader_unpack_pacs2_bits(Seader* seader, const OCTET_STRING_t* pacs_
 // ATR3:
 //    800207358106793D81F9F385820104A51E8004000000018106053000000000820B323330353139313232395A830152
 #define MAX_VERSION_SIZE 60
-bool seader_parse_version(SeaderWorker* seader_worker, uint8_t* buf, size_t size) {
+bool seader_parse_version(Seader* seader, uint8_t* buf, size_t size) {
     bool rtn = false;
     if(size > MAX_VERSION_SIZE) {
         // Too large to handle now
@@ -820,12 +833,12 @@ bool seader_parse_version(SeaderWorker* seader_worker, uint8_t* buf, size_t size
         }
 #endif
         if(version.version.size == 2) {
-            memcpy(seader_worker->sam_version, version.version.buf, version.version.size);
+            memcpy(seader->sam_version, version.version.buf, version.version.size);
             FURI_LOG_I(
                 TAG,
                 "SAM Version: %d.%d",
-                seader_worker->sam_version[0],
-                seader_worker->sam_version[1]);
+                seader->sam_version[0],
+                seader->sam_version[1]);
         }
 
         rtn = true;
@@ -921,16 +934,19 @@ bool seader_parse_serial_number(Seader* seader, uint8_t* buf, size_t size) {
 }
 
 static void seader_abort_active_read(Seader* seader) {
-    SeaderWorker* seader_worker = seader->worker;
-    FURI_LOG_W(TAG, "Abort active read stage=%d sam=%d", seader_worker->stage, seader->samCommand);
+    SeaderWorker* seader_worker = seader_get_active_worker(seader);
+    const int stage = seader_worker ? (int)seader_worker->stage : -1;
+    FURI_LOG_W(TAG, "Abort active read stage=%d sam=%d", stage, seader->samCommand);
     seader_trace(
         TAG,
         "abort stage=%d sam=%d state=%d intent=%d",
-        seader_worker->stage,
+        stage,
         seader->samCommand,
         seader->sam_state,
         seader->sam_intent);
-    seader_worker->stage = SeaderPollerEventTypeFail;
+    if(seader_worker) {
+        seader_worker->stage = SeaderPollerEventTypeFail;
+    }
     if(!seader_sam_has_active_card(seader) && seader->sam_state != SeaderSamStateClearPending) {
         seader_sam_set_state(
             seader, SeaderSamStateIdle, SeaderSamIntentNone, SamCommand_PR_NOTHING);
@@ -961,7 +977,10 @@ bool seader_parse_sam_response2(Seader* seader, SamResponse2_t* samResponse) {
                                                            SeaderPacsMediaTypeUnknown;
 
         if(seader_unpack_pacs2_bits(seader, pacs)) {
-            seader->worker->stage = SeaderPollerEventTypeComplete;
+            SeaderWorker* seader_worker = seader_get_active_worker(seader);
+            if(seader_worker) {
+                seader_worker->stage = SeaderPollerEventTypeComplete;
+            }
             seader_sam_set_state(
                 seader, SeaderSamStateIdle, SeaderSamIntentNone, SamCommand_PR_NOTHING);
         } else {
@@ -982,14 +1001,16 @@ bool seader_parse_sam_response2(Seader* seader, SamResponse2_t* samResponse) {
 }
 
 bool seader_parse_sam_response(Seader* seader, SamResponse_t* samResponse) {
-    SeaderWorker* seader_worker = seader->worker;
+    SeaderWorker* seader_worker = seader_get_active_worker(seader);
 
     switch(seader->sam_state) {
     case SeaderSamStateConversation:
     case SeaderSamStateFinishing:
         if(seader->sam_intent == SeaderSamIntentConfig) {
             FURI_LOG_I(TAG, "samResponse config");
-            seader_worker->stage = SeaderPollerEventTypeFail;
+            if(seader_worker) {
+                seader_worker->stage = SeaderPollerEventTypeFail;
+            }
             seader_sam_set_state(
                 seader, SeaderSamStateIdle, SeaderSamIntentNone, SamCommand_PR_NOTHING);
         } else {
@@ -999,7 +1020,7 @@ bool seader_parse_sam_response(Seader* seader, SamResponse_t* samResponse) {
         break;
     case SeaderSamStateVersionPending:
         FURI_LOG_I(TAG, "samResponse version");
-        seader_parse_version(seader_worker, samResponse->buf, samResponse->size);
+        seader_parse_version(seader, samResponse->buf, samResponse->size);
         seader_worker_send_serial_number(seader);
         break;
     case SeaderSamStateSerialPending:
@@ -1043,7 +1064,10 @@ bool seader_parse_sam_response(Seader* seader, SamResponse_t* samResponse) {
         break;
     case SeaderSamStateClearPending:
         FURI_LOG_I(TAG, "samResponse clear-detected-card ack");
-        seader_trace(TAG, "cardDetected ack clear stage=%d", seader_worker->stage);
+        seader_trace(
+            TAG,
+            "cardDetected ack clear stage=%d",
+            seader_worker ? (int)seader_worker->stage : -1);
         seader_sam_set_state(
             seader, SeaderSamStateIdle, SeaderSamIntentNone, SamCommand_PR_NOTHING);
         break;
@@ -1141,7 +1165,7 @@ void seader_iso15693_transmit(
     PicopassPoller* picopass_poller,
     uint8_t* buffer,
     size_t len) {
-    SeaderWorker* seader_worker = seader->worker;
+    SeaderWorker* seader_worker = seader_get_active_worker(seader);
 
     BitBuffer* tx_buffer = bit_buffer_alloc(len);
     BitBuffer* rx_buffer = bit_buffer_alloc(SEADER_POLLER_MAX_BUFFER_SIZE);
@@ -1162,7 +1186,9 @@ void seader_iso15693_transmit(
         }
 
         if(error != PicopassErrorNone) {
-            seader_worker->stage = SeaderPollerEventTypeFail;
+            if(seader_worker) {
+                seader_worker->stage = SeaderPollerEventTypeFail;
+            }
             break;
         }
 
@@ -1192,7 +1218,7 @@ void seader_iso14443a_transmit(
     furi_assert(seader);
     furi_assert(buffer);
     furi_assert(iso14443_4a_poller);
-    SeaderWorker* seader_worker = seader->worker;
+    SeaderWorker* seader_worker = seader_get_active_worker(seader);
     SeaderCredential* credential = seader->credential;
 
     BitBuffer* tx_buffer =
@@ -1217,7 +1243,9 @@ void seader_iso14443a_transmit(
             iso14443_4a_poller_send_block(iso14443_4a_poller, tx_buffer, rx_buffer);
         if(error != Iso14443_4aErrorNone) {
             FURI_LOG_W(TAG, "iso14443_4a_poller_send_block error %d", error);
-            seader_worker->stage = SeaderPollerEventTypeFail;
+            if(seader_worker) {
+                seader_worker->stage = SeaderPollerEventTypeFail;
+            }
             break;
         }
 
@@ -1264,7 +1292,7 @@ void seader_mfc_transmit(
     furi_assert(seader);
     furi_assert(buffer);
     furi_assert(mfc_poller);
-    SeaderWorker* seader_worker = seader->worker;
+    SeaderWorker* seader_worker = seader_get_active_worker(seader);
 
     BitBuffer* tx_buffer = bit_buffer_alloc(len);
     BitBuffer* rx_buffer = bit_buffer_alloc(SEADER_POLLER_MAX_BUFFER_SIZE);
@@ -1292,7 +1320,9 @@ void seader_mfc_transmit(
             if(error != MfClassicErrorNone) {
                 FURI_LOG_W(TAG, "mf_classic_poller_send_frame error %d", error);
                 seader_trace(TAG, "mfc send_frame error=%d", error);
-                seader_worker->stage = SeaderPollerEventTypeFail;
+                if(seader_worker) {
+                    seader_worker->stage = SeaderPollerEventTypeFail;
+                }
                 break;
             }
 
@@ -1358,7 +1388,9 @@ void seader_mfc_transmit(
                         sizeof(seader->read_error),
                         "Protected read timed out.\nNo supported data\nor wrong key.");
                 }
-                seader_worker->stage = SeaderPollerEventTypeFail;
+                if(seader_worker) {
+                    seader_worker->stage = SeaderPollerEventTypeFail;
+                }
                 break;
             }
 
@@ -1508,7 +1540,10 @@ void seader_parse_nfc_command(Seader* seader, NFCCommand_t* nfcCommand, SeaderPo
     case NFCCommand_PR_nfcOff:
         seader_parse_nfc_off(seader);
         if(spc != NULL) {
-            seader->worker->stage = SeaderPollerEventTypeComplete;
+            SeaderWorker* seader_worker = seader_get_active_worker(seader);
+            if(seader_worker) {
+                seader_worker->stage = SeaderPollerEventTypeComplete;
+            }
         }
         break;
     default:

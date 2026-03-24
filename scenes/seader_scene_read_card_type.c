@@ -21,10 +21,12 @@ void seader_scene_read_card_type_submenu_callback(void* context, uint32_t index)
 void seader_scene_read_card_type_on_enter(void* context) {
     Seader* seader = context;
     Submenu* submenu = seader->submenu;
+    const SeaderCredentialType* detected_types = seader_hf_mode_get_detected_types(seader);
+    const size_t detected_type_count = seader_hf_mode_get_detected_type_count(seader);
 
     submenu_reset(submenu);
-    for(size_t i = 0; i < seader->detected_card_type_count; i++) {
-        const SeaderCredentialType type = seader->detected_card_types[i];
+    for(size_t i = 0; i < detected_type_count; i++) {
+        const SeaderCredentialType type = detected_types[i];
         submenu_add_item(
             submenu,
             seader_scene_read_card_type_label(type),
@@ -44,16 +46,15 @@ bool seader_scene_read_card_type_on_event(void* context, SceneManagerEvent event
         const SeaderCredentialType type = event.event;
         if(type == SeaderCredentialType14A || type == SeaderCredentialTypeMifareClassic ||
            type == SeaderCredentialTypePicopass) {
-            seader->selected_read_type = type;
-            seader->detected_card_type_count = 0;
-            memset(seader->detected_card_types, 0, sizeof(seader->detected_card_types));
+            seader_hf_mode_set_selected_read_type(seader, type);
+            seader_hf_mode_clear_detected_types(seader);
             scene_manager_next_scene(seader->scene_manager, SeaderSceneRead);
             consumed = true;
         }
     } else if(event.type == SceneManagerEventTypeBack) {
-        seader->selected_read_type = SeaderCredentialTypeNone;
-        seader->detected_card_type_count = 0;
-        memset(seader->detected_card_types, 0, sizeof(seader->detected_card_types));
+        seader_hf_mode_set_selected_read_type(seader, SeaderCredentialTypeNone);
+        seader_hf_mode_clear_detected_types(seader);
+        seader_hf_mode_deactivate(seader);
         scene_manager_search_and_switch_to_previous_scene(
             seader->scene_manager, SeaderSceneSamPresent);
         consumed = true;

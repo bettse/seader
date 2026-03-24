@@ -93,6 +93,10 @@ void seader_ccid_GetSlotStatus(SeaderUartBridge* seader_uart, uint8_t slot) {
 
 void seader_ccid_SetParameters(Seader* seader, uint8_t slot) {
     SeaderWorker* seader_worker = seader->worker;
+    if(!seader_worker || !seader_worker->uart) {
+        FURI_LOG_W(TAG, "Skip SetParameters without worker UART");
+        return;
+    }
     SeaderUartBridge* seader_uart = seader_worker->uart;
     FURI_LOG_D(TAG, "seader_ccid_SetParameters(%d)", slot);
 
@@ -228,6 +232,10 @@ void seader_ccid_XfrBlockToSlot(
 
 size_t seader_ccid_process(Seader* seader, uint8_t* cmd, size_t cmd_len) {
     SeaderWorker* seader_worker = seader->worker;
+    if(!seader_worker || !seader_worker->uart) {
+        FURI_LOG_W(TAG, "Drop CCID frame without worker UART");
+        return cmd_len;
+    }
     SeaderUartBridge* seader_uart = seader_worker->uart;
     CCID_Message message;
     message.consumed = 0;

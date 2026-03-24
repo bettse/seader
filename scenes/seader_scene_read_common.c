@@ -21,7 +21,9 @@ void seader_scene_read_prepare(Seader* seader) {
         seader->samCommand = SamCommand_PR_NOTHING;
     }
     memset(seader->read_error, 0, sizeof(seader->read_error));
-    seader_worker_reset_poller_session(seader->worker);
+    if(seader->worker) {
+        seader_worker_reset_poller_session(seader->worker);
+    }
 }
 
 void seader_scene_read_cleanup(Seader* seader) {
@@ -33,14 +35,18 @@ void seader_scene_read_cleanup(Seader* seader) {
         seader->samCommand,
         seader->sam_state,
         seader->sam_intent);
-    seader_worker_cancel_poller_session(seader->worker);
+    if(seader->worker) {
+        seader_worker_cancel_poller_session(seader->worker);
+    }
 
     if(seader_sam_has_active_card(seader)) {
         seader_send_no_card_detected(seader);
     }
 
     popup_reset(seader->popup);
-    seader_worker_reset_poller_session(seader->worker);
+    if(seader->worker) {
+        seader_worker_reset_poller_session(seader->worker);
+    }
     if(seader->sam_state == SeaderSamStateIdle) {
         seader->samCommand = SamCommand_PR_NOTHING;
     }

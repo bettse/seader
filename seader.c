@@ -2,6 +2,7 @@
 #include "trace_log.h"
 
 #define TAG "Seader"
+#define SEADER_PLUGIN_DIR APP_ASSETS_PATH("plugins")
 
 bool seader_custom_event_callback(void* context, uint32_t event) {
     furi_assert(context);
@@ -21,6 +22,10 @@ void seader_tick_event_callback(void* context) {
     scene_manager_handle_tick_event(seader->scene_manager);
 }
 
+static bool seader_align_is_valid(size_t align) {
+    return align != 0U && ((align & (align - 1U)) == 0U);
+}
+
 Seader* seader_alloc() {
     Seader* seader = malloc(sizeof(Seader));
     seader_trace_reset();
@@ -34,14 +39,15 @@ Seader* seader_alloc() {
     seader->sam_state = SeaderSamStateIdle;
     seader->sam_intent = SeaderSamIntentNone;
     seader->sam_present = false;
+    memset(seader->sam_version, 0, sizeof(seader->sam_version));
     seader_sam_key_label_format(
         false, NULL, 0U, seader->sam_key_label, sizeof(seader->sam_key_label));
     seader_uhf_status_label_format(
         false, false, false, false, seader->uhf_status_label, sizeof(seader->uhf_status_label));
-    memset(seader->detected_card_types, 0, sizeof(seader->detected_card_types));
-    seader->detected_card_type_count = 0;
-    seader->selected_read_type = SeaderCredentialTypeNone;
     seader_uhf_snmp_probe_init(&seader->snmp_probe);
+    seader->scratch.offset = 0U;
+    seader->scratch.high_water = 0U;
+    seader->hf_mode = NULL;
 
     seader->worker = seader_worker_alloc();
     seader->view_dispatcher = view_dispatcher_alloc();
@@ -106,28 +112,8 @@ Seader* seader_alloc() {
     seader->temp_string3 = furi_string_alloc();
     seader->temp_string4 = furi_string_alloc();
 
-    seader->plugin_manager =
-        plugin_manager_alloc(PLUGIN_APP_ID, PLUGIN_API_VERSION, firmware_api_interface);
-
+    seader->plugin_manager = NULL;
     seader->plugin_wiegand = NULL;
-    FURI_LOG_I(TAG, "Loading plugins from %s", APP_ASSETS_PATH("plugins"));
-    if(plugin_manager_load_all(seader->plugin_manager, APP_ASSETS_PATH("plugins")) !=
-       PluginManagerErrorNone) {
-        FURI_LOG_E(TAG, "Failed to load all libs");
-    } else {
-        uint32_t plugin_count = plugin_manager_get_count(seader->plugin_manager);
-        FURI_LOG_I(TAG, "Loaded %lu plugin(s)", plugin_count);
-
-        for(uint32_t i = 0; i < plugin_count; i++) {
-            const PluginWiegand* plugin = plugin_manager_get_ep(seader->plugin_manager, i);
-            FURI_LOG_I(TAG, "plugin index %lu, name: %s", i, plugin->name);
-            if(strcmp(plugin->name, "Plugin Wiegand") == 0) {
-                FURI_LOG_I(TAG, "Wiegand plugin found and assigned");
-                // Have to cast to drop "const" qualifier
-                seader->plugin_wiegand = (PluginWiegand*)plugin;
-            }
-        }
-    }
 
     return seader;
 }
@@ -186,9 +172,12 @@ void seader_free(Seader* seader) {
     furi_string_free(seader->temp_string3);
     furi_string_free(seader->temp_string4);
 
-    // Worker
-    seader_worker_stop(seader->worker);
-    seader_worker_free(seader->worker);
+    seader_hf_mode_deactivate(seader);
+    seader_worker_release(seader);
+    if(seader->worker) {
+        seader_worker_free(seader->worker);
+        seader->worker = NULL;
+    }
 
     // View Dispatcher
     view_dispatcher_free(seader->view_dispatcher);
@@ -204,7 +193,7 @@ void seader_free(Seader* seader) {
     furi_record_close(RECORD_NOTIFICATION);
     seader->notifications = NULL;
 
-    plugin_manager_free(seader->plugin_manager);
+    seader_wiegand_plugin_release(seader);
 
     free(seader);
 }
@@ -253,6 +242,202 @@ void seader_show_loading_popup(void* context, bool show) {
         // Restore default timer priority
         furi_timer_set_thread_priority(FuriTimerThreadPriorityNormal);
     }
+}
+
+bool seader_wiegand_plugin_acquire(Seader* seader) {
+    furi_assert(seader);
+
+    if(seader->plugin_wiegand) {
+        return true;
+    }
+
+    if(!seader->plugin_manager) {
+        seader->plugin_manager =
+            plugin_manager_alloc(PLUGIN_APP_ID, PLUGIN_API_VERSION, firmware_api_interface);
+        if(!seader->plugin_manager) {
+            FURI_LOG_E(TAG, "Failed to allocate plugin manager");
+            return false;
+        }
+    }
+
+    FURI_LOG_I(TAG, "Loading Wiegand plugin from %s", SEADER_PLUGIN_DIR);
+    if(plugin_manager_load_all(seader->plugin_manager, SEADER_PLUGIN_DIR) !=
+       PluginManagerErrorNone) {
+        FURI_LOG_E(TAG, "Failed to load Wiegand plugin");
+        plugin_manager_free(seader->plugin_manager);
+        seader->plugin_manager = NULL;
+        return false;
+    }
+
+    if(plugin_manager_get_count(seader->plugin_manager) == 0) {
+        FURI_LOG_E(TAG, "Wiegand plugin manager is empty after load");
+        plugin_manager_free(seader->plugin_manager);
+        seader->plugin_manager = NULL;
+        return false;
+    }
+
+    seader->plugin_wiegand = NULL;
+    const uint32_t plugin_count = plugin_manager_get_count(seader->plugin_manager);
+    for(uint32_t i = 0; i < plugin_count; i++) {
+        const PluginWiegand* plugin = plugin_manager_get_ep(seader->plugin_manager, i);
+        if(plugin && strcmp(plugin->name, "Plugin Wiegand") == 0) {
+            seader->plugin_wiegand = (PluginWiegand*)plugin;
+            break;
+        }
+    }
+
+    if(!seader->plugin_wiegand) {
+        FURI_LOG_E(TAG, "Failed to resolve Wiegand plugin entry point");
+        plugin_manager_free(seader->plugin_manager);
+        seader->plugin_manager = NULL;
+        return false;
+    }
+
+    FURI_LOG_I(TAG, "Wiegand plugin loaded: %s", seader->plugin_wiegand->name);
+    return true;
+}
+
+void seader_wiegand_plugin_release(Seader* seader) {
+    furi_assert(seader);
+
+    if(!seader->plugin_manager) {
+        seader->plugin_wiegand = NULL;
+        return;
+    }
+
+    FURI_LOG_I(TAG, "Unloading Wiegand plugin");
+    seader->plugin_wiegand = NULL;
+    plugin_manager_free(seader->plugin_manager);
+    seader->plugin_manager = NULL;
+}
+
+bool seader_worker_acquire(Seader* seader) {
+    furi_assert(seader);
+
+    if(seader->worker) {
+        return true;
+    }
+
+    seader->worker = seader_worker_alloc();
+    return seader->worker != NULL;
+}
+
+void seader_worker_release(Seader* seader) {
+    furi_assert(seader);
+
+    if(!seader->worker) {
+        return;
+    }
+
+    seader_worker_stop(seader->worker);
+    seader->worker->callback = NULL;
+    seader->worker->context = NULL;
+    seader_worker_change_state(seader->worker, SeaderWorkerStateReady);
+}
+
+void seader_scratch_reset(Seader* seader) {
+    furi_assert(seader);
+    seader->scratch.offset = 0U;
+}
+
+void* seader_scratch_alloc(Seader* seader, size_t size, size_t align) {
+    furi_assert(seader);
+    furi_assert(seader_align_is_valid(align));
+
+    const size_t mask = align - 1U;
+    const size_t aligned_offset = (seader->scratch.offset + mask) & ~mask;
+    if(aligned_offset + size > sizeof(seader->scratch.arena)) {
+        FURI_LOG_E(TAG, "Scratch overflow: need=%zu offset=%zu", size, aligned_offset);
+        return NULL;
+    }
+
+    void* ptr = &seader->scratch.arena[aligned_offset];
+    memset(ptr, 0, size);
+    seader->scratch.offset = aligned_offset + size;
+    if(seader->scratch.offset > seader->scratch.high_water) {
+        seader->scratch.high_water = seader->scratch.offset;
+    }
+
+    return ptr;
+}
+
+bool seader_hf_mode_activate(Seader* seader) {
+    furi_assert(seader);
+
+    if(seader->hf_mode) {
+        return true;
+    }
+
+    seader_scratch_reset(seader);
+    seader->hf_mode =
+        seader_scratch_alloc(seader, sizeof(SeaderHfModeContext), _Alignof(SeaderHfModeContext));
+    if(!seader->hf_mode) {
+        return false;
+    }
+
+    seader->hf_mode->selected_read_type = SeaderCredentialTypeNone;
+    return true;
+}
+
+void seader_hf_mode_deactivate(Seader* seader) {
+    furi_assert(seader);
+
+    seader->hf_mode = NULL;
+    seader_scratch_reset(seader);
+}
+
+SeaderCredentialType seader_hf_mode_get_selected_read_type(const Seader* seader) {
+    return seader && seader->hf_mode ? seader->hf_mode->selected_read_type : SeaderCredentialTypeNone;
+}
+
+void seader_hf_mode_set_selected_read_type(Seader* seader, SeaderCredentialType type) {
+    if(!seader || !seader->hf_mode) {
+        FURI_LOG_W(
+            TAG,
+            "Ignoring HF selected read type update without mode context seader=%p hf_mode=%p type=%d",
+            seader,
+            seader ? seader->hf_mode : NULL,
+            type);
+        return;
+    }
+    seader->hf_mode->selected_read_type = type;
+}
+
+void seader_hf_mode_set_detected_types(
+    Seader* seader,
+    const SeaderCredentialType* types,
+    size_t count) {
+    if(!seader || !seader->hf_mode) {
+        FURI_LOG_W(
+            TAG,
+            "Ignoring HF detected types update without mode context seader=%p hf_mode=%p count=%zu",
+            seader,
+            seader ? seader->hf_mode : NULL,
+            count);
+        return;
+    }
+
+    if(count > SEADER_MAX_DETECTED_CARD_TYPES) {
+        count = SEADER_MAX_DETECTED_CARD_TYPES;
+    }
+
+    memset(seader->hf_mode->detected_card_types, 0, sizeof(seader->hf_mode->detected_card_types));
+    if(types && count > 0) {
+        memcpy(seader->hf_mode->detected_card_types, types, count * sizeof(types[0]));
+    }
+    seader->hf_mode->detected_card_type_count = count;
+}
+
+size_t seader_hf_mode_get_detected_type_count(const Seader* seader) {
+    return seader && seader->hf_mode ? seader->hf_mode->detected_card_type_count : 0U;
+}
+
+const SeaderCredentialType* seader_hf_mode_get_detected_types(const Seader* seader) {
+    return seader && seader->hf_mode ? seader->hf_mode->detected_card_types : NULL;
+}
+
+void seader_hf_mode_clear_detected_types(Seader* seader) {
+    seader_hf_mode_set_detected_types(seader, NULL, 0U);
 }
 
 int32_t seader_app(void* p) {

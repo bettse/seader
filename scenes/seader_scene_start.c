@@ -18,6 +18,7 @@ void seader_scene_start_submenu_callback(void* context, uint32_t index) {
 
 void seader_scene_start_on_enter(void* context) {
     Seader* seader = context;
+    seader_worker_acquire(seader);
 
     Popup* popup = seader->popup;
 
@@ -68,4 +69,5 @@ bool seader_scene_start_on_event(void* context, SceneManagerEvent event) {
 void seader_scene_start_on_exit(void* context) {
     Seader* seader = context;
     popup_reset(seader->popup);
+    seader_worker_release(seader);
 }

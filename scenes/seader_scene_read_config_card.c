@@ -10,6 +10,7 @@ void seader_read_config_card_worker_callback(uint32_t event, void* context) {
 
 void seader_scene_read_config_card_on_enter(void* context) {
     Seader* seader = context;
+    seader_worker_acquire(seader);
 
     // Setup view
     Popup* popup = seader->popup;
@@ -53,6 +54,9 @@ bool seader_scene_read_config_card_on_event(void* context, SceneManagerEvent eve
 
 void seader_scene_read_config_card_on_exit(void* context) {
     Seader* seader = context;
-    seader_worker_stop(seader->worker);
+    if(seader->worker) {
+        seader_worker_stop(seader->worker);
+    }
     seader_scene_read_cleanup(seader);
+    seader_worker_release(seader);
 }

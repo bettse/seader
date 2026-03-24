@@ -32,6 +32,10 @@ void seader_t_1_reset(SeaderUartBridge* seader_uart) {
 
 void seader_t_1_set_IFSD(Seader* seader) {
     SeaderWorker* seader_worker = seader->worker;
+    if(!seader_worker || !seader_worker->uart) {
+        FURI_LOG_W(TAG, "Skip IFSD without worker UART");
+        return;
+    }
     SeaderUartBridge* seader_uart = seader_worker->uart;
     SeaderT1State* t1 = seader_t1_state(seader_uart);
     uint8_t frame[5];
@@ -52,6 +56,10 @@ void seader_t_1_set_IFSD(Seader* seader) {
 
 static void seader_t_1_IFSD_response(Seader* seader, uint8_t ifs_value) {
     SeaderWorker* seader_worker = seader->worker;
+    if(!seader_worker || !seader_worker->uart) {
+        FURI_LOG_W(TAG, "Skip IFS response without worker UART");
+        return;
+    }
     SeaderUartBridge* seader_uart = seader_worker->uart;
     SeaderT1State* t1 = seader_t1_state(seader_uart);
     uint8_t frame[5];
@@ -69,6 +77,10 @@ static void seader_t_1_IFSD_response(Seader* seader, uint8_t ifs_value) {
 
 static void seader_t_1_WTX_response(Seader* seader, uint8_t multiplier) {
     SeaderWorker* seader_worker = seader->worker;
+    if(!seader_worker || !seader_worker->uart) {
+        FURI_LOG_W(TAG, "Skip WTX response without worker UART");
+        return;
+    }
     SeaderUartBridge* seader_uart = seader_worker->uart;
     SeaderT1State* t1 = seader_t1_state(seader_uart);
     uint8_t frame[5];
@@ -86,6 +98,10 @@ static void seader_t_1_WTX_response(Seader* seader, uint8_t multiplier) {
 
 static void seader_t_1_resynch_response(Seader* seader) {
     SeaderWorker* seader_worker = seader->worker;
+    if(!seader_worker || !seader_worker->uart) {
+        FURI_LOG_W(TAG, "Skip RESYNCH without worker UART");
+        return;
+    }
     SeaderUartBridge* seader_uart = seader_worker->uart;
     SeaderT1State* t1 = seader_t1_state(seader_uart);
     uint8_t frame[4];
@@ -102,6 +118,10 @@ static void seader_t_1_resynch_response(Seader* seader) {
 
 void seader_t_1_send_ack(Seader* seader) {
     SeaderWorker* seader_worker = seader->worker;
+    if(!seader_worker || !seader_worker->uart) {
+        FURI_LOG_W(TAG, "Skip ACK without worker UART");
+        return;
+    }
     SeaderUartBridge* seader_uart = seader_worker->uart;
     SeaderT1State* t1 = seader_t1_state(seader_uart);
     uint8_t frame[4];
@@ -118,6 +138,10 @@ void seader_t_1_send_ack(Seader* seader) {
 
 static void seader_t_1_send_nak(Seader* seader) {
     SeaderWorker* seader_worker = seader->worker;
+    if(!seader_worker || !seader_worker->uart) {
+        FURI_LOG_W(TAG, "Skip NAK without worker UART");
+        return;
+    }
     SeaderUartBridge* seader_uart = seader_worker->uart;
     SeaderT1State* t1 = seader_t1_state(seader_uart);
     uint8_t frame[4];
@@ -212,6 +236,10 @@ void seader_send_t1(SeaderUartBridge* seader_uart, uint8_t* apdu, size_t len) {
 
 bool seader_recv_t1(Seader* seader, CCID_Message* message) {
     SeaderWorker* seader_worker = seader->worker;
+    if(!seader_worker || !seader_worker->uart) {
+        FURI_LOG_W(TAG, "Drop T=1 frame without worker UART");
+        return false;
+    }
     SeaderUartBridge* seader_uart = seader_worker->uart;
     SeaderT1State* t1 = seader_t1_state(seader_uart);
     uint8_t* apdu = NULL;

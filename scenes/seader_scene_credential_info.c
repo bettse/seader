@@ -16,7 +16,7 @@ void seader_scene_credential_info_widget_callback(
 void seader_scene_credential_info_on_enter(void* context) {
     Seader* seader = context;
     SeaderCredential* credential = seader->credential;
-    PluginWiegand* plugin = seader->plugin_wiegand;
+    seader_wiegand_plugin_acquire(seader);
     Widget* widget = seader->widget;
 
     // Use reusable strings instead of allocating new ones
@@ -41,16 +41,13 @@ void seader_scene_credential_info_on_enter(void* context) {
         seader_scene_credential_info_widget_callback,
         seader);
 
-    if(plugin) {
-        size_t format_count = plugin->count(credential->bit_length, credential->credential);
-        if(format_count > 0) {
-            widget_add_button_element(
-                seader->widget,
-                GuiButtonTypeCenter,
-                "Parse",
-                seader_scene_credential_info_widget_callback,
-                seader);
-        }
+    if(credential->bit_length > 0) {
+        widget_add_button_element(
+            seader->widget,
+            GuiButtonTypeCenter,
+            "Parse",
+            seader_scene_credential_info_widget_callback,
+            seader);
     }
 
     widget_add_string_element(
@@ -109,4 +106,5 @@ void seader_scene_credential_info_on_exit(void* context) {
 
     // Clear views
     widget_reset(seader->widget);
+    seader_wiegand_plugin_release(seader);
 }

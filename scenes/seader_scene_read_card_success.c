@@ -18,11 +18,9 @@ void seader_scene_read_card_success_widget_callback(
 void seader_scene_read_card_success_on_enter(void* context) {
     Seader* seader = context;
     SeaderCredential* credential = seader->credential;
-    PluginWiegand* plugin = seader->plugin_wiegand;
+    PluginWiegand* plugin = seader_wiegand_plugin_acquire(seader) ? seader->plugin_wiegand : NULL;
     Widget* widget = seader->widget;
-    seader->selected_read_type = SeaderCredentialTypeNone;
-    seader->detected_card_type_count = 0;
-    memset(seader->detected_card_types, 0, sizeof(seader->detected_card_types));
+    seader_hf_mode_deactivate(seader);
 
     // Use reusable strings instead of allocating new ones
     FuriString* type_str = seader->temp_string1;
@@ -46,10 +44,8 @@ void seader_scene_read_card_success_on_enter(void* context) {
         furi_string_set(type_str, "Read error");
         furi_string_set(bitlength_str, seader->read_error[0] ? seader->read_error : "Read failed");
 
-        SeaderWorker* seader_worker = seader->worker;
-        SeaderUartBridge* seader_uart = seader_worker->uart;
         seader_t_1_reset(seader->uart);
-        seader_ccid_check_for_sam(seader_uart);
+        seader_ccid_check_for_sam(seader->uart);
     }
 
     widget_add_button_element(
@@ -71,22 +67,24 @@ void seader_scene_read_card_success_on_enter(void* context) {
             seader);
     }
 
-    if(plugin && credential->bit_length > 0) {
-        size_t format_count = plugin->count(credential->bit_length, credential->credential);
-        FURI_LOG_D(
-            TAG,
-            "Plugin present, bit_length=%d, format_count=%zu",
-            credential->bit_length,
-            format_count);
-        if(format_count > 0) {
-            widget_add_button_element(
-                seader->widget,
-                GuiButtonTypeCenter,
-                "Parse",
-                seader_scene_read_card_success_widget_callback,
-                seader);
+    if(credential->bit_length > 0) {
+        if(plugin) {
+            size_t format_count = plugin->count(credential->bit_length, credential->credential);
+            FURI_LOG_D(
+                TAG,
+                "Plugin present, bit_length=%d, format_count=%zu",
+                credential->bit_length,
+                format_count);
+        } else {
+            FURI_LOG_D(TAG, "Parse available without plugin bit_length=%d", credential->bit_length);
         }
-    } else {
+        widget_add_button_element(
+            seader->widget,
+            GuiButtonTypeCenter,
+            "Parse",
+            seader_scene_read_card_success_widget_callback,
+            seader);
+    } else if(!plugin) {
         FURI_LOG_D(TAG, "Plugin=%p, bit_length=%d", plugin, credential->bit_length);
     }
 
@@ -162,4 +160,5 @@ void seader_scene_read_card_success_on_exit(void* context) {
 
     // Clear view
     widget_reset(seader->widget);
+    seader_wiegand_plugin_release(seader);
 }

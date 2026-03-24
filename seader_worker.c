@@ -161,7 +161,6 @@ SeaderWorker* seader_worker_alloc() {
     seader_worker->callback = NULL;
     seader_worker->context = NULL;
     seader_worker->storage = furi_record_open(RECORD_STORAGE);
-    memset(seader_worker->sam_version, 0, sizeof(seader_worker->sam_version));
 
     seader_worker_change_state(seader_worker, SeaderWorkerStateReady);
 
@@ -300,7 +299,15 @@ bool seader_process_success_response(Seader* seader, uint8_t* apdu, size_t len) 
 
 bool seader_worker_process_sam_message(Seader* seader, uint8_t* apdu, uint32_t len) {
     SeaderWorker* seader_worker = seader->worker;
+    if(!seader_worker) {
+        FURI_LOG_W(TAG, "Drop SAM message without worker len=%lu", len);
+        return false;
+    }
     SeaderUartBridge* seader_uart = seader_worker->uart;
+    if(!seader_uart) {
+        FURI_LOG_W(TAG, "Drop SAM message without UART");
+        return false;
+    }
     if(len < 2) {
         return false;
     }
@@ -440,7 +447,7 @@ void seader_worker_reading(Seader* seader) {
     while(seader_worker->state == SeaderWorkerStateReading) {
         bool detected = false;
         SeaderPollerEventType result_stage = SeaderPollerEventTypeFail;
-        SeaderCredentialType type_to_read = seader->selected_read_type;
+        SeaderCredentialType type_to_read = seader_hf_mode_get_selected_read_type(seader);
 
         if(type_to_read == SeaderCredentialTypeNone) {
             SeaderCredentialType detected_types[SEADER_MAX_DETECTED_CARD_TYPES] = {0};
@@ -448,11 +455,7 @@ void seader_worker_reading(Seader* seader) {
                 seader, detected_types, COUNT_OF(detected_types));
 
             if(detected_type_count > 1) {
-                memcpy(
-                    seader->detected_card_types,
-                    detected_types,
-                    sizeof(seader->detected_card_types));
-                seader->detected_card_type_count = detected_type_count;
+                seader_hf_mode_set_detected_types(seader, detected_types, detected_type_count);
                 if(seader_worker->callback) {
                     seader_worker->callback(
                         SeaderWorkerEventSelectCardType, seader_worker->context);
