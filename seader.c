@@ -480,6 +480,7 @@ Seader* seader_alloc() {
     seader->hf_plugin_manager = NULL;
     seader->plugin_hf = NULL;
     seader->hf_plugin_ctx = NULL;
+    seader->mode_runtime = SeaderModeRuntimeNone;
     seader->hf_session_state = SeaderHfSessionStateUnloaded;
     seader->hf_teardown_action = SeaderHfTeardownActionNone;
     seader->hf_teardown_skip_read_cleanup = false;
@@ -676,6 +677,11 @@ void seader_wiegand_plugin_release(Seader* seader) {
 bool seader_hf_plugin_acquire(Seader* seader) {
     furi_assert(seader);
 
+    if(seader->mode_runtime == SeaderModeRuntimeUHF) {
+        FURI_LOG_W(TAG, "Reject HF plugin acquire while UHF runtime is active");
+        return false;
+    }
+
     if(seader->hf_session_state == SeaderHfSessionStateTearingDown) {
         FURI_LOG_W(TAG, "Reject HF plugin acquire during teardown");
         return false;
@@ -685,6 +691,7 @@ bool seader_hf_plugin_acquire(Seader* seader) {
         if(seader->hf_session_state == SeaderHfSessionStateUnloaded) {
             seader->hf_session_state = SeaderHfSessionStateLoaded;
         }
+        seader->mode_runtime = SeaderModeRuntimeHF;
         return true;
     }
 
@@ -751,6 +758,7 @@ bool seader_hf_plugin_acquire(Seader* seader) {
     }
 
     seader->hf_session_state = SeaderHfSessionStateLoaded;
+    seader->mode_runtime = SeaderModeRuntimeHF;
     FURI_LOG_I(TAG, "HF plugin loaded: %s", seader->plugin_hf->name);
     return true;
 }
@@ -818,6 +826,9 @@ void seader_hf_plugin_release(Seader* seader) {
         seader->hf_plugin_manager = NULL;
     }
 
+    if(seader->mode_runtime == SeaderModeRuntimeHF) {
+        seader->mode_runtime = SeaderModeRuntimeNone;
+    }
     seader->hf_session_state = SeaderHfSessionStateUnloaded;
 }
 

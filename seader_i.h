@@ -187,6 +187,7 @@ struct Seader {
     PluginManager* hf_plugin_manager;
     PluginHf* plugin_hf;
     void* hf_plugin_ctx;
+    SeaderModeRuntime mode_runtime;
     SeaderHfSessionState hf_session_state;
     SeaderHfTeardownAction hf_teardown_action;
     bool hf_teardown_skip_read_cleanup;

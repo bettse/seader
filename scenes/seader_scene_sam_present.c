@@ -1,10 +1,10 @@
 #include "../seader_i.h"
 enum SubmenuIndex {
-    SubmenuIndexSamInfo,
     SubmenuIndexRead,
     SubmenuIndexSaved,
     SubmenuIndexAPDURunner,
     SubmenuIndexReadConfigCard,
+    SubmenuIndexSamInfo,
 };
 
 static uint8_t fwChecks = 3;

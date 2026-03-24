@@ -39,14 +39,31 @@ void seader_scene_read_cleanup(Seader* seader) {
         seader_worker_cancel_poller_session(seader->worker);
     }
 
+    seader_scene_read_abort_cleanup(seader);
+
+    if(seader->worker) {
+        seader_worker_reset_poller_session(seader->worker);
+    }
+}
+
+void seader_scene_read_abort_cleanup(Seader* seader) {
+    furi_assert(seader);
+    FURI_LOG_D("SceneRead", "Abort cleanup session sam=%d", seader->samCommand);
+
     if(seader_sam_has_active_card(seader)) {
         seader_send_no_card_detected(seader);
     }
 
     popup_reset(seader->popup);
-    if(seader->worker) {
-        seader_worker_reset_poller_session(seader->worker);
+    if(seader->sam_state == SeaderSamStateIdle) {
+        seader->samCommand = SamCommand_PR_NOTHING;
     }
+    seader_blink_stop(seader);
+}
+
+void seader_scene_read_finish_cleanup(Seader* seader) {
+    furi_assert(seader);
+    popup_reset(seader->popup);
     if(seader->sam_state == SeaderSamStateIdle) {
         seader->samCommand = SamCommand_PR_NOTHING;
     }

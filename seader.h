@@ -14,6 +14,12 @@ typedef enum {
 } SeaderHfSessionState;
 
 typedef enum {
+    SeaderModeRuntimeNone,
+    SeaderModeRuntimeHF,
+    SeaderModeRuntimeUHF,
+} SeaderModeRuntime;
+
+typedef enum {
     SeaderHfTeardownActionNone,
     SeaderHfTeardownActionSamPresent,
     SeaderHfTeardownActionRestartRead,
