@@ -1,4 +1,5 @@
 #include "seader_worker_i.h"
+#include "seader_hf_read_plan.h"
 #include "trace_log.h"
 
 #include <flipper_format/flipper_format.h>
@@ -490,6 +491,7 @@ void seader_worker_reading(Seader* seader) {
         bool detected = false;
         SeaderPollerEventType result_stage = SeaderPollerEventTypeFail;
         SeaderCredentialType type_to_read = seader_hf_mode_get_selected_read_type(seader);
+        SeaderHfReadPlan read_plan = {0};
         FURI_LOG_D(TAG, "HF loop selected type=%d stage=%d", type_to_read, seader_worker->stage);
 
         if(type_to_read == SeaderCredentialTypeNone) {
@@ -497,22 +499,23 @@ void seader_worker_reading(Seader* seader) {
             const size_t detected_type_count = seader->plugin_hf->detect_supported_types(
                 seader->hf_plugin_ctx, detected_types, COUNT_OF(detected_types));
             FURI_LOG_I(TAG, "HF plugin detected %u type(s)", detected_type_count);
-
-            if(detected_type_count > 1) {
-                seader_hf_mode_set_detected_types(seader, detected_types, detected_type_count);
-                if(seader_worker->callback) {
-                    seader_worker->callback(
-                        SeaderWorkerEventSelectCardType, seader_worker->context);
-                }
-                break;
-            } else if(detected_type_count == 1) {
-                type_to_read = detected_types[0];
-            }
+            read_plan =
+                seader_hf_read_plan_build(type_to_read, detected_types, detected_type_count);
+        } else {
+            read_plan = seader_hf_read_plan_build(type_to_read, NULL, 0U);
         }
 
-        if(type_to_read != SeaderCredentialTypeNone) {
-            FURI_LOG_I(TAG, "HF start read for type=%d", type_to_read);
-            detected = seader->plugin_hf->start_read_for_type(seader->hf_plugin_ctx, type_to_read);
+        if(read_plan.decision == SeaderHfReadDecisionSelectType) {
+            seader_hf_mode_set_detected_types(
+                seader, read_plan.detected_types, read_plan.detected_type_count);
+            if(seader_worker->callback) {
+                seader_worker->callback(SeaderWorkerEventSelectCardType, seader_worker->context);
+            }
+            break;
+        } else if(read_plan.decision == SeaderHfReadDecisionStartRead) {
+            FURI_LOG_I(TAG, "HF start read for type=%d", read_plan.type_to_read);
+            detected =
+                seader->plugin_hf->start_read_for_type(seader->hf_plugin_ctx, read_plan.type_to_read);
             if(detected) {
                 seader->hf_session_state = SeaderHfSessionStateActive;
             }
