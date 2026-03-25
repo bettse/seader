@@ -65,12 +65,20 @@ static void seader_update_uhf_status_label(Seader* seader) {
     seader_publish_sam_status(seader);
 }
 
-static SeaderUartBridge* seader_get_uart(Seader* seader) {
-    return seader ? seader->uart : NULL;
-}
-
 static SeaderWorker* seader_get_active_worker(Seader* seader) {
     return seader ? seader->worker : NULL;
+}
+
+static SeaderUartBridge* seader_require_uart(Seader* seader) {
+    furi_check(seader);
+    furi_check(seader->uart);
+    return seader->uart;
+}
+
+static SeaderWorker* seader_require_worker(Seader* seader) {
+    furi_check(seader);
+    furi_check(seader->worker);
+    return seader->worker;
 }
 
 /* A newly inserted SAM should never inherit the previous card's cached firmware/UHF status
@@ -88,14 +96,10 @@ static void seader_reset_cached_sam_metadata(Seader* seader) {
 }
 
 static bool seader_snmp_probe_send_next_request(Seader* seader) {
-    SeaderUartBridge* seader_uart = seader_get_uart(seader);
-    uint8_t* scratch = seader_uart ? (seader_uart->tx_buf + MAX_FRAME_HEADERS) : NULL;
-    uint8_t* message = seader_uart ? seader_uart->rx_buf : NULL;
+    SeaderUartBridge* seader_uart = seader_require_uart(seader);
+    uint8_t* scratch = seader_uart->tx_buf + MAX_FRAME_HEADERS;
+    uint8_t* message = seader_uart->rx_buf;
     size_t message_len = 0U;
-
-    if(!seader || !scratch || !message) {
-        return false;
-    }
 
     if(!seader_uhf_snmp_probe_build_next_request(
            &seader->snmp_probe,
@@ -436,11 +440,7 @@ bool seader_send_apdu(
     uint8_t* payload,
     uint8_t payloadLen,
     bool in_scratchpad) {
-    SeaderUartBridge* seader_uart = seader_get_uart(seader);
-    if(!seader_uart) {
-        FURI_LOG_E(TAG, "Cannot send APDU without UART");
-        return false;
-    }
+    SeaderUartBridge* seader_uart = seader_require_uart(seader);
 
     bool extended = seader_uart->T == 1;
     uint8_t header_len = extended ? 7 : 5;
@@ -525,11 +525,7 @@ void seader_send_payload(
     uint8_t from,
     uint8_t to,
     uint8_t replyTo) {
-    SeaderUartBridge* seader_uart = seader_get_uart(seader);
-    if(!seader_uart) {
-        FURI_LOG_E(TAG, "Cannot send payload without UART");
-        return;
-    }
+    SeaderUartBridge* seader_uart = seader_require_uart(seader);
 
     uint8_t* scratchpad = seader_uart->tx_buf + MAX_FRAME_HEADERS;
     size_t scratchpad_size = SEADER_UART_RX_BUF_SIZE - MAX_FRAME_HEADERS;
@@ -694,7 +690,9 @@ bool seader_worker_send_process_snmp_message(
     Seader* seader,
     const uint8_t* message,
     size_t message_len) {
-    if(!seader || !message || message_len == 0U || message_len > UINT16_MAX) return false;
+    furi_check(seader);
+    furi_check(message);
+    if(message_len == 0U || message_len > UINT16_MAX) return false;
 
     SamCommand_t samCommand = {0};
     samCommand.present = SamCommand_PR_processSNMPMessage;
@@ -711,15 +709,9 @@ bool seader_worker_send_process_snmp_message(
 }
 
 void seader_send_card_detected(Seader* seader, CardDetails_t* cardDetails) {
-    if(!seader || !cardDetails || !cardDetails->csn.buf) {
-        FURI_LOG_E(
-            TAG,
-            "Drop cardDetected invalid input seader=%p details=%p csn=%p",
-            (void*)seader,
-            (void*)cardDetails,
-            cardDetails ? (void*)cardDetails->csn.buf : NULL);
-        return;
-    }
+    furi_check(seader);
+    furi_check(cardDetails);
+    furi_check(cardDetails->csn.buf);
     CardDetected_t cardDetected = {
         .detectedCardDetails = *cardDetails,
     };
@@ -1258,11 +1250,10 @@ void seader_iso14443a_transmit(
     UNUSED(timeout);
     UNUSED(format);
 
-    if(!seader || !buffer || !iso14443_4a_poller) {
-        FURI_LOG_W(TAG, "Skip 14A transmit invalid input");
-        return;
-    }
-    SeaderWorker* seader_worker = seader_get_active_worker(seader);
+    furi_check(seader);
+    furi_check(buffer);
+    furi_check(iso14443_4a_poller);
+    SeaderWorker* seader_worker = seader_require_worker(seader);
     SeaderCredential* credential = seader->credential;
 
     BitBuffer* tx_buffer =
@@ -1340,11 +1331,10 @@ void seader_mfc_transmit(
     uint8_t format[3]) {
     UNUSED(timeout);
 
-    if(!seader || !buffer || !mfc_poller) {
-        FURI_LOG_W(TAG, "Skip MFC transmit invalid input");
-        return;
-    }
-    SeaderWorker* seader_worker = seader_get_active_worker(seader);
+    furi_check(seader);
+    furi_check(buffer);
+    furi_check(mfc_poller);
+    SeaderWorker* seader_worker = seader_require_worker(seader);
 
     BitBuffer* tx_buffer = bit_buffer_alloc(len);
     BitBuffer* rx_buffer = bit_buffer_alloc(SEADER_POLLER_MAX_BUFFER_SIZE);
@@ -1726,16 +1716,10 @@ NfcCommand seader_worker_card_detect(
     uint8_t* ats,
     uint8_t ats_len) {
     UNUSED(atqa);
-    if(!seader || !seader->credential || !uid || uid_len == 0U) {
-        FURI_LOG_E(
-            TAG,
-            "Ignore card_detect invalid input seader=%p cred=%p uid=%p uid_len=%u",
-            (void*)seader,
-            seader ? (void*)seader->credential : NULL,
-            (const void*)uid,
-            uid_len);
-        return NfcCommandStop;
-    }
+    furi_check(seader);
+    furi_check(seader->credential);
+    furi_check(uid);
+    furi_check(uid_len > 0U);
     SeaderCredential* credential = seader->credential;
 
     CardDetails_t cardDetails = {0};

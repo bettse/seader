@@ -9,7 +9,7 @@
 #include <lib/nfc/nfc.h>
 #include <nfc/nfc_device.h>
 
-#define HF_PLUGIN_APP_ID "plugin_hf"
+#define HF_PLUGIN_APP_ID      "plugin_hf"
 #define HF_PLUGIN_API_VERSION 1
 
 typedef enum {
@@ -35,6 +35,7 @@ typedef struct {
 } PluginHfAction;
 
 typedef struct {
+    /* Required runtime callbacks. A successful plugin alloc assumes these remain valid until free. */
     void (*notify_card_detected)(void* host_ctx);
     void (*notify_worker_exit)(void* host_ctx);
     bool (*sam_can_accept_card)(void* host_ctx);
@@ -57,6 +58,8 @@ typedef struct {
     void (*set_14a_sio)(void* host_ctx, const uint8_t* data, size_t len);
     Nfc* (*get_nfc)(void* host_ctx);
     NfcDevice* (*get_nfc_device)(void* host_ctx);
+
+    /* Required Picopass hooks. All Flippers expose Picopass through the HF host API. */
     bool (*picopass_detect)(void* host_ctx);
     bool (*picopass_start)(void* host_ctx, PicopassPollerCallback callback, void* callback_ctx);
     void (*picopass_stop)(void* host_ctx);
@@ -69,6 +72,8 @@ typedef struct {
         size_t rx_capacity,
         size_t* rx_len,
         uint32_t fwt_fc);
+
+    /* Optional UX hook for richer read failure text. */
     void (*set_read_error)(void* host_ctx, const char* text);
 } PluginHfHostApi;
 

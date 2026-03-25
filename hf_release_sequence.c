@@ -7,7 +7,7 @@ static void seader_hf_release_callback_invoke(SeaderHfReleaseCallback callback, 
 }
 
 /* This is the one canonical HF release order used by production teardown paths and by
-   the runtime-integration tests. It mirrors OWNERSHIP_MODEL.md so teardown ordering can
+   the runtime-integration tests. It mirrors the ownership documentation so teardown ordering can
    be reviewed and exercised without duplicating the sequence in multiple call sites. */
 void seader_hf_release_sequence_run(SeaderHfReleaseSequence* sequence) {
     if(!sequence) {
