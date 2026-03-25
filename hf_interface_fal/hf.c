@@ -442,11 +442,8 @@ static NfcCommand plugin_hf_poller_callback_iso14443_4a(NfcGenericEvent event, v
                 return NfcCommandContinue;
             }
 
-            if(!ctx->poller || !ctx->nfc_device) {
-                FURI_LOG_E(TAG, "14A ready without poller/device");
-                ctx->api->set_stage(ctx->host_ctx, PluginHfStageFail);
-                return NfcCommandStop;
-            }
+            furi_check(ctx->poller);
+            furi_check(ctx->nfc_device);
             const void* poller_data = nfc_poller_get_data(ctx->poller);
             if(!poller_data) {
                 FURI_LOG_E(TAG, "14A ready without poller data");
@@ -554,11 +551,7 @@ static NfcCommand plugin_hf_poller_callback_mfc(NfcGenericEvent event, void* con
                 return NfcCommandContinue;
             }
 
-            if(!ctx->poller) {
-                FURI_LOG_E(TAG, "MFC success without poller");
-                ctx->api->set_stage(ctx->host_ctx, PluginHfStageFail);
-                return NfcCommandStop;
-            }
+            furi_check(ctx->poller);
             const MfClassicData* mfc_data = nfc_poller_get_data(ctx->poller);
             if(!mfc_data || !mfc_data->iso14443_3a_data) {
                 FURI_LOG_E(TAG, "MFC data unavailable");
@@ -620,11 +613,8 @@ static NfcCommand plugin_hf_poller_callback_picopass(PicopassPollerEvent event, 
             if(!ctx->api->sam_can_accept_card(ctx->host_ctx)) {
                 return NfcCommandContinue;
             }
-            uint8_t* csn = ctx->api->picopass_get_csn ? ctx->api->picopass_get_csn(ctx->host_ctx) :
-                                                        NULL;
-            if(!csn) {
-                return NfcCommandStop;
-            }
+            uint8_t* csn = ctx->api->picopass_get_csn(ctx->host_ctx);
+            furi_check(csn);
             ctx->api->send_card_detected(
                 ctx->host_ctx, 0, csn, sizeof(PicopassSerialNum), NULL, 0);
             FURI_LOG_D(TAG, "Picopass cardDetected delivered");

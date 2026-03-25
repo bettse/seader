@@ -334,16 +334,11 @@ bool seader_process_success_response(Seader* seader, uint8_t* apdu, size_t len) 
 }
 
 bool seader_worker_process_sam_message(Seader* seader, uint8_t* apdu, uint32_t len) {
+    furi_check(seader);
     SeaderWorker* seader_worker = seader->worker;
-    if(!seader_worker) {
-        FURI_LOG_W(TAG, "Drop SAM message without worker len=%lu", len);
-        return false;
-    }
+    furi_check(seader_worker);
     SeaderUartBridge* seader_uart = seader_worker->uart;
-    if(!seader_uart) {
-        FURI_LOG_W(TAG, "Drop SAM message without UART");
-        return false;
-    }
+    furi_check(seader_uart);
     if(len < 2) {
         return false;
     }
@@ -594,10 +589,11 @@ void seader_worker_run_hf_conversation(Seader* seader) {
 }
 
 NfcCommand seader_worker_poller_callback_iso14443_4a(NfcGenericEvent event, void* context) {
-    if(event.protocol != NfcProtocolIso14443_4a || !context || !event.event_data) {
+    if(event.protocol != NfcProtocolIso14443_4a || !event.event_data) {
         FURI_LOG_W(TAG, "Ignore invalid host 14A callback");
         return NfcCommandStop;
     }
+    furi_check(context);
     NfcCommand ret = NfcCommandContinue;
 
     Seader* seader = context;
@@ -719,10 +715,11 @@ NfcCommand seader_worker_poller_callback_iso14443_4a(NfcGenericEvent event, void
 }
 
 NfcCommand seader_worker_poller_callback_mfc(NfcGenericEvent event, void* context) {
-    if(event.protocol != NfcProtocolMfClassic || !context || !event.event_data) {
+    if(event.protocol != NfcProtocolMfClassic || !event.event_data) {
         FURI_LOG_W(TAG, "Ignore invalid host MFC callback");
         return NfcCommandStop;
     }
+    furi_check(context);
     NfcCommand ret = NfcCommandContinue;
 
     Seader* seader = context;
@@ -778,10 +775,7 @@ NfcCommand seader_worker_poller_callback_mfc(NfcGenericEvent event, void* contex
 }
 
 NfcCommand seader_worker_poller_callback_picopass(PicopassPollerEvent event, void* context) {
-    if(!context) {
-        FURI_LOG_W(TAG, "Ignore invalid host picopass callback");
-        return NfcCommandStop;
-    }
+    furi_check(context);
     NfcCommand ret = NfcCommandContinue;
 
     Seader* seader = context;
