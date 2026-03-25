@@ -555,6 +555,8 @@ Seader* seader_alloc() {
     seader->hf_session_state = SeaderHfSessionStateUnloaded;
     seader->hf_teardown_action = SeaderHfTeardownActionNone;
     seader->loading_popup_enabled = true;
+    seader->start_scene_active = false;
+    seader->sam_present_menu_guard_active = false;
 
     if(seader->nfc_device) {
         nfc_device_set_loading_callback(seader->nfc_device, seader_nfc_loading_callback, seader);

@@ -72,7 +72,13 @@ bool seader_scene_sam_present_on_event(void* context, SceneManagerEvent event) {
     bool consumed = false;
 
     if(event.type == SceneManagerEventTypeCustom) {
-        if(event.event == SubmenuIndexRead) {
+        if(seader->sam_present_menu_guard_active &&
+           (event.event == SubmenuIndexRead || event.event == SubmenuIndexSaved ||
+            event.event == SubmenuIndexAPDURunner || event.event == SubmenuIndexReadConfigCard ||
+            event.event == SubmenuIndexSamInfo)) {
+            seader->sam_present_menu_guard_active = false;
+            consumed = true;
+        } else if(event.event == SubmenuIndexRead) {
             scene_manager_set_scene_state(
                 seader->scene_manager, SeaderSceneSamPresent, event.event);
             scene_manager_next_scene(seader->scene_manager, SeaderSceneRead);
@@ -110,6 +116,9 @@ bool seader_scene_sam_present_on_event(void* context, SceneManagerEvent event) {
     } else if(event.type == SceneManagerEventTypeBack) {
         consumed = seader_hf_request_teardown(seader, SeaderHfTeardownActionStopApp);
     } else if(event.type == SceneManagerEventTypeTick) {
+        if(seader->sam_present_menu_guard_active) {
+            seader->sam_present_menu_guard_active = false;
+        }
         if(fwChecks > 0 && seader->sam_version[0] != 0 && seader->sam_version[1] != 0) {
             fwChecks--;
             seader_scene_sam_present_rebuild_menu(

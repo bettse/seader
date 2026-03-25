@@ -191,6 +191,8 @@ struct Seader {
     SeaderHfSessionState hf_session_state;
     SeaderHfTeardownAction hf_teardown_action;
     bool loading_popup_enabled;
+    bool start_scene_active;
+    bool sam_present_menu_guard_active;
 
     APDULog* apdu_log;
     SeaderAPDURunnerContext apdu_runner_ctx;
