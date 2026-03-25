@@ -4,6 +4,46 @@
 
 #define TAG "SeaderCredentialInfoScene"
 
+static void seader_scene_credential_info_alloc_strings(Seader* seader) {
+    furi_check(seader);
+    if(!seader->temp_string1) {
+        seader->temp_string1 = furi_string_alloc();
+        furi_check(seader->temp_string1);
+    }
+    if(!seader->temp_string2) {
+        seader->temp_string2 = furi_string_alloc();
+        furi_check(seader->temp_string2);
+    }
+    if(!seader->temp_string3) {
+        seader->temp_string3 = furi_string_alloc();
+        furi_check(seader->temp_string3);
+    }
+    if(!seader->temp_string4) {
+        seader->temp_string4 = furi_string_alloc();
+        furi_check(seader->temp_string4);
+    }
+}
+
+static void seader_scene_credential_info_free_strings(Seader* seader) {
+    furi_check(seader);
+    if(seader->temp_string1) {
+        furi_string_free(seader->temp_string1);
+        seader->temp_string1 = NULL;
+    }
+    if(seader->temp_string2) {
+        furi_string_free(seader->temp_string2);
+        seader->temp_string2 = NULL;
+    }
+    if(seader->temp_string3) {
+        furi_string_free(seader->temp_string3);
+        seader->temp_string3 = NULL;
+    }
+    if(seader->temp_string4) {
+        furi_string_free(seader->temp_string4);
+        seader->temp_string4 = NULL;
+    }
+}
+
 static bool seader_credential_is_picopass_sio_context(const SeaderCredential* credential) {
     return credential && (credential->type == SeaderCredentialTypePicopass ||
                           (credential->has_pacs_media_type &&
@@ -26,7 +66,7 @@ void seader_scene_credential_info_on_enter(void* context) {
     seader_wiegand_plugin_acquire(seader);
     Widget* widget = seader->widget;
 
-    // Use reusable strings instead of allocating new ones
+    seader_scene_credential_info_alloc_strings(seader);
     FuriString* type_str = seader->temp_string1;
     FuriString* bitlength_str = seader->temp_string2;
     FuriString* credential_str = seader->temp_string3;
@@ -119,5 +159,6 @@ void seader_scene_credential_info_on_exit(void* context) {
 
     // Clear views
     widget_reset(seader->widget);
+    seader_scene_credential_info_free_strings(seader);
     seader_wiegand_plugin_release(seader);
 }

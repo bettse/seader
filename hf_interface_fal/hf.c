@@ -247,7 +247,7 @@ static void plugin_hf_iso14443a_transmit(
         return;
     }
 
-    BitBuffer* tx_buffer = bit_buffer_alloc(len + 1);
+    BitBuffer* tx_buffer = bit_buffer_alloc(len + 1U);
     BitBuffer* rx_buffer = bit_buffer_alloc(HF_PLUGIN_POLLER_MAX_BUFFER_SIZE);
     if(!tx_buffer || !rx_buffer) {
         FURI_LOG_E(TAG, "Failed to allocate 14A buffers");

@@ -8,7 +8,7 @@
 #define TAG "APDU_Runner"
 
 // Max length of firmware upgrade: 731 bytes
-#define SEADER_APDU_MAX_LEN 732
+#define SEADER_APDU_MAX_LEN                  732
 #define SEADER_APDU_RUNNER_HEX_LOG_MAX_BYTES 32U
 
 void seader_apdu_runner_cleanup(Seader* seader, SeaderWorkerEvent event) {

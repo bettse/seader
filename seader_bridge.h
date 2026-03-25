@@ -12,7 +12,7 @@
 #include "t_1_logic.h"
 
 // https://ww1.microchip.com/downloads/en/DeviceDoc/00001561C.pdf
-#define SEADER_UART_RX_BUF_SIZE (300)
+#define SEADER_UART_RX_BUF_SIZE (272)
 #define SEADER_CCID_SLOT_COUNT  (2U)
 
 typedef struct BitBuffer BitBuffer;

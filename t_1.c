@@ -6,7 +6,7 @@
 
 #include "t_1_logic.h"
 
-#define TAG "Seader:T=1"
+#define TAG                     "Seader:T=1"
 #define SEADER_T1_MAX_FRAME_LEN (3U + SEADER_T1_IFS_MAX + 1U)
 
 static SeaderT1State* seader_t1_state(SeaderUartBridge* seader_uart) {

@@ -1,7 +1,7 @@
 #include "seader_i.h"
 #include "ccid_logic.h"
 
-#define TAG "SeaderCCID"
+#define TAG                           "SeaderCCID"
 #define SEADER_CCID_HEX_LOG_MAX_BYTES 32U
 const uint8_t SAM_ATR[] =
     {0x3b, 0x95, 0x96, 0x80, 0xb1, 0xfe, 0x55, 0x1f, 0xc7, 0x47, 0x72, 0x61, 0x63, 0x65, 0x13};
@@ -44,8 +44,8 @@ static void seader_ccid_log_hex(const char* prefix, const uint8_t* data, size_t 
         return;
     }
 
-    const size_t display_len = len > SEADER_CCID_HEX_LOG_MAX_BYTES ? SEADER_CCID_HEX_LOG_MAX_BYTES :
-                                                                     len;
+    const size_t display_len =
+        len > SEADER_CCID_HEX_LOG_MAX_BYTES ? SEADER_CCID_HEX_LOG_MAX_BYTES : len;
     char hex[(SEADER_CCID_HEX_LOG_MAX_BYTES * 2U) + 1U];
 
     for(size_t i = 0; i < display_len; i++) {

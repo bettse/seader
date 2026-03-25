@@ -12,7 +12,7 @@
 #include "t_1_logic.h"
 
 /* Keep the host harness aligned with the production UART scratchpad size. */
-#define SEADER_UART_RX_BUF_SIZE   (300)
+#define SEADER_UART_RX_BUF_SIZE   (272)
 #define FURI_LOG_W(tag, fmt, ...) ((void)0)
 #define furi_check(expr)                                                                  \
     do {                                                                                  \

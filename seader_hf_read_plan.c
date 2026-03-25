@@ -2,9 +2,7 @@
 
 #define SEADER_HF_READ_PLAN_MAX_TYPES 3U
 
-static void seader_hf_read_plan_add_type(
-    SeaderHfReadPlan* plan,
-    SeaderCredentialType type) {
+static void seader_hf_read_plan_add_type(SeaderHfReadPlan* plan, SeaderCredentialType type) {
     if(type == SeaderCredentialTypeNone) {
         return;
     }

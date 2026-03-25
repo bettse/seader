@@ -7,8 +7,8 @@
 
 #define TAG "SeaderWorker"
 
-#define APDU_HEADER_LEN 5
-#define ASN1_PREFIX     6
+#define APDU_HEADER_LEN          5
+#define ASN1_PREFIX              6
 #define SEADER_HEX_LOG_MAX_BYTES 32U
 // #define ASN1_DEBUG      true
 
@@ -69,10 +69,8 @@ static void seader_worker_release_apdu_slot(SeaderWorker* seader_worker, uint8_t
     }
 }
 
-static bool seader_worker_dequeue_apdu(
-    SeaderWorker* seader_worker,
-    uint8_t* slot_index,
-    FuriWait timeout) {
+static bool
+    seader_worker_dequeue_apdu(SeaderWorker* seader_worker, uint8_t* slot_index, FuriWait timeout) {
     furi_assert(seader_worker);
     furi_assert(slot_index);
     return furi_message_queue_get(seader_worker->messages, slot_index, timeout) == FuriStatusOk;
@@ -250,9 +248,21 @@ SeaderWorker* seader_worker_alloc() {
 
     // Worker thread attributes
     seader_worker->thread =
-        furi_thread_alloc_ex("SeaderWorker", 6144, seader_worker_task, seader_worker);
+        furi_thread_alloc_ex("SeaderWorker", 5120, seader_worker_task, seader_worker);
     seader_worker->messages = furi_message_queue_alloc(2, sizeof(uint8_t));
     seader_worker->apdu_slots = calloc(SEADER_WORKER_APDU_SLOT_COUNT, sizeof(SeaderAPDU));
+
+    if(!seader_worker->thread || !seader_worker->messages || !seader_worker->apdu_slots) {
+        if(seader_worker->thread) {
+            furi_thread_free(seader_worker->thread);
+        }
+        if(seader_worker->messages) {
+            furi_message_queue_free(seader_worker->messages);
+        }
+        free(seader_worker->apdu_slots);
+        free(seader_worker);
+        return NULL;
+    }
 
     seader_worker->callback = NULL;
     seader_worker->context = NULL;
@@ -559,14 +569,9 @@ void seader_worker_reading(Seader* seader) {
     SeaderWorker* seader_worker = seader->worker;
     FURI_LOG_I(TAG, "Reading loop started");
 
-    if(!seader_hf_plugin_acquire(seader) || !seader->plugin_hf || !seader->hf_plugin_ctx) {
-        FURI_LOG_E(TAG, "HF plugin unavailable");
-        strlcpy(seader->read_error, "HF plugin unavailable", sizeof(seader->read_error));
-        if(seader_worker->callback) {
-            seader_worker->callback(SeaderWorkerEventFail, seader_worker->context);
-        }
-        return;
-    }
+    furi_check(seader_hf_plugin_acquire(seader));
+    furi_check(seader->plugin_hf);
+    furi_check(seader->hf_plugin_ctx);
 
     while(seader_worker->state == SeaderWorkerStateReading) {
         bool detected = false;
@@ -595,8 +600,8 @@ void seader_worker_reading(Seader* seader) {
             break;
         } else if(read_plan.decision == SeaderHfReadDecisionStartRead) {
             FURI_LOG_I(TAG, "HF start read for type=%d", read_plan.type_to_read);
-            detected =
-                seader->plugin_hf->start_read_for_type(seader->hf_plugin_ctx, read_plan.type_to_read);
+            detected = seader->plugin_hf->start_read_for_type(
+                seader->hf_plugin_ctx, read_plan.type_to_read);
             if(detected) {
                 seader->hf_session_state = SeaderHfSessionStateActive;
             }
