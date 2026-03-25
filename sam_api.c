@@ -98,8 +98,12 @@ static void seader_reset_cached_sam_metadata(Seader* seader) {
 static bool seader_snmp_probe_send_next_request(Seader* seader) {
     SeaderUartBridge* seader_uart = seader_require_uart(seader);
     uint8_t* scratch = seader_uart->tx_buf + MAX_FRAME_HEADERS;
-    uint8_t* message = seader_uart->rx_buf;
+    uint8_t* message = seader_scratch_alloc(seader, SEADER_UART_RX_BUF_SIZE, _Alignof(uint8_t));
     size_t message_len = 0U;
+
+    if(!message) {
+        return false;
+    }
 
     if(!seader_uhf_snmp_probe_build_next_request(
            &seader->snmp_probe,

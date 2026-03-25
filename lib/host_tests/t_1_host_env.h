@@ -32,7 +32,6 @@ typedef enum { SeaderWorkerEventSamPresent = 53 } SeaderWorkerEvent;
 typedef void (*SeaderWorkerCallback)(uint32_t event, void* context);
 
 struct SeaderUartBridge {
-    uint8_t rx_buf[SEADER_UART_RX_BUF_SIZE];
     uint8_t tx_buf[SEADER_UART_RX_BUF_SIZE];
     size_t tx_len;
     uint8_t T;
