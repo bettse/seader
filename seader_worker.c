@@ -219,6 +219,8 @@ void seader_worker_start(
         seader_worker_stop(seader_worker);
     }
 
+    /* Worker startup owns queue/stage reset. Scene code must not pre-reset the live
+       poller session because the worker is the runtime owner for those objects. */
     seader_worker_reset_poller_session(seader_worker);
     seader_worker->callback = callback;
     seader_worker->context = context;
@@ -279,7 +281,6 @@ void seader_worker_reset_poller_session(SeaderWorker* seader_worker) {
         furi_message_queue_get_count(seader_worker->messages));
 
     furi_message_queue_reset(seader_worker->messages);
-
     seader_worker->stage = SeaderPollerEventTypeCardDetect;
 }
 
@@ -291,6 +292,8 @@ bool seader_process_success_response(Seader* seader, uint8_t* apdu, size_t len) 
     if(seader_process_success_response_i(seader, apdu, len, false, NULL)) {
         // no-op, message was processed
     } else {
+        /* Outside an active conversation, an unhandled SAM message is stale noise from a
+           previous flow. Enqueueing it would let old maintenance/read traffic bleed forward. */
         if(seader_worker->state != SeaderWorkerStateVirtualCredential &&
            seader_worker->stage != SeaderPollerEventTypeConversation) {
             FURI_LOG_I(
@@ -531,6 +534,8 @@ void seader_worker_reading(Seader* seader) {
                 furi_delay_ms(10);
             }
             result_stage = seader_worker->stage;
+            /* SAM active-card state belongs to the read lifecycle, not to the success scene.
+               Clear it as soon as the poller conversation reaches a terminal stage. */
             seader_worker_clear_active_card(
                 seader,
                 result_stage == SeaderPollerEventTypeComplete ? "read-complete" : "read-abort");
@@ -557,6 +562,8 @@ void seader_worker_run_hf_conversation(Seader* seader) {
 
     furi_thread_set_current_priority(FuriThreadPriorityHighest);
 
+    /* The NFC callback thread stays in this loop while the SAM drives the conversation.
+       The worker queue is the bridge between SAM APDUs and the poller callback thread. */
     while(seader_worker->stage == SeaderPollerEventTypeConversation &&
           seader_worker->state == SeaderWorkerStateReading) {
         SeaderAPDU seaderApdu = {};

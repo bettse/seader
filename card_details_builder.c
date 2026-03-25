@@ -4,6 +4,9 @@
 
 #include <FrameProtocol.h>
 
+/* Build the ASN.1-owned CardDetails payload used for cardDetected. Optional members
+   must be heap/ASN.1-owned because the caller always releases the structure through
+   ASN_STRUCT_FREE_CONTENTS_ONLY(). */
 bool seader_card_details_build(
     CardDetails_t* card_details,
     uint8_t sak,
@@ -23,6 +26,7 @@ bool seader_card_details_build(
 
     uint8_t protocol_bytes[] = {0x00, 0x00};
     if(ats != NULL) {
+        /* ISO14443-4A cards report ATS and SAK to the SAM. */
         protocol_bytes[1] = FrameProtocol_nfc;
         if(OCTET_STRING_fromBuf(
                &card_details->protocol, (const char*)protocol_bytes, sizeof(protocol_bytes)) !=
@@ -39,6 +43,7 @@ bool seader_card_details_build(
             return false;
         }
     } else if(uid_len == 8U) {
+        /* Picopass does not provide ATS/SAK in this path; uid_len==8 is the existing discriminator. */
         protocol_bytes[1] = FrameProtocol_iclass;
         if(OCTET_STRING_fromBuf(
                &card_details->protocol, (const char*)protocol_bytes, sizeof(protocol_bytes)) !=
@@ -47,6 +52,7 @@ bool seader_card_details_build(
             return false;
         }
     } else {
+        /* MIFARE Classic still identifies as NFC here, but carries a one-byte SAK. */
         protocol_bytes[1] = FrameProtocol_nfc;
         if(OCTET_STRING_fromBuf(
                &card_details->protocol, (const char*)protocol_bytes, sizeof(protocol_bytes)) !=
@@ -65,6 +71,7 @@ bool seader_card_details_build(
     return true;
 }
 
+/* Release a builder result through the same ASN.1 ownership boundary used by production code. */
 void seader_card_details_reset(CardDetails_t* card_details) {
     if(!card_details) {
         return;

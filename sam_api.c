@@ -73,6 +73,8 @@ static SeaderWorker* seader_get_active_worker(Seader* seader) {
     return seader ? seader->worker : NULL;
 }
 
+/* A newly inserted SAM should never inherit the previous card's cached firmware/UHF status
+   while maintenance probes for the new card are still pending. */
 static void seader_reset_cached_sam_metadata(Seader* seader) {
     if(!seader) {
         return;
@@ -108,6 +110,8 @@ static bool seader_snmp_probe_send_next_request(Seader* seader) {
     return seader_worker_send_process_snmp_message(seader, message, message_len);
 }
 
+/* Finishing the maintenance probe returns mode ownership to the normal app flow and leaves
+   the SAM state machine idle for the next command. */
 static void seader_snmp_probe_finish(Seader* seader) {
     if(!seader) {
         return;
@@ -117,6 +121,8 @@ static void seader_snmp_probe_finish(Seader* seader) {
     seader_sam_set_state(seader, SeaderSamStateIdle, SeaderSamIntentNone, SamCommand_PR_NOTHING);
 }
 
+/* UHF maintenance is only legal when the SAM is present and HF runtime is fully unloaded.
+   The helper enforces that ownership boundary before any SNMP request is sent. */
 static void seader_start_snmp_probe(Seader* seader) {
     if(!seader || !seader->sam_present) {
         return;
@@ -1171,6 +1177,8 @@ void seader_capture_sio(BitBuffer* tx_buffer, BitBuffer* rx_buffer, SeaderCreden
         if(buffer[0] == RFAL_PICOPASS_CMD_READ4) {
             uint8_t block_num = buffer[1];
             if(credential->sio_len == 0 && rxBuffer[0] == 0x30) {
+                /* Only Picopass uses block-derived SR/SE labeling, so remember where the
+                   first ASN.1 SIO fragment was observed. */
                 credential->sio_start_block = block_num;
             }
             uint8_t offset = (block_num - credential->sio_start_block) * PICOPASS_BLOCK_LEN;
@@ -1178,10 +1186,9 @@ void seader_capture_sio(BitBuffer* tx_buffer, BitBuffer* rx_buffer, SeaderCreden
             credential->sio_len += PICOPASS_BLOCK_LEN * 4;
         }
     } else if(credential->type == SeaderCredentialType14A) {
-        // Desfire EV1 passes SIO in the clear
-        // The desfire_read command is 13 bytes in total, but we deliberately don't check the read length as newer SAM
-        // firmware versions read 5 bytes first to determine the length of the SIO from the ASN.1 tag length then do a
-        // second read with just the required length to skip reading any additional bytes at the end of the file
+        /* DESFire exposes SIO as raw file data rather than as block-addressed Picopass reads.
+           Match the fixed read command body, but accept any response length that starts with
+           ASN.1 SEQUENCE data instead of expecting one exact returned payload size. */
         uint8_t desfire_read[] = {0x90, 0xbd, 0x00, 0x00, 0x07, 0x0f, 0x00, 0x00, 0x00};
         if(len == 13 && memcmp(buffer, desfire_read, sizeof(desfire_read)) == 0 &&
            rxBuffer[0] == 0x30) {
@@ -1676,6 +1683,8 @@ bool seader_process_success_response_i(
     Payload_t* payload_p = &payload;
     bool processed = false;
 
+    /* Seader wraps each ASN.1 payload with a 6-byte application header
+       {from, to, replyTo, 0x00, 0x00, 0x00}. Skip that prefix before decoding. */
     asn_dec_rval_t rval =
         asn_decode(0, ATS_DER, &asn_DEF_Payload, (void**)&payload_p, apdu + 6, len - 6);
     if(rval.code == RC_OK) {
@@ -1732,8 +1741,9 @@ NfcCommand seader_worker_card_detect(
     CardDetails_t cardDetails = {0};
     FURI_LOG_D(TAG, "Build card_detect sak=%02x uid_len=%u ats_len=%u", sak, uid_len, ats_len);
 
-    // this won't hold true for Seos cards, but then we won't see the SIO from Seos cards anyway
-    // so it doesn't really matter
+    /* The UID is reused as the current diversifier seed for formats that need one. This is
+       not universal across all media, but it is the intentional behavior for the cards Seader
+       currently supports on this read path. */
     size_t diversifier_len = uid_len;
     if(diversifier_len > sizeof(credential->diversifier)) {
         FURI_LOG_W(
@@ -1753,6 +1763,8 @@ NfcCommand seader_worker_card_detect(
         SeaderSamStateDetectPending,
         seader_sam_card_intent(seader),
         SamCommand_PR_cardDetected);
+    /* cardDetails must remain valid until the SAM payload is encoded, then it can be released
+       through the ASN.1-owned reset helper. */
     seader_send_card_detected(seader, &cardDetails);
     FURI_LOG_D(TAG, "cardDetected sent");
     // Print version information for app and firmware for later review in log

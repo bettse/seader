@@ -1,5 +1,7 @@
 #include "runtime_policy.h"
 
+/* A newly accepted SAM must not inherit visible metadata from the previous card while
+   asynchronous version/serial/UHF maintenance responses are still in flight. */
 void seader_runtime_reset_cached_sam_metadata(
     uint8_t sam_version[2],
     char* uhf_status_label,
@@ -19,6 +21,8 @@ void seader_runtime_reset_cached_sam_metadata(
     }
 }
 
+/* UHF maintenance is a mutually exclusive runtime mode. The probe may only start when
+   the SAM is present, HF is fully unloaded, and no other mode currently owns runtime. */
 bool seader_runtime_begin_uhf_probe(
     bool sam_present,
     SeaderModeRuntime* mode_runtime,
@@ -41,6 +45,7 @@ bool seader_runtime_begin_uhf_probe(
     return true;
 }
 
+/* Clear the narrow UHF probe runtime only when it currently owns mode_runtime. */
 void seader_runtime_finish_uhf_probe(SeaderModeRuntime* mode_runtime) {
     if(!mode_runtime) {
         return;
@@ -51,12 +56,15 @@ void seader_runtime_finish_uhf_probe(SeaderModeRuntime* mode_runtime) {
     }
 }
 
+/* Teardown publishes TearingDown before any runtime release so acquire paths and teardown
+   request paths can see that HF work is already shutting down. */
 void seader_runtime_begin_hf_teardown(SeaderHfSessionState* hf_session_state) {
     if(hf_session_state) {
         *hf_session_state = SeaderHfSessionStateTearingDown;
     }
 }
 
+/* Final state publication happens only after the caller has completed the release sequence. */
 void seader_runtime_finalize_hf_release(
     SeaderHfSessionState* hf_session_state,
     SeaderModeRuntime* mode_runtime) {

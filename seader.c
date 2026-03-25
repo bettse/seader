@@ -765,6 +765,7 @@ void seader_wiegand_plugin_release(Seader* seader) {
 bool seader_hf_plugin_acquire(Seader* seader) {
     furi_assert(seader);
 
+    /* UHF maintenance and HF runtime are mutually exclusive mode owners. */
     if(seader->mode_runtime == SeaderModeRuntimeUHF) {
         FURI_LOG_W(TAG, "Reject HF plugin acquire while UHF runtime is active");
         return false;
@@ -775,6 +776,7 @@ bool seader_hf_plugin_acquire(Seader* seader) {
         return false;
     }
 
+    /* Re-acquire is allowed only when the live runtime is already coherent. */
     if(seader->plugin_hf && seader->hf_plugin_ctx) {
         if(seader->hf_session_state == SeaderHfSessionStateUnloaded) {
             seader->hf_session_state = SeaderHfSessionStateLoaded;
@@ -783,6 +785,8 @@ bool seader_hf_plugin_acquire(Seader* seader) {
         return true;
     }
 
+    /* Partial pointer state is always a bug; normalize through the single release path
+       instead of trying to reason about each damaged combination inline. */
     if(seader->hf_plugin_manager || seader->plugin_hf || seader->hf_plugin_ctx) {
         FURI_LOG_W(
             TAG,
@@ -846,6 +850,8 @@ static bool seader_hf_has_runtime(const Seader* seader) {
                       seader->poller || seader->picopass_poller);
 }
 
+/* App shutdown uses the same teardown primitive as normal navigation. The only difference
+   is that shutdown waits synchronously for the worker-owned teardown to finish. */
 static void seader_hf_teardown_blocking(Seader* seader) {
     if(!seader || !seader_hf_has_runtime(seader)) {
         return;
@@ -864,6 +870,8 @@ static void seader_hf_teardown_blocking(Seader* seader) {
     seader_worker_join(seader->worker);
 }
 
+/* All HF runtime shutdown funnels through the canonical release sequence so stop/free/unload
+   order cannot silently diverge between code paths. */
 void seader_hf_plugin_release(Seader* seader) {
     furi_assert(seader);
     SeaderHfReleaseSequence release_sequence = {
@@ -880,6 +888,8 @@ void seader_hf_plugin_release(Seader* seader) {
     seader_hf_release_sequence_run(&release_sequence);
 }
 
+/* Teardown completion is the single place that collapses HF UI/runtime mode back into
+   ordinary app navigation. Scenes request teardown targets; they do not perform teardown. */
 bool seader_hf_finish_teardown_action(Seader* seader) {
     if(!seader) {
         return false;
@@ -911,6 +921,8 @@ bool seader_hf_finish_teardown_action(Seader* seader) {
     }
 }
 
+/* Requesting teardown is intentionally cheap: record the target, handle the no-runtime and
+   already-tearing-down fast paths, and hand off actual release work to the worker. */
 bool seader_hf_request_teardown(Seader* seader, SeaderHfTeardownAction action) {
     furi_assert(seader);
 
