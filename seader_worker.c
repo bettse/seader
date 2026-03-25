@@ -9,6 +9,7 @@
 
 #define APDU_HEADER_LEN 5
 #define ASN1_PREFIX     6
+#define SEADER_HEX_LOG_MAX_BYTES 32U
 // #define ASN1_DEBUG      true
 
 #define RFAL_PICOPASS_TXRX_FLAGS                                                    \
@@ -32,6 +33,51 @@ typedef struct {
     volatile bool detected;
 } SeaderPicopassDetectContext;
 
+static void seader_worker_reset_apdu_slots(SeaderWorker* seader_worker) {
+    furi_assert(seader_worker);
+    memset(seader_worker->apdu_slot_in_use, 0, sizeof(seader_worker->apdu_slot_in_use));
+    if(seader_worker->apdu_slots) {
+        memset(
+            seader_worker->apdu_slots,
+            0,
+            sizeof(*seader_worker->apdu_slots) * SEADER_WORKER_APDU_SLOT_COUNT);
+    }
+}
+
+static bool seader_worker_claim_apdu_slot(SeaderWorker* seader_worker, uint8_t* slot_index) {
+    furi_assert(seader_worker);
+    furi_assert(slot_index);
+
+    for(uint8_t i = 0; i < SEADER_WORKER_APDU_SLOT_COUNT; i++) {
+        if(!seader_worker->apdu_slot_in_use[i]) {
+            seader_worker->apdu_slot_in_use[i] = true;
+            *slot_index = i;
+            return true;
+        }
+    }
+
+    return false;
+}
+
+static void seader_worker_release_apdu_slot(SeaderWorker* seader_worker, uint8_t slot_index) {
+    furi_assert(seader_worker);
+    furi_assert(slot_index < SEADER_WORKER_APDU_SLOT_COUNT);
+
+    seader_worker->apdu_slot_in_use[slot_index] = false;
+    if(seader_worker->apdu_slots) {
+        seader_worker->apdu_slots[slot_index].len = 0U;
+    }
+}
+
+static bool seader_worker_dequeue_apdu(
+    SeaderWorker* seader_worker,
+    uint8_t* slot_index,
+    FuriWait timeout) {
+    furi_assert(seader_worker);
+    furi_assert(slot_index);
+    return furi_message_queue_get(seader_worker->messages, slot_index, timeout) == FuriStatusOk;
+}
+
 static void seader_worker_clear_active_card(Seader* seader, const char* reason) {
     if(!seader) {
         return;
@@ -40,6 +86,27 @@ static void seader_worker_clear_active_card(Seader* seader, const char* reason) 
     if(seader_sam_has_active_card(seader)) {
         FURI_LOG_I(TAG, "Clear active SAM card (%s)", reason ? reason : "worker");
         seader_send_no_card_detected(seader);
+    }
+}
+
+static void seader_worker_log_hex(const char* prefix, const uint8_t* data, size_t len) {
+    if(!data || len == 0U) {
+        FURI_LOG_I(TAG, "%s: <empty>", prefix);
+        return;
+    }
+
+    const size_t display_len = len > SEADER_HEX_LOG_MAX_BYTES ? SEADER_HEX_LOG_MAX_BYTES : len;
+    char hex[(SEADER_HEX_LOG_MAX_BYTES * 2U) + 1U];
+
+    for(size_t i = 0; i < display_len; i++) {
+        snprintf(hex + (i * 2U), sizeof(hex) - (i * 2U), "%02x", data[i]);
+    }
+    hex[display_len * 2U] = '\0';
+
+    if(display_len < len) {
+        FURI_LOG_I(TAG, "%s len=%u: %s...", prefix, (unsigned)len, hex);
+    } else {
+        FURI_LOG_I(TAG, "%s len=%u: %s", prefix, (unsigned)len, hex);
     }
 }
 
@@ -177,15 +244,20 @@ seader_worker_start_read_for_type(Seader* seader, SeaderCredentialType type) {
 
 SeaderWorker* seader_worker_alloc() {
     SeaderWorker* seader_worker = calloc(1, sizeof(SeaderWorker));
+    if(!seader_worker) {
+        return NULL;
+    }
 
     // Worker thread attributes
     seader_worker->thread =
-        furi_thread_alloc_ex("SeaderWorker", 8192, seader_worker_task, seader_worker);
-    seader_worker->messages = furi_message_queue_alloc(3, sizeof(SeaderAPDU));
+        furi_thread_alloc_ex("SeaderWorker", 6144, seader_worker_task, seader_worker);
+    seader_worker->messages = furi_message_queue_alloc(2, sizeof(uint8_t));
+    seader_worker->apdu_slots = calloc(SEADER_WORKER_APDU_SLOT_COUNT, sizeof(SeaderAPDU));
 
     seader_worker->callback = NULL;
     seader_worker->context = NULL;
     seader_worker->storage = furi_record_open(RECORD_STORAGE);
+    seader_worker_reset_apdu_slots(seader_worker);
 
     seader_worker_change_state(seader_worker, SeaderWorkerStateReady);
 
@@ -197,6 +269,7 @@ void seader_worker_free(SeaderWorker* seader_worker) {
 
     furi_thread_free(seader_worker->thread);
     furi_message_queue_free(seader_worker->messages);
+    free(seader_worker->apdu_slots);
 
     furi_record_close(RECORD_STORAGE);
 
@@ -282,6 +355,7 @@ void seader_worker_reset_poller_session(SeaderWorker* seader_worker) {
         furi_message_queue_get_count(seader_worker->messages));
 
     furi_message_queue_reset(seader_worker->messages);
+    seader_worker_reset_apdu_slots(seader_worker);
     seader_worker->stage = SeaderPollerEventTypeCardDetect;
 }
 
@@ -323,12 +397,23 @@ bool seader_process_success_response(Seader* seader, uint8_t* apdu, size_t len) 
         seader_trace(
             TAG, "enqueue len=%d stage=%d sam=%d", len, seader_worker->stage, seader->samCommand);
         uint32_t space = furi_message_queue_get_space(seader_worker->messages);
-        if(space > 0) {
-            SeaderAPDU seaderApdu = {};
-            seaderApdu.len = len;
-            memcpy(seaderApdu.buf, apdu, len);
+        if(space > 0 && len <= SEADER_POLLER_MAX_BUFFER_SIZE) {
+            uint8_t slot_index = 0U;
+            if(!seader_worker_claim_apdu_slot(seader_worker, &slot_index)) {
+                FURI_LOG_W(TAG, "No free APDU slot for len=%u", (unsigned)len);
+                return true;
+            }
 
-            furi_message_queue_put(seader_worker->messages, &seaderApdu, FuriWaitForever);
+            seader_worker->apdu_slots[slot_index].len = len;
+            memcpy(seader_worker->apdu_slots[slot_index].buf, apdu, len);
+
+            if(furi_message_queue_put(seader_worker->messages, &slot_index, FuriWaitForever) !=
+               FuriStatusOk) {
+                FURI_LOG_W(TAG, "Failed to queue APDU slot=%u", slot_index);
+                seader_worker_release_apdu_slot(seader_worker, slot_index);
+            }
+        } else if(len > SEADER_POLLER_MAX_BUFFER_SIZE) {
+            FURI_LOG_W(TAG, "Drop oversized SAM message len=%u", (unsigned)len);
         }
     }
     return true;
@@ -348,12 +433,7 @@ bool seader_worker_process_sam_message(Seader* seader, uint8_t* apdu, uint32_t l
         return seader_apdu_runner_response(seader, apdu, len);
     }
 
-    char* display = malloc(len * 2 + 1);
-    memset(display, 0, len * 2 + 1);
-    for(size_t i = 0; i < len; i++) {
-        snprintf(display + (i * 2), sizeof(display), "%02x", apdu[i]);
-    }
-    FURI_LOG_I(TAG, "APDU: %s", display);
+    seader_worker_log_hex("APDU", apdu, len);
     seader_trace(
         TAG,
         "sam apdu len=%lu stage=%d sam=%d state=%d intent=%d sw=%02x%02x",
@@ -364,7 +444,6 @@ bool seader_worker_process_sam_message(Seader* seader, uint8_t* apdu, uint32_t l
         seader->sam_intent,
         apdu[len - 2],
         apdu[len - 1]);
-    free(display);
 
     uint8_t SW1 = apdu[len - 2];
     uint8_t SW2 = apdu[len - 1];
@@ -408,21 +487,23 @@ void seader_worker_virtual_credential(Seader* seader) {
         if(count > 0) {
             FURI_LOG_I(TAG, "Dequeue SAM message [%ld messages]", count);
 
-            SeaderAPDU seaderApdu = {};
-            FuriStatus status =
-                furi_message_queue_get(seader_worker->messages, &seaderApdu, FuriWaitForever);
-            if(status != FuriStatusOk) {
-                FURI_LOG_W(TAG, "furi_message_queue_get fail %d", status);
+            uint8_t slot_index = 0U;
+            if(!seader_worker_dequeue_apdu(seader_worker, &slot_index, FuriWaitForever)) {
+                FURI_LOG_W(TAG, "furi_message_queue_get fail");
                 view_dispatcher_send_custom_event(
                     seader->view_dispatcher, SeaderCustomEventWorkerExit);
+                continue;
             }
+            furi_assert(slot_index < SEADER_WORKER_APDU_SLOT_COUNT);
+            SeaderAPDU* seaderApdu = &seader_worker->apdu_slots[slot_index];
             if(seader_process_success_response_i(
-                   seader, seaderApdu.buf, seaderApdu.len, true, NULL)) {
+                   seader, seaderApdu->buf, seaderApdu->len, true, NULL)) {
                 // no-op
             } else {
                 FURI_LOG_I(TAG, "Response false");
                 running = false;
             }
+            seader_worker_release_apdu_slot(seader_worker, slot_index);
         } else {
             dead_loops--;
             running = (dead_loops > 0);
@@ -564,14 +645,16 @@ void seader_worker_run_hf_conversation(Seader* seader) {
        The worker queue is the bridge between SAM APDUs and the poller callback thread. */
     while(seader_worker->stage == SeaderPollerEventTypeConversation &&
           seader_worker->state == SeaderWorkerStateReading) {
-        SeaderAPDU seaderApdu = {};
+        uint8_t slot_index = 0U;
         // Short wait for SAM message
-        FuriStatus status = furi_message_queue_get(seader_worker->messages, &seaderApdu, 100);
+        FuriStatus status = furi_message_queue_get(seader_worker->messages, &slot_index, 100);
 
         if(status == FuriStatusOk) {
-            FURI_LOG_D(TAG, "Dequeue SAM message [%d bytes]", seaderApdu.len);
+            furi_assert(slot_index < SEADER_WORKER_APDU_SLOT_COUNT);
+            SeaderAPDU* seaderApdu = &seader_worker->apdu_slots[slot_index];
+            FURI_LOG_D(TAG, "Dequeue SAM message [%d bytes]", seaderApdu->len);
             if(seader_process_success_response_i(
-                   seader, seaderApdu.buf, seaderApdu.len, true, NULL)) {
+                   seader, seaderApdu->buf, seaderApdu->len, true, NULL)) {
                 // message was processed, loop again to see if SAM has more to say
             } else {
                 FURI_LOG_I(TAG, "Response false, ending conversation");
@@ -579,6 +662,7 @@ void seader_worker_run_hf_conversation(Seader* seader) {
                 view_dispatcher_send_custom_event(
                     seader->view_dispatcher, SeaderCustomEventWorkerExit);
             }
+            seader_worker_release_apdu_slot(seader_worker, slot_index);
         } else if(status == FuriStatusErrorTimeout) {
             // No message yet, keep looping to stay in callback
             // This is "properly idling" while waiting for SAM
@@ -638,14 +722,14 @@ NfcCommand seader_worker_poller_callback_iso14443_4a(NfcGenericEvent event, void
             }
 
             uint8_t ats_len = 0;
-            uint8_t* ats = malloc(4 + t1_tk_size);
-            if(!ats) {
-                FURI_LOG_E(TAG, "Failed to allocate host ATS buffer");
-                seader_worker->stage = SeaderPollerEventTypeFail;
-                return NfcCommandStop;
-            }
+            uint8_t ats[SEADER_MAX_ATR_SIZE] = {0};
 
             if(iso14443_4a_data->ats_data.tl > 1) {
+                if(sizeof(ats) < 4U + t1_tk_size) {
+                    FURI_LOG_E(TAG, "Host ATS buffer too small: %u", (unsigned)(4U + t1_tk_size));
+                    seader_worker->stage = SeaderPollerEventTypeFail;
+                    return NfcCommandStop;
+                }
                 ats[ats_len++] = iso14443_4a_data->ats_data.t0;
                 if(iso14443_4a_data->ats_data.t0 & ISO14443_4A_ATS_T0_TA1) {
                     ats[ats_len++] = iso14443_4a_data->ats_data.ta_1;
@@ -671,8 +755,6 @@ NfcCommand seader_worker_poller_callback_iso14443_4a(NfcGenericEvent event, void
             seader_worker_card_detect(
                 seader, sak, (uint8_t*)iso14443_3a_data->atqa, uid, uid_len, ats, ats_len);
             seader_trace(TAG, "14a card_detect sent uid_len=%d sak=%d", uid_len, sak);
-
-            free(ats);
 
             if(seader_worker->state == SeaderWorkerStateReading) {
                 seader_worker->stage = SeaderPollerEventTypeConversation;

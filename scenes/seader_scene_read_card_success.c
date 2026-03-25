@@ -33,6 +33,7 @@ void seader_scene_read_card_success_on_enter(void* context) {
     FuriString* bitlength_str = seader->temp_string2;
     FuriString* credential_str = seader->temp_string3;
     FuriString* sio_str = seader->temp_string4;
+    char sio_label[SEADER_TEXT_STORE_SIZE + 1] = {0};
 
     dolphin_deed(DolphinDeedNfcReadSuccess);
 
@@ -117,12 +118,12 @@ void seader_scene_read_card_success_on_enter(void* context) {
            credential->sio[0] == 0x30,
            seader_credential_is_picopass_sio_context(credential),
            credential->sio_start_block,
-           seader->text_store,
-           sizeof(seader->text_store))) {
-        if(strcmp(seader->text_store, "+SIO(?)") == 0) {
+           sio_label,
+           sizeof(sio_label))) {
+        if(strcmp(sio_label, "+SIO(?)") == 0) {
             FURI_LOG_E(TAG, "Unknown SIO start block: %d", credential->sio_start_block);
         }
-        furi_string_set(sio_str, seader->text_store);
+        furi_string_set(sio_str, sio_label);
         widget_add_string_element(
             widget, 64, 48, AlignCenter, AlignCenter, FontSecondary, furi_string_get_cstr(sio_str));
     }

@@ -647,19 +647,6 @@ void seader_free(Seader* seader) {
     free(seader);
 }
 
-void seader_text_store_set(Seader* seader, const char* text, ...) {
-    va_list args;
-    va_start(args, text);
-
-    vsnprintf(seader->text_store, sizeof(seader->text_store), text, args);
-
-    va_end(args);
-}
-
-void seader_text_store_clear(Seader* seader) {
-    memset(seader->text_store, 0, sizeof(seader->text_store));
-}
-
 static const NotificationSequence seader_sequence_blink_start_blue = {
     &message_blink_start_10,
     &message_blink_set_color_blue,
