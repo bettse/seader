@@ -25,6 +25,7 @@ test-host:
 		lib/host_tests/test_snmp.c \
 		lib/host_tests/test_uhf_status_label.c \
 		lib/host_tests/test_credential_sio_label.c \
+		lib/host_tests/test_hf_read_plan.c \
 		lib/host_tests/test_runtime_policy.c \
 		lib/host_tests/t1_test_stubs.c \
 		lib/host_tests/bit_buffer_mock.c \
@@ -40,6 +41,7 @@ test-host:
 		uhf_status_label.c \
 		uhf_tag_config_view.c \
 		uhf_snmp_probe.c \
+		seader_hf_read_plan.c \
 		runtime_policy.c \
 		-o build/host_tests/seader_tests
 	./build/host_tests/seader_tests
