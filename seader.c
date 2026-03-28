@@ -1412,6 +1412,9 @@ bool seader_hf_finish_teardown_action(Seader* seader) {
         seader->board_status = SeaderBoardStatusRetryRequested;
         scene_manager_next_scene(seader->scene_manager, SeaderSceneStart);
         return true;
+    case SeaderHfTeardownActionPrepareSave:
+        scene_manager_next_scene(seader->scene_manager, SeaderSceneSaveName);
+        return true;
     case SeaderHfTeardownActionRestartRead:
         scene_manager_next_scene(seader->scene_manager, SeaderSceneRead);
         return true;

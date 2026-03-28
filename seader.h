@@ -27,6 +27,7 @@ typedef enum {
     SeaderHfTeardownActionSamPresent,
     SeaderHfTeardownActionBoardMissing,
     SeaderHfTeardownActionAutoRecover,
+    SeaderHfTeardownActionPrepareSave,
     SeaderHfTeardownActionRestartRead,
     SeaderHfTeardownActionStopApp,
 } SeaderHfTeardownAction;
