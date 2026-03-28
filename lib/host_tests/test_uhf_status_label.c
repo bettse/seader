@@ -21,6 +21,19 @@ static MunitResult test_formats_supported_key_states(const MunitParameter params
     return MUNIT_OK;
 }
 
+static MunitResult test_longest_supported_label_fits_buffer(
+    const MunitParameter params[],
+    void* fixture) {
+    (void)params;
+    (void)fixture;
+
+    char label[SEADER_UHF_STATUS_LABEL_MAX_LEN] = {0};
+    seader_uhf_status_label_format(true, false, true, false, label, sizeof(label));
+    munit_assert_string_equal(label, "UHF: Monza 4QT [no key]/Higgs 3 [no key]");
+    munit_assert_size(strlen(label), <, sizeof(label));
+    return MUNIT_OK;
+}
+
 static MunitResult test_handles_null_and_zero_sized_output(
     const MunitParameter params[],
     void* fixture) {
@@ -79,6 +92,7 @@ static MunitResult test_small_buffer_for_none_is_safe(const MunitParameter param
 static MunitTest test_uhf_status_label_cases[] = {
     {(char*)"/none", test_formats_none, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {(char*)"/supported-key-states", test_formats_supported_key_states, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {(char*)"/longest-fits", test_longest_supported_label_fits_buffer, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {(char*)"/null-zero-output", test_handles_null_and_zero_sized_output, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {(char*)"/single-byte-output", test_nul_terminates_single_byte_output, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {(char*)"/small-buffer-truncation", test_truncates_safely_for_small_buffers, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},

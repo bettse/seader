@@ -97,18 +97,14 @@ static void seader_reset_cached_sam_metadata(Seader* seader) {
 
 static bool seader_snmp_probe_send_next_request(Seader* seader) {
     SeaderUartBridge* seader_uart = seader_require_uart(seader);
-    uint8_t* scratch = seader_uart->tx_buf + MAX_FRAME_HEADERS;
-    uint8_t* message = seader_scratch_alloc(seader, SEADER_UART_RX_BUF_SIZE, _Alignof(uint8_t));
+    uint8_t scratch[SEADER_UART_RX_BUF_SIZE - MAX_FRAME_HEADERS] = {0};
+    uint8_t* message = seader_uart->tx_buf;
     size_t message_len = 0U;
-
-    if(!message) {
-        return false;
-    }
 
     if(!seader_uhf_snmp_probe_build_next_request(
            &seader->snmp_probe,
            scratch,
-           SEADER_UART_RX_BUF_SIZE - MAX_FRAME_HEADERS,
+           sizeof(scratch),
            message,
            SEADER_UART_RX_BUF_SIZE,
            &message_len)) {
@@ -332,6 +328,18 @@ bool seader_sam_has_active_card(const Seader* seader) {
     return seader->sam_state == SeaderSamStateDetectPending ||
            seader->sam_state == SeaderSamStateConversation ||
            seader->sam_state == SeaderSamStateFinishing;
+}
+
+void seader_sam_force_idle_for_recovery(Seader* seader) {
+    if(!seader) {
+        return;
+    }
+
+    FURI_LOG_W(TAG, "Force SAM idle state=%d intent=%d", seader->sam_state, seader->sam_intent);
+    seader_sam_set_state(seader, SeaderSamStateIdle, SeaderSamIntentNone, SamCommand_PR_NOTHING);
+    if(seader->worker) {
+        seader_worker_reset_poller_session(seader->worker);
+    }
 }
 
 PicopassError seader_worker_fake_epurse_update(BitBuffer* tx_buffer, BitBuffer* rx_buffer) {
@@ -991,9 +999,9 @@ static void seader_abort_active_read(Seader* seader) {
     if(seader_worker) {
         seader_worker->stage = SeaderPollerEventTypeFail;
     }
+    seader->hf_read_state = SeaderHfReadStateTerminalFail;
     if(!seader_sam_has_active_card(seader) && seader->sam_state != SeaderSamStateClearPending) {
-        seader_sam_set_state(
-            seader, SeaderSamStateIdle, SeaderSamIntentNone, SamCommand_PR_NOTHING);
+        seader_sam_force_idle_for_recovery(seader);
     }
     view_dispatcher_send_custom_event(seader->view_dispatcher, SeaderCustomEventWorkerExit);
 }
@@ -1025,6 +1033,7 @@ bool seader_parse_sam_response2(Seader* seader, SamResponse2_t* samResponse) {
             if(seader_worker) {
                 seader_worker->stage = SeaderPollerEventTypeComplete;
             }
+            seader->hf_read_state = SeaderHfReadStateTerminalSuccess;
             seader_sam_set_state(
                 seader, SeaderSamStateIdle, SeaderSamIntentNone, SamCommand_PR_NOTHING);
         } else {
@@ -1598,6 +1607,8 @@ void seader_parse_nfc_off(Seader* seader) {
     if(seader->sam_state == SeaderSamStateConversation &&
        (seader->sam_intent == SeaderSamIntentReadPacs2 ||
         seader->sam_intent == SeaderSamIntentConfig)) {
+        seader->hf_read_state = SeaderHfReadStateFinishing;
+        seader->hf_read_last_progress_tick = furi_get_tick();
         seader_sam_set_state(
             seader, SeaderSamStateFinishing, seader->sam_intent, seader->samCommand);
     }

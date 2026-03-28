@@ -5,6 +5,10 @@
 void seader_scene_read_on_enter(void* context) {
     Seader* seader = context;
     seader_hf_mode_activate(seader);
+    if(seader->board_auto_recover_read_type != SeaderCredentialTypeNone) {
+        seader_hf_mode_set_selected_read_type(seader, seader->board_auto_recover_read_type);
+        seader->board_auto_recover_read_type = SeaderCredentialTypeNone;
+    }
     seader_worker_acquire(seader);
     dolphin_deed(DolphinDeedNfcRead);
 

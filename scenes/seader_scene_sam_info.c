@@ -49,15 +49,19 @@ void seader_scene_sam_info_on_enter(void* context) {
     seader_scene_sam_info_alloc_strings(seader);
     FuriString* fw_str = seader->temp_string1;
     FuriString* info_str = seader->temp_string2;
-    FuriString* uhf_str = seader->temp_string3;
+    FuriString* status_str = seader->temp_string3;
 
     furi_string_reset(fw_str);
     furi_string_reset(info_str);
-    furi_string_reset(uhf_str);
+    furi_string_reset(status_str);
 
     furi_string_cat_printf(fw_str, "FW %d.%d", seader->sam_version[0], seader->sam_version[1]);
     furi_string_set_str(info_str, seader->sam_key_label);
-    furi_string_set_str(uhf_str, seader->uhf_status_label);
+    furi_string_printf(
+        status_str,
+        "%s\n%s",
+        seader_board_status_label(seader->board_status),
+        seader->uhf_status_label);
 
     widget_add_button_element(
         seader->widget, GuiButtonTypeLeft, "Back", seader_scene_sam_info_widget_callback, seader);
@@ -65,7 +69,7 @@ void seader_scene_sam_info_on_enter(void* context) {
     widget_add_string_element(
         widget, 64, 14, AlignCenter, AlignCenter, FontPrimary, furi_string_get_cstr(info_str));
     widget_add_text_box_element(
-        widget, 5, 22, 118, 20, AlignCenter, AlignTop, furi_string_get_cstr(uhf_str), false);
+        widget, 5, 22, 118, 22, AlignCenter, AlignTop, furi_string_get_cstr(status_str), false);
     widget_add_string_element(
         widget, 64, 50, AlignCenter, AlignCenter, FontSecondary, furi_string_get_cstr(fw_str));
 

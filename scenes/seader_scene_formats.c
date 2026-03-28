@@ -25,12 +25,13 @@ void seader_scene_formats_on_enter(void* context) {
     if(plugin) {
         // Use reusable string instead of allocating new one
         FuriString* description = seader->temp_string1;
-        furi_string_reset(description);
         size_t format_count = plugin->count(credential->bit_length, credential->credential);
         for(size_t i = 0; i < format_count; i++) {
+            furi_string_reset(description);
             plugin->description(credential->bit_length, credential->credential, i, description);
-
-            furi_string_cat_printf(str, "%s\n", furi_string_get_cstr(description));
+            if(furi_string_size(description) > 0U) {
+                furi_string_cat_printf(str, "%s\n", furi_string_get_cstr(description));
+            }
         }
         if(format_count == 0) {
             furi_string_set_str(str, "No known Wiegand formats matched.");

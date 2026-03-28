@@ -3,7 +3,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#define SEADER_UHF_STATUS_LABEL_MAX_LEN 64U
+#define SEADER_UHF_STATUS_LABEL_MAX_LEN 48U
 
 void seader_uhf_status_label_format(
     bool has_monza4qt,
