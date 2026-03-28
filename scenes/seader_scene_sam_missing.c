@@ -1,26 +1,6 @@
 #include "../seader_i.h"
 #include <gui/elements.h>
 
-static void seader_scene_sam_missing_alloc_strings(Seader* seader) {
-    if(!seader->temp_string1) {
-        seader->temp_string1 = furi_string_alloc();
-    }
-    if(!seader->temp_string2) {
-        seader->temp_string2 = furi_string_alloc();
-    }
-}
-
-static void seader_scene_sam_missing_free_strings(Seader* seader) {
-    if(seader->temp_string1) {
-        furi_string_free(seader->temp_string1);
-        seader->temp_string1 = NULL;
-    }
-    if(seader->temp_string2) {
-        furi_string_free(seader->temp_string2);
-        seader->temp_string2 = NULL;
-    }
-}
-
 void seader_scene_sam_missing_widget_callback(GuiButtonType result, InputType type, void* context) {
     Seader* seader = context;
     if(type == InputTypeShort) {
@@ -37,7 +17,10 @@ void seader_scene_sam_missing_on_enter(void* context) {
     }
     const bool retry_exhausted = (seader->board_retry_remaining == 0U);
 
-    seader_scene_sam_missing_alloc_strings(seader);
+    if(!seader_temp_strings_ensure(seader, 2U)) {
+        FURI_LOG_E("SeaderSceneSamMissing", "Temp string allocation failed");
+        return;
+    }
     furi_string_reset(seader->temp_string1);
     furi_string_set_str(
         seader->temp_string1,
@@ -119,5 +102,5 @@ void seader_scene_sam_missing_on_exit(void* context) {
     if(seader->widget) {
         widget_reset(seader->widget);
     }
-    seader_scene_sam_missing_free_strings(seader);
+    seader_temp_strings_release(seader, 2U);
 }

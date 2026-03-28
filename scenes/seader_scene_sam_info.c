@@ -3,38 +3,6 @@
 
 #define TAG "SeaderSamInfoScene"
 
-static void seader_scene_sam_info_alloc_strings(Seader* seader) {
-    furi_check(seader);
-    if(!seader->temp_string1) {
-        seader->temp_string1 = furi_string_alloc();
-        furi_check(seader->temp_string1);
-    }
-    if(!seader->temp_string2) {
-        seader->temp_string2 = furi_string_alloc();
-        furi_check(seader->temp_string2);
-    }
-    if(!seader->temp_string3) {
-        seader->temp_string3 = furi_string_alloc();
-        furi_check(seader->temp_string3);
-    }
-}
-
-static void seader_scene_sam_info_free_strings(Seader* seader) {
-    furi_check(seader);
-    if(seader->temp_string1) {
-        furi_string_free(seader->temp_string1);
-        seader->temp_string1 = NULL;
-    }
-    if(seader->temp_string2) {
-        furi_string_free(seader->temp_string2);
-        seader->temp_string2 = NULL;
-    }
-    if(seader->temp_string3) {
-        furi_string_free(seader->temp_string3);
-        seader->temp_string3 = NULL;
-    }
-}
-
 void seader_scene_sam_info_widget_callback(GuiButtonType result, InputType type, void* context) {
     Seader* seader = context;
     if(type == InputTypeShort) {
@@ -50,7 +18,10 @@ void seader_scene_sam_info_on_enter(void* context) {
         return;
     }
 
-    seader_scene_sam_info_alloc_strings(seader);
+    if(!seader_temp_strings_ensure(seader, 3U)) {
+        FURI_LOG_E(TAG, "Temp string allocation failed");
+        return;
+    }
     FuriString* fw_str = seader->temp_string1;
     FuriString* info_str = seader->temp_string2;
     FuriString* status_str = seader->temp_string3;
@@ -108,5 +79,5 @@ void seader_scene_sam_info_on_exit(void* context) {
     if(seader->widget) {
         widget_reset(seader->widget);
     }
-    seader_scene_sam_info_free_strings(seader);
+    seader_temp_strings_release(seader, 3U);
 }

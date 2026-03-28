@@ -7,10 +7,7 @@ static void seader_scene_formats_alloc_strings(Seader* seader) {
         seader->text_box_store = furi_string_alloc();
         furi_check(seader->text_box_store);
     }
-    if(!seader->temp_string1) {
-        seader->temp_string1 = furi_string_alloc();
-        furi_check(seader->temp_string1);
-    }
+    furi_check(seader_temp_strings_ensure(seader, 1U));
 }
 
 void seader_scene_formats_on_enter(void* context) {
@@ -76,9 +73,6 @@ void seader_scene_formats_on_exit(void* context) {
         furi_string_free(seader->text_box_store);
         seader->text_box_store = NULL;
     }
-    if(seader->temp_string1) {
-        furi_string_free(seader->temp_string1);
-        seader->temp_string1 = NULL;
-    }
+    seader_temp_strings_release(seader, 1U);
     seader_wiegand_plugin_release(seader);
 }

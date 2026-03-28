@@ -4,7 +4,6 @@
 #include "sam_key_label.h"
 #include "trace_log.h"
 #include "uhf_snmp_probe.h"
-#include "runtime_policy.h"
 #include "card_details_builder.h"
 #include "uhf_status_label.h"
 #include <toolbox/path.h>
@@ -29,6 +28,27 @@ static void seader_sam_set_state(
     SeaderSamState state,
     SeaderSamIntent intent,
     SamCommand_PR command);
+
+static const char* seader_snmp_probe_stage_name(SeaderUhfSnmpProbeStage stage) {
+    switch(stage) {
+    case SeaderUhfSnmpProbeStageDiscovery:
+        return "discovery";
+    case SeaderUhfSnmpProbeStageReadIce:
+        return "read_ice";
+    case SeaderUhfSnmpProbeStageReadTagConfig:
+        return "read_tag_config";
+    case SeaderUhfSnmpProbeStageReadMonza4QtKey:
+        return "read_monza4qt_key";
+    case SeaderUhfSnmpProbeStageReadHiggs3Key:
+        return "read_higgs3_key";
+    case SeaderUhfSnmpProbeStageDone:
+        return "done";
+    case SeaderUhfSnmpProbeStageFailed:
+        return "failed";
+    default:
+        return "unknown";
+    }
+}
 
 static void seader_publish_sam_status(Seader* seader) {
     if(seader && seader->view_dispatcher) {
@@ -107,12 +127,10 @@ static void seader_reset_cached_sam_metadata(Seader* seader) {
 
     seader->sam_key_probe_status = SeaderSamKeyProbeStatusUnknown;
     seader->uhf_probe_status = SeaderUhfProbeStatusUnknown;
-
-    seader_runtime_reset_cached_sam_metadata(
-        seader->sam_version,
-        seader->uhf_status_label,
-        sizeof(seader->uhf_status_label),
-        &seader->snmp_probe);
+    seader->sam_version[0] = 0U;
+    seader->sam_version[1] = 0U;
+    seader->uhf_status_label[0] = '\0';
+    seader_uhf_snmp_probe_init(&seader->snmp_probe);
 }
 
 static bool seader_snmp_probe_send_next_request(Seader* seader) {
@@ -141,7 +159,9 @@ static void seader_snmp_probe_finish(Seader* seader) {
         return;
     }
 
-    seader_runtime_finish_uhf_probe(&seader->mode_runtime);
+    if(seader->mode_runtime == SeaderModeRuntimeUHF) {
+        seader->mode_runtime = SeaderModeRuntimeNone;
+    }
     seader_sam_set_state(seader, SeaderSamStateIdle, SeaderSamIntentNone, SamCommand_PR_NOTHING);
 }
 
@@ -152,14 +172,13 @@ static void seader_start_snmp_probe(Seader* seader) {
         return;
     }
 
-    if(!seader_runtime_begin_uhf_probe(
-           seader->sam_present,
-           &seader->mode_runtime,
-           seader->hf_session_state,
-           &seader->snmp_probe)) {
+    if(seader->hf_session_state != SeaderHfSessionStateUnloaded ||
+       seader->mode_runtime != SeaderModeRuntimeNone) {
         seader_snmp_probe_finish(seader);
         return;
     }
+    seader->mode_runtime = SeaderModeRuntimeUHF;
+    seader_uhf_snmp_probe_init(&seader->snmp_probe);
     seader->sam_key_probe_status = SeaderSamKeyProbeStatusUnknown;
     seader->uhf_probe_status = SeaderUhfProbeStatusUnknown;
     seader_update_sam_key_label(seader, NULL, 0U);
@@ -1708,12 +1727,20 @@ bool seader_worker_state_machine(
         }
         break;
     case Payload_PR_errorResponse:
-        FURI_LOG_W(TAG, "Payload_PR_errorResponse");
         processed = true;
         if(seader->sam_state == SeaderSamStateCapabilityPending) {
             ErrorResponse_t* err = &payload->choice.errorResponse;
+            SeaderUhfSnmpProbeStage previous_stage = seader->snmp_probe.stage;
             if(seader_uhf_snmp_probe_consume_error(
                    &seader->snmp_probe, err->errorCode, err->data.buf, err->data.size)) {
+                FURI_LOG_I(
+                    TAG,
+                    "SNMP probe handled error stage=%s code=0x%02lx data=%02x%02x len=%zu",
+                    seader_snmp_probe_stage_name(previous_stage),
+                    (unsigned long)err->errorCode,
+                    err->data.size > 0U ? err->data.buf[0] : 0U,
+                    err->data.size > 1U ? err->data.buf[1] : 0U,
+                    err->data.size);
                 if(seader->snmp_probe.ice_value_len > 0U) {
                     seader->sam_key_probe_status = seader_ice_value_is_standard(
                                                        seader->snmp_probe.ice_value_storage,
@@ -1739,6 +1766,14 @@ bool seader_worker_state_machine(
                     seader_snmp_probe_finish(seader);
                 }
             } else {
+                FURI_LOG_W(
+                    TAG,
+                    "SNMP probe unhandled error stage=%s code=0x%02lx data=%02x%02x len=%zu",
+                    seader_snmp_probe_stage_name(previous_stage),
+                    (unsigned long)err->errorCode,
+                    err->data.size > 0U ? err->data.buf[0] : 0U,
+                    err->data.size > 1U ? err->data.buf[1] : 0U,
+                    err->data.size);
                 seader->sam_key_probe_status = SeaderSamKeyProbeStatusProbeFailed;
                 seader->uhf_probe_status = SeaderUhfProbeStatusFailed;
                 seader_update_sam_key_label(seader, NULL, 0U);
@@ -1746,6 +1781,7 @@ bool seader_worker_state_machine(
                 seader_snmp_probe_finish(seader);
             }
         } else {
+            FURI_LOG_W(TAG, "Payload_PR_errorResponse");
             view_dispatcher_send_custom_event(
                 seader->view_dispatcher, SeaderCustomEventWorkerExit);
         }

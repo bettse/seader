@@ -1,7 +1,6 @@
 #include "seader_worker_i.h"
 #include "seader_hf_read_plan.h"
 #include "hf_read_lifecycle.h"
-#include "runtime_policy.h"
 #include "trace_log.h"
 
 #include <flipper_format/flipper_format.h>
@@ -39,12 +38,13 @@ static void seader_worker_fail_hf_startup(Seader* seader, const char* detail) {
 
     SeaderWorker* seader_worker = seader->worker;
     seader_hf_plugin_release(seader);
-    seader_runtime_fail_hf_startup(
-        &seader->hf_read_state,
-        &seader->hf_read_failure_reason,
-        &seader->hf_read_last_progress_tick,
-        &seader->hf_session_state,
-        &seader->mode_runtime);
+    seader->hf_read_state = SeaderHfReadStateTerminalFail;
+    seader->hf_read_failure_reason = SeaderHfReadFailureReasonUnavailable;
+    seader->hf_read_last_progress_tick = 0U;
+    seader->hf_session_state = SeaderHfSessionStateUnloaded;
+    if(seader->mode_runtime == SeaderModeRuntimeHF) {
+        seader->mode_runtime = SeaderModeRuntimeNone;
+    }
     strlcpy(
         seader->read_error,
         detail ? detail : seader_hf_read_failure_reason_text(seader->hf_read_failure_reason),

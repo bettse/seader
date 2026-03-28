@@ -1,5 +1,4 @@
 #include "../seader_i.h"
-#include "../runtime_policy.h"
 #include "seader_scene_read_common.h"
 
 enum SubmenuIndex {
@@ -25,6 +24,20 @@ static void seader_scene_start_begin_detection(Seader* seader) {
         seader->uart,
         seader_sam_check_worker_callback,
         seader);
+}
+
+static void seader_scene_start_finish_board_auto_recover(
+    Seader* seader,
+    bool preserve_read_type) {
+    if(!seader) {
+        return;
+    }
+
+    seader->board_auto_recover_pending = false;
+    seader->board_auto_recover_resume_read = false;
+    if(!preserve_read_type) {
+        seader->board_auto_recover_read_type = SeaderCredentialTypeNone;
+    }
 }
 
 void seader_scene_start_submenu_callback(void* context, uint32_t index) {
@@ -64,10 +77,7 @@ bool seader_scene_start_on_event(void* context, SceneManagerEvent event) {
             seader->board_status = SeaderBoardStatusReady;
             if(seader->board_auto_recover_pending) {
                 const bool resume_read = seader->board_auto_recover_resume_read;
-                seader_runtime_finish_board_auto_recover(
-                    &seader->board_auto_recover_pending,
-                    &seader->board_auto_recover_resume_read,
-                    resume_read ? NULL : &seader->board_auto_recover_read_type);
+                seader_scene_start_finish_board_auto_recover(seader, resume_read);
                 if(resume_read) {
                     scene_manager_next_scene(seader->scene_manager, SeaderSceneRead);
                 } else {
@@ -98,10 +108,7 @@ bool seader_scene_start_on_event(void* context, SceneManagerEvent event) {
             }
 
             seader->board_status = seader_board_status_on_sam_missing(seader->board_status);
-            seader_runtime_finish_board_auto_recover(
-                &seader->board_auto_recover_pending,
-                &seader->board_auto_recover_resume_read,
-                &seader->board_auto_recover_read_type);
+            seader_scene_start_finish_board_auto_recover(seader, false);
             seader->sam_present = false;
             seader_sam_key_label_format(
                 false,
@@ -114,10 +121,7 @@ bool seader_scene_start_on_event(void* context, SceneManagerEvent event) {
             consumed = true;
         } else if(event.event == SeaderWorkerEventSamWrong) {
             seader->board_status = SeaderBoardStatusReady;
-            seader_runtime_finish_board_auto_recover(
-                &seader->board_auto_recover_pending,
-                &seader->board_auto_recover_resume_read,
-                &seader->board_auto_recover_read_type);
+            seader_scene_start_finish_board_auto_recover(seader, false);
             seader->sam_present = false;
             seader_sam_key_label_format(
                 false,

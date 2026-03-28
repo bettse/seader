@@ -1,5 +1,4 @@
 #include "seader_i.h"
-#include "runtime_policy.h"
 #include "board_power_lifecycle.h"
 #include "hf_release_sequence.h"
 #include "hf_read_lifecycle.h"
@@ -30,6 +29,51 @@ static void seader_hf_read_note_progress(Seader* seader);
 static void seader_hf_read_fail(Seader* seader, SeaderHfReadFailureReason reason);
 static bool seader_board_auto_recover_begin(Seader* seader);
 static void seader_hf_mode_reset(Seader* seader);
+
+bool seader_temp_strings_ensure(Seader* seader, size_t count) {
+    if(!seader || count > 4U) {
+        return false;
+    }
+
+    FuriString** slots[] = {
+        &seader->temp_string1,
+        &seader->temp_string2,
+        &seader->temp_string3,
+        &seader->temp_string4,
+    };
+
+    for(size_t i = 0; i < count; i++) {
+        if(!*slots[i]) {
+            *slots[i] = furi_string_alloc();
+            if(!*slots[i]) {
+                seader_temp_strings_release(seader, i);
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+void seader_temp_strings_release(Seader* seader, size_t count) {
+    if(!seader || count > 4U) {
+        return;
+    }
+
+    FuriString** slots[] = {
+        &seader->temp_string1,
+        &seader->temp_string2,
+        &seader->temp_string3,
+        &seader->temp_string4,
+    };
+
+    for(size_t i = 0; i < count; i++) {
+        if(*slots[i]) {
+            furi_string_free(*slots[i]);
+            *slots[i] = NULL;
+        }
+    }
+}
 
 TextInput* seader_get_text_input(Seader* seader) {
     if(!seader) {
@@ -118,15 +162,15 @@ static bool seader_board_auto_recover_begin(Seader* seader) {
         return false;
     }
 
-    if(!seader_runtime_begin_board_auto_recover(
-           seader->sam_present,
-           seader_hf_has_runtime(seader),
-           seader_hf_mode_get_selected_read_type(seader),
-           &seader->board_auto_recover_pending,
-           &seader->board_auto_recover_resume_read,
-           &seader->board_auto_recover_read_type)) {
+    if(!seader->sam_present || seader->board_auto_recover_pending) {
         return false;
     }
+
+    const bool resume_read = seader_hf_has_runtime(seader);
+    seader->board_auto_recover_pending = true;
+    seader->board_auto_recover_resume_read = resume_read;
+    seader->board_auto_recover_read_type =
+        resume_read ? seader_hf_mode_get_selected_read_type(seader) : SeaderCredentialTypeNone;
 
     FURI_LOG_I(
         TAG, "Begin board auto recovery resume_read=%d", seader->board_auto_recover_resume_read);
@@ -147,12 +191,13 @@ static void seader_hf_mode_reset(Seader* seader) {
         return;
     }
 
-    seader_runtime_reset_hf_mode(
-        &seader->hf_mode_active,
-        &seader->hf_mode_ctx.selected_read_type,
+    seader->hf_mode_ctx.selected_read_type = SeaderCredentialTypeNone;
+    memset(
         seader->hf_mode_ctx.detected_card_types,
-        COUNT_OF(seader->hf_mode_ctx.detected_card_types),
-        &seader->hf_mode_ctx.detected_card_type_count);
+        0,
+        sizeof(seader->hf_mode_ctx.detected_card_types));
+    seader->hf_mode_ctx.detected_card_type_count = 0U;
+    seader->hf_mode_active = false;
 }
 
 static bool seader_board_handle_runtime_power_lost(Seader* seader) {
@@ -1297,7 +1342,7 @@ static void seader_hf_teardown_blocking(Seader* seader) {
         return;
     }
 
-    seader_runtime_begin_hf_teardown(&seader->hf_session_state);
+    seader->hf_session_state = SeaderHfSessionStateTearingDown;
     if(!seader_worker_acquire(seader) || !seader->worker || !seader->uart) {
         FURI_LOG_W(TAG, "HF blocking teardown fallback");
         seader_hf_plugin_release(seader);

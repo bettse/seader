@@ -1,19 +1,6 @@
 #include "../seader_i.h"
 #include <gui/elements.h>
 
-static void seader_scene_sam_wrong_alloc_strings(Seader* seader) {
-    if(!seader->temp_string1) {
-        seader->temp_string1 = furi_string_alloc();
-    }
-}
-
-static void seader_scene_sam_wrong_free_strings(Seader* seader) {
-    if(seader->temp_string1) {
-        furi_string_free(seader->temp_string1);
-        seader->temp_string1 = NULL;
-    }
-}
-
 void seader_scene_sam_wrong_widget_callback(GuiButtonType result, InputType type, void* context) {
     Seader* seader = context;
     if(type == InputTypeShort) {
@@ -30,7 +17,10 @@ void seader_scene_sam_wrong_on_enter(void* context) {
     }
     char atr_summary[48];
 
-    seader_scene_sam_wrong_alloc_strings(seader);
+    if(!seader_temp_strings_ensure(seader, 1U)) {
+        FURI_LOG_E("SeaderSceneSamWrong", "Temp string allocation failed");
+        return;
+    }
     seader_format_atr_summary(seader->ATR, seader->ATR_len, atr_summary, sizeof(atr_summary));
     furi_string_reset(seader->temp_string1);
     furi_string_printf(seader->temp_string1, "%s\nUse supported SAM", atr_summary);
@@ -94,5 +84,5 @@ void seader_scene_sam_wrong_on_exit(void* context) {
     if(seader->widget) {
         widget_reset(seader->widget);
     }
-    seader_scene_sam_wrong_free_strings(seader);
+    seader_temp_strings_release(seader, 1U);
 }
