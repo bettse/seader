@@ -205,7 +205,7 @@ static MunitResult test_probe_full_sequence_succeeds_with_runtime_sized_buffers(
     (void)fixture;
 
     SeaderUhfSnmpProbe probe = {0};
-    uint8_t message[272] = {0};
+    uint8_t message[176] = {0};
     uint8_t scratch[240] = {0};
     uint8_t response[512] = {0};
     size_t message_len = 0U;
@@ -252,6 +252,39 @@ static MunitResult test_probe_full_sequence_succeeds_with_runtime_sized_buffers(
     return MUNIT_OK;
 }
 
+static MunitResult test_get_data_request_fits_bounded_transport_buffer(
+    const MunitParameter params[],
+    void* fixture) {
+    (void)params;
+    (void)fixture;
+
+    uint8_t engine[SEADER_UHF_SNMP_MAX_ID_LEN];
+    uint8_t username[SEADER_UHF_SNMP_MAX_ID_LEN];
+    uint8_t scratch[240] = {0};
+    uint8_t message[176] = {0};
+    size_t message_len = 0U;
+
+    memset(engine, 0xAA, sizeof(engine));
+    memset(username, 0xBB, sizeof(username));
+
+    munit_assert_true(seader_snmp_build_get_data_request(
+        engine,
+        sizeof(engine),
+        username,
+        sizeof(username),
+        UINT32_MAX,
+        UINT32_MAX,
+        oid_monza4qt_access_key,
+        sizeof(oid_monza4qt_access_key),
+        scratch,
+        sizeof(scratch),
+        message,
+        sizeof(message),
+        &message_len));
+    munit_assert_size(message_len, <=, sizeof(message));
+    return MUNIT_OK;
+}
+
 static MunitResult test_tag_config_view_extracts_known_entries(const MunitParameter params[], void* fixture) {
     (void)params;
     (void)fixture;
@@ -295,6 +328,7 @@ static MunitTest test_snmp_cases[] = {
     {(char*)"/parse-values", test_parse_ice_and_tag_config_values, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {(char*)"/probe", test_probe_stages, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {(char*)"/probe-runtime-buffers", test_probe_full_sequence_succeeds_with_runtime_sized_buffers, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {(char*)"/bounded-get-data", test_get_data_request_fits_bounded_transport_buffer, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {(char*)"/tag-config", test_tag_config_view_extracts_known_entries, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {(char*)"/malformed-length", test_response_rejects_truncated_length, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {NULL, NULL, NULL, NULL, 0, NULL},

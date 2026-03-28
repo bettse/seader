@@ -18,6 +18,7 @@
 #define ASN1_PREFIX                     6
 #define SEADER_ICLASS_SR_SIO_BASE_BLOCK 10
 #define SEADER_SERIAL_FILE_NAME         "sam_serial"
+#define SEADER_SNMP_MAX_REQUEST_SIZE    176U
 
 const uint8_t picopass_iclass_key[] = {0xaf, 0xa7, 0x85, 0xa7, 0xda, 0xb3, 0x33, 0x78};
 const uint8_t seader_oid[] =
@@ -43,6 +44,7 @@ static void seader_update_sam_key_label(Seader* seader, const uint8_t* value, si
 
     seader_sam_key_label_format(
         seader->sam_present,
+        seader->sam_key_probe_status,
         value,
         value_len,
         seader->sam_key_label,
@@ -56,6 +58,7 @@ static void seader_update_uhf_status_label(Seader* seader) {
     }
 
     seader_uhf_status_label_format(
+        seader->uhf_probe_status,
         seader->snmp_probe.has_monza4qt,
         seader->snmp_probe.monza4qt_key_present,
         seader->snmp_probe.has_higgs3,
@@ -67,6 +70,20 @@ static void seader_update_uhf_status_label(Seader* seader) {
 
 static SeaderWorker* seader_get_active_worker(Seader* seader) {
     return seader ? seader->worker : NULL;
+}
+
+static bool seader_ice_value_is_standard(const uint8_t* value, size_t value_len) {
+    if(!value || value_len == 0U) {
+        return false;
+    }
+
+    for(size_t i = 0; i < value_len; i++) {
+        if(value[i] != 0x00U) {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 static SeaderUartBridge* seader_require_uart(Seader* seader) {
@@ -88,6 +105,9 @@ static void seader_reset_cached_sam_metadata(Seader* seader) {
         return;
     }
 
+    seader->sam_key_probe_status = SeaderSamKeyProbeStatusUnknown;
+    seader->uhf_probe_status = SeaderUhfProbeStatusUnknown;
+
     seader_runtime_reset_cached_sam_metadata(
         seader->sam_version,
         seader->uhf_status_label,
@@ -97,16 +117,16 @@ static void seader_reset_cached_sam_metadata(Seader* seader) {
 
 static bool seader_snmp_probe_send_next_request(Seader* seader) {
     SeaderUartBridge* seader_uart = seader_require_uart(seader);
-    uint8_t scratch[SEADER_UART_RX_BUF_SIZE - MAX_FRAME_HEADERS] = {0};
-    uint8_t* message = seader_uart->tx_buf;
+    uint8_t* scratch = seader_uart->tx_buf + MAX_FRAME_HEADERS;
+    uint8_t message[SEADER_SNMP_MAX_REQUEST_SIZE] = {0};
     size_t message_len = 0U;
 
     if(!seader_uhf_snmp_probe_build_next_request(
            &seader->snmp_probe,
            scratch,
-           sizeof(scratch),
+           SEADER_UART_RX_BUF_SIZE - MAX_FRAME_HEADERS,
            message,
-           SEADER_UART_RX_BUF_SIZE,
+           sizeof(message),
            &message_len)) {
         return false;
     }
@@ -140,6 +160,9 @@ static void seader_start_snmp_probe(Seader* seader) {
         seader_snmp_probe_finish(seader);
         return;
     }
+    seader->sam_key_probe_status = SeaderSamKeyProbeStatusUnknown;
+    seader->uhf_probe_status = SeaderUhfProbeStatusUnknown;
+    seader_update_sam_key_label(seader, NULL, 0U);
     seader_update_uhf_status_label(seader);
     seader_sam_set_state(
         seader,
@@ -148,6 +171,10 @@ static void seader_start_snmp_probe(Seader* seader) {
         SamCommand_PR_processSNMPMessage);
 
     if(!seader_snmp_probe_send_next_request(seader)) {
+        seader->sam_key_probe_status = SeaderSamKeyProbeStatusProbeFailed;
+        seader->uhf_probe_status = SeaderUhfProbeStatusFailed;
+        seader_update_sam_key_label(seader, NULL, 0U);
+        seader_update_uhf_status_label(seader);
         seader_snmp_probe_finish(seader);
     }
 }
@@ -692,6 +719,7 @@ void seader_worker_send_version(Seader* seader) {
     samCommand.present = SamCommand_PR_version;
     seader_reset_cached_sam_metadata(seader);
     seader->sam_present = true;
+    seader->sam_key_probe_status = SeaderSamKeyProbeStatusUnknown;
     seader_update_sam_key_label(seader, NULL, 0U);
     seader_sam_set_state(
         seader, SeaderSamStateVersionPending, SeaderSamIntentMaintenance, samCommand.present);
@@ -1085,12 +1113,24 @@ bool seader_parse_sam_response(Seader* seader, SamResponse_t* samResponse) {
         FURI_LOG_I(TAG, "samResponse processSNMPMessage");
         if(!seader_uhf_snmp_probe_consume_response(
                &seader->snmp_probe, samResponse->buf, samResponse->size)) {
+            seader->sam_key_probe_status = SeaderSamKeyProbeStatusProbeFailed;
+            seader->uhf_probe_status = SeaderUhfProbeStatusFailed;
             seader_update_sam_key_label(seader, NULL, 0U);
+            seader_update_uhf_status_label(seader);
             seader_snmp_probe_finish(seader);
             break;
         }
 
+        if(seader->snmp_probe.ice_value_len > 0U) {
+            seader->sam_key_probe_status =
+                seader_ice_value_is_standard(
+                    seader->snmp_probe.ice_value_storage, seader->snmp_probe.ice_value_len) ?
+                    SeaderSamKeyProbeStatusVerifiedStandard :
+                    SeaderSamKeyProbeStatusVerifiedValue;
+        }
+
         if(seader->snmp_probe.stage >= SeaderUhfSnmpProbeStageReadTagConfig) {
+            seader->uhf_probe_status = SeaderUhfProbeStatusSuccess;
             seader_update_sam_key_label(
                 seader, seader->snmp_probe.ice_value_storage, seader->snmp_probe.ice_value_len);
             seader_update_uhf_status_label(seader);
@@ -1101,6 +1141,10 @@ bool seader_parse_sam_response(Seader* seader, SamResponse_t* samResponse) {
         } else if(
             seader->snmp_probe.stage == SeaderUhfSnmpProbeStageFailed ||
             !seader_snmp_probe_send_next_request(seader)) {
+            seader->sam_key_probe_status = SeaderSamKeyProbeStatusProbeFailed;
+            seader->uhf_probe_status = SeaderUhfProbeStatusFailed;
+            seader_update_sam_key_label(seader, NULL, 0U);
+            seader_update_uhf_status_label(seader);
             seader_snmp_probe_finish(seader);
         }
         break;
@@ -1670,13 +1714,35 @@ bool seader_worker_state_machine(
             ErrorResponse_t* err = &payload->choice.errorResponse;
             if(seader_uhf_snmp_probe_consume_error(
                    &seader->snmp_probe, err->errorCode, err->data.buf, err->data.size)) {
+                if(seader->snmp_probe.ice_value_len > 0U) {
+                    seader->sam_key_probe_status = seader_ice_value_is_standard(
+                                                       seader->snmp_probe.ice_value_storage,
+                                                       seader->snmp_probe.ice_value_len) ?
+                                                       SeaderSamKeyProbeStatusVerifiedStandard :
+                                                       SeaderSamKeyProbeStatusVerifiedValue;
+                }
+                if(seader->snmp_probe.stage >= SeaderUhfSnmpProbeStageReadTagConfig) {
+                    seader->uhf_probe_status = SeaderUhfProbeStatusSuccess;
+                }
+                seader_update_sam_key_label(
+                    seader,
+                    seader->snmp_probe.ice_value_storage,
+                    seader->snmp_probe.ice_value_len);
                 seader_update_uhf_status_label(seader);
                 if(seader->snmp_probe.stage == SeaderUhfSnmpProbeStageDone) {
                     seader_snmp_probe_finish(seader);
                 } else if(!seader_snmp_probe_send_next_request(seader)) {
+                    seader->sam_key_probe_status = SeaderSamKeyProbeStatusProbeFailed;
+                    seader->uhf_probe_status = SeaderUhfProbeStatusFailed;
+                    seader_update_sam_key_label(seader, NULL, 0U);
+                    seader_update_uhf_status_label(seader);
                     seader_snmp_probe_finish(seader);
                 }
             } else {
+                seader->sam_key_probe_status = SeaderSamKeyProbeStatusProbeFailed;
+                seader->uhf_probe_status = SeaderUhfProbeStatusFailed;
+                seader_update_sam_key_label(seader, NULL, 0U);
+                seader_update_uhf_status_label(seader);
                 seader_snmp_probe_finish(seader);
             }
         } else {

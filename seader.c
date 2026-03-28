@@ -47,7 +47,12 @@ static void seader_board_prepare_missing_state(Seader* seader, SeaderBoardStatus
     seader->board_status = status;
     seader->sam_present = false;
     seader_sam_key_label_format(
-        false, NULL, 0U, seader->sam_key_label, sizeof(seader->sam_key_label));
+        false,
+        SeaderSamKeyProbeStatusUnknown,
+        NULL,
+        0U,
+        seader->sam_key_label,
+        sizeof(seader->sam_key_label));
 }
 
 static bool seader_board_auto_recover_begin(Seader* seader) {
@@ -815,10 +820,23 @@ Seader* seader_alloc() {
     seader->sam_intent = SeaderSamIntentNone;
     seader->sam_present = false;
     memset(seader->sam_version, 0, sizeof(seader->sam_version));
+    seader->sam_key_probe_status = SeaderSamKeyProbeStatusUnknown;
+    seader->uhf_probe_status = SeaderUhfProbeStatusUnknown;
     seader_sam_key_label_format(
-        false, NULL, 0U, seader->sam_key_label, sizeof(seader->sam_key_label));
+        false,
+        seader->sam_key_probe_status,
+        NULL,
+        0U,
+        seader->sam_key_label,
+        sizeof(seader->sam_key_label));
     seader_uhf_status_label_format(
-        false, false, false, false, seader->uhf_status_label, sizeof(seader->uhf_status_label));
+        seader->uhf_probe_status,
+        false,
+        false,
+        false,
+        false,
+        seader->uhf_status_label,
+        sizeof(seader->uhf_status_label));
     seader_uhf_snmp_probe_init(&seader->snmp_probe);
     seader->nfc = nfc_alloc();
     seader->nfc_device = seader->nfc ? nfc_device_alloc() : NULL;

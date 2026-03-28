@@ -102,7 +102,12 @@ bool seader_scene_start_on_event(void* context, SceneManagerEvent event) {
                 &seader->board_auto_recover_read_type);
             seader->sam_present = false;
             seader_sam_key_label_format(
-                false, NULL, 0U, seader->sam_key_label, sizeof(seader->sam_key_label));
+                false,
+                SeaderSamKeyProbeStatusUnknown,
+                NULL,
+                0U,
+                seader->sam_key_label,
+                sizeof(seader->sam_key_label));
             scene_manager_next_scene(seader->scene_manager, SeaderSceneSamMissing);
             consumed = true;
         } else if(event.event == SeaderWorkerEventSamWrong) {
@@ -113,7 +118,12 @@ bool seader_scene_start_on_event(void* context, SceneManagerEvent event) {
                 &seader->board_auto_recover_read_type);
             seader->sam_present = false;
             seader_sam_key_label_format(
-                false, NULL, 0U, seader->sam_key_label, sizeof(seader->sam_key_label));
+                false,
+                SeaderSamKeyProbeStatusUnknown,
+                NULL,
+                0U,
+                seader->sam_key_label,
+                sizeof(seader->sam_key_label));
             scene_manager_next_scene(seader->scene_manager, SeaderSceneSamWrong);
             consumed = true;
         }
