@@ -26,9 +26,7 @@ static void seader_scene_start_begin_detection(Seader* seader) {
         seader);
 }
 
-static void seader_scene_start_finish_board_auto_recover(
-    Seader* seader,
-    bool preserve_read_type) {
+static void seader_scene_start_finish_board_auto_recover(Seader* seader, bool preserve_read_type) {
     if(!seader) {
         return;
     }

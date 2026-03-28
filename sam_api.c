@@ -908,7 +908,8 @@ bool seader_parse_version(Seader* seader, uint8_t* buf, size_t size) {
 #endif
         if(version.version.size == 2) {
             memcpy(seader->sam_version, version.version.buf, version.version.size);
-            SEADER_VERBOSE_I(TAG, "SAM Version: %d.%d", seader->sam_version[0], seader->sam_version[1]);
+            SEADER_VERBOSE_I(
+                TAG, "SAM Version: %d.%d", seader->sam_version[0], seader->sam_version[1]);
         }
 
         rtn = true;
@@ -1588,7 +1589,8 @@ void seader_mfc_transmit(
 
 void seader_parse_nfc_command_transmit(Seader* seader, NFCSend_t* nfcSend) {
 #ifdef ASN1_DEBUG
-    SEADER_VERBOSE_HEX(FuriLogLevelDebug, TAG, "Transmit data", nfcSend->data.buf, nfcSend->data.size);
+    SEADER_VERBOSE_HEX(
+        FuriLogLevelDebug, TAG, "Transmit data", nfcSend->data.buf, nfcSend->data.size);
 #endif
 
     PluginHfAction action = {
@@ -1829,7 +1831,8 @@ NfcCommand seader_worker_card_detect(
     SeaderCredential* credential = seader->credential;
 
     CardDetails_t cardDetails = {0};
-    SEADER_VERBOSE_D(TAG, "Build card_detect sak=%02x uid_len=%u ats_len=%u", sak, uid_len, ats_len);
+    SEADER_VERBOSE_D(
+        TAG, "Build card_detect sak=%02x uid_len=%u ats_len=%u", sak, uid_len, ats_len);
 
     /* The UID is reused as the current diversifier seed for formats that need one. This is
        not universal across all media, but it is the intentional behavior for the cards Seader

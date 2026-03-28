@@ -557,7 +557,8 @@ void seader_worker_reading(Seader* seader) {
             seader->hf_read_failure_reason = SeaderHfReadFailureReasonNone;
             seader->hf_read_last_progress_tick = 0U;
         }
-        SEADER_VERBOSE_D(TAG, "HF loop selected type=%d stage=%d", type_to_read, seader_worker->stage);
+        SEADER_VERBOSE_D(
+            TAG, "HF loop selected type=%d stage=%d", type_to_read, seader_worker->stage);
 
         if(type_to_read == SeaderCredentialTypeNone) {
             SeaderCredentialType detected_types[SEADER_MAX_DETECTED_CARD_TYPES] = {0};

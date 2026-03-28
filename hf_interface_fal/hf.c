@@ -12,7 +12,7 @@
 #include <lib/nfc/protocols/mf_classic/mf_classic_poller.h>
 #include <nfc/helpers/iso13239_crc.h>
 
-#define TAG "PluginHF"
+#define TAG            "PluginHF"
 #define HF_DIAG_D(...) SEADER_VERBOSE_D(TAG, __VA_ARGS__)
 #define HF_DIAG_I(...) SEADER_VERBOSE_I(TAG, __VA_ARGS__)
 

@@ -141,7 +141,7 @@ typedef asn_type_selector_result_t(asn_type_selector_f)(
  * Generalized functions for dealing with the speciic type.
  * May be directly invoked by applications.
  */
-typedef struct asn_TYPE_operation_s {
+typedef const struct asn_TYPE_operation_s {
     asn_struct_free_f *free_struct;     /* Free the structure */
     asn_struct_print_f *print_struct;   /* Human readable output */
     asn_struct_compare_f *compare_struct; /* Compare two structures */
@@ -169,7 +169,7 @@ typedef struct asn_encoding_constraints_s {
 /*
  * The definitive description of the destination language's structure.
  */
-typedef struct asn_TYPE_descriptor_s {
+typedef const struct asn_TYPE_descriptor_s {
     const char *name;       /* A name of the ASN.1 type. "" in some cases. */
     const char *xml_tag;    /* Name used in XML tag */
 
@@ -177,7 +177,7 @@ typedef struct asn_TYPE_descriptor_s {
      * Generalized functions for dealing with the specific type.
      * May be directly invoked by applications.
      */
-    asn_TYPE_operation_t *op;
+    const asn_TYPE_operation_t *op;
 
     /***********************************************************************
      * Internally useful members. Not to be used by applications directly. *
@@ -197,7 +197,7 @@ typedef struct asn_TYPE_descriptor_s {
     /*
      * An ASN.1 production type members (members of SEQUENCE, SET, CHOICE).
      */
-    struct asn_TYPE_member_s *elements;
+    const struct asn_TYPE_member_s *elements;
     unsigned elements_count;
 
     /*
@@ -217,13 +217,13 @@ typedef struct asn_TYPE_descriptor_s {
     ATF_OPEN_TYPE = 0x02, /* Open Type */
     ATF_ANY_TYPE = 0x04   /* ANY type (deprecated!) */
   };
-typedef struct asn_TYPE_member_s {
+typedef const struct asn_TYPE_member_s {
     enum asn_TYPE_flags_e flags; /* Element's presentation flags */
     unsigned optional;      /* Following optional members, including current */
     unsigned memb_offset;   /* Offset of the element */
     ber_tlv_tag_t tag;      /* Outmost (most immediate) tag */
     int tag_mode;           /* IMPLICIT/no/EXPLICIT tag at current level */
-    asn_TYPE_descriptor_t *type;            /* Member type descriptor */
+    const asn_TYPE_descriptor_t *type;      /* Member type descriptor */
     asn_type_selector_f *type_selector;     /* IoS runtime type selector */
     asn_encoding_constraints_t encoding_constraints;
     int (*default_value_cmp)(const void *sptr); /* Compare DEFAULT <value> */
@@ -234,7 +234,7 @@ typedef struct asn_TYPE_member_s {
 /*
  * BER tag to element number mapping.
  */
-typedef struct asn_TYPE_tag2member_s {
+typedef const struct asn_TYPE_tag2member_s {
     ber_tlv_tag_t el_tag;   /* Outmost tag of the member */
     unsigned el_no;         /* Index of the associated member, base 0 */
     int toff_first;         /* First occurence of the el_tag, relative */

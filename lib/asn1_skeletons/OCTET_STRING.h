@@ -73,7 +73,7 @@ OCTET_STRING_t *OCTET_STRING_new_fromBuf(const asn_TYPE_descriptor_t *td,
  * Internally useful stuff. *
  ****************************/
 
-typedef struct asn_OCTET_STRING_specifics_s {
+typedef const struct asn_OCTET_STRING_specifics_s {
     /*
      * Target structure description.
      */

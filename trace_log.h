@@ -29,20 +29,20 @@ void seader_verbose_hex(
     seader_verbose_hex(level, tag, prefix, data, len)
 #else
 #define SEADER_VERBOSE_D(tag, format, ...) \
-    do {                                     \
-        (void)(tag);                         \
+    do {                                   \
+        (void)(tag);                       \
     } while(0)
 #define SEADER_VERBOSE_I(tag, format, ...) \
-    do {                                     \
-        (void)(tag);                         \
+    do {                                   \
+        (void)(tag);                       \
     } while(0)
 #define SEADER_VERBOSE_HEX(level, tag, prefix, data, len) \
-    do {                                                   \
-        (void)(level);                                     \
-        (void)(tag);                                       \
-        (void)(prefix);                                    \
-        (void)(data);                                      \
-        (void)(len);                                       \
+    do {                                                  \
+        (void)(level);                                    \
+        (void)(tag);                                      \
+        (void)(prefix);                                   \
+        (void)(data);                                     \
+        (void)(len);                                      \
     } while(0)
 #endif
 
