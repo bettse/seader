@@ -17,7 +17,7 @@
 extern "C" {
 #endif
 
-typedef const struct asn_NativeReal_specifics_s {
+typedef struct asn_NativeReal_specifics_s {
     unsigned float_size; /* sizeof(float) or sizeof(double) */
 } asn_NativeReal_specifics_t;
 

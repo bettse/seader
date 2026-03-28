@@ -265,8 +265,8 @@ uper_open_type_get(const asn_codec_ctx_t *ctx, const asn_TYPE_descriptor_t *td,
 
 int
 uper_open_type_skip(const asn_codec_ctx_t *ctx, asn_per_data_t *pd) {
-	struct asn_TYPE_descriptor_s s_td = {0};
-    struct asn_TYPE_operation_s s_op = {0};
+	asn_TYPE_descriptor_t s_td;
+    asn_TYPE_operation_t s_op;
 	asn_dec_rval_t rv;
 
 	s_td.name = "<unknown extension>";
