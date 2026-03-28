@@ -1,4 +1,5 @@
 #include "seader_i.h"
+#include "trace_log.h"
 
 #define TAG                              "SeaderUART"
 #define BAUDRATE_DEFAULT                 115200
@@ -215,7 +216,7 @@ SeaderUartBridge* seader_uart_alloc(Seader* seader) {
     SeaderUartState uart_state;
     SeaderUartBridge* seader_uart;
 
-    FURI_LOG_I(TAG, "Enable UART");
+    SEADER_VERBOSE_I(TAG, "Enable UART");
     seader_uart = seader_uart_enable(&cfg, seader);
 
     seader_uart_get_config(seader_uart, &cfg);

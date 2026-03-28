@@ -10,7 +10,6 @@
 
 #define APDU_HEADER_LEN                   5
 #define ASN1_PREFIX                       6
-#define SEADER_HEX_LOG_MAX_BYTES          32U
 #define SEADER_HF_CONVERSATION_TIMEOUT_MS 3000U
 #define SEADER_WORKER_STACK_SIZE          2048U
 // #define ASN1_DEBUG      true
@@ -112,27 +111,6 @@ static void seader_worker_clear_active_card(Seader* seader, const char* reason) 
     if(seader_sam_has_active_card(seader)) {
         FURI_LOG_I(TAG, "Clear active SAM card (%s)", reason ? reason : "worker");
         seader_send_no_card_detected(seader);
-    }
-}
-
-static void seader_worker_log_hex(const char* prefix, const uint8_t* data, size_t len) {
-    if(!data || len == 0U) {
-        FURI_LOG_I(TAG, "%s: <empty>", prefix);
-        return;
-    }
-
-    const size_t display_len = len > SEADER_HEX_LOG_MAX_BYTES ? SEADER_HEX_LOG_MAX_BYTES : len;
-    char hex[(SEADER_HEX_LOG_MAX_BYTES * 2U) + 1U];
-
-    for(size_t i = 0; i < display_len; i++) {
-        snprintf(hex + (i * 2U), sizeof(hex) - (i * 2U), "%02x", data[i]);
-    }
-    hex[display_len * 2U] = '\0';
-
-    if(display_len < len) {
-        FURI_LOG_I(TAG, "%s len=%u: %s...", prefix, (unsigned)len, hex);
-    } else {
-        FURI_LOG_I(TAG, "%s len=%u: %s", prefix, (unsigned)len, hex);
     }
 }
 
@@ -363,7 +341,7 @@ bool seader_process_success_response(Seader* seader, uint8_t* apdu, size_t len) 
            previous flow. Enqueueing it would let old maintenance/read traffic bleed forward. */
         if(seader_worker->state != SeaderWorkerStateVirtualCredential &&
            seader_worker->stage != SeaderPollerEventTypeConversation) {
-            FURI_LOG_I(
+            SEADER_VERBOSE_I(
                 TAG,
                 "Discard stale SAM message outside active conversation, %d bytes, stage=%d, sam=%d",
                 len,
@@ -380,7 +358,7 @@ bool seader_process_success_response(Seader* seader, uint8_t* apdu, size_t len) 
             return true;
         }
 
-        FURI_LOG_I(
+        SEADER_VERBOSE_I(
             TAG,
             "Enqueue SAM message, %d bytes, stage=%d, sam=%d",
             len,
@@ -425,7 +403,7 @@ bool seader_worker_process_sam_message(Seader* seader, uint8_t* apdu, uint32_t l
         return seader_apdu_runner_response(seader, apdu, len);
     }
 
-    seader_worker_log_hex("APDU", apdu, len);
+    SEADER_VERBOSE_HEX(FuriLogLevelInfo, TAG, "APDU", apdu, len);
     seader_trace(
         TAG,
         "sam apdu len=%lu stage=%d sam=%d state=%d intent=%d sw=%02x%02x",
@@ -477,7 +455,7 @@ void seader_worker_virtual_credential(Seader* seader) {
     while(running) {
         uint32_t count = furi_message_queue_get_count(seader_worker->messages);
         if(count > 0) {
-            FURI_LOG_I(TAG, "Dequeue SAM message [%ld messages]", count);
+            SEADER_VERBOSE_I(TAG, "Dequeue SAM message [%ld messages]", count);
 
             uint8_t slot_index = 0U;
             if(!seader_worker_dequeue_apdu(seader_worker, &slot_index, FuriWaitForever)) {
@@ -492,14 +470,14 @@ void seader_worker_virtual_credential(Seader* seader) {
                    seader, seaderApdu->buf, seaderApdu->len, true, NULL)) {
                 // no-op
             } else {
-                FURI_LOG_I(TAG, "Response false");
+                SEADER_VERBOSE_I(TAG, "Response false");
                 running = false;
             }
             seader_worker_release_apdu_slot(seader_worker, slot_index);
         } else {
             dead_loops--;
             running = (dead_loops > 0);
-            FURI_LOG_D(
+            SEADER_VERBOSE_D(
                 TAG, "Dead loops: %d -> Running: %s", dead_loops, running ? "true" : "false");
             if(running) furi_delay_ms(10); // Don't tight loop if empty
         }
@@ -511,7 +489,7 @@ void seader_worker_virtual_credential(Seader* seader) {
             seader_worker->callback(SeaderWorkerEventSuccess, seader_worker->context);
         }
     } else if(dead_loops > 0) {
-        FURI_LOG_D(TAG, "Final dead loops: %d", dead_loops);
+        SEADER_VERBOSE_D(TAG, "Final dead loops: %d", dead_loops);
     } else {
         view_dispatcher_send_custom_event(seader->view_dispatcher, SeaderCustomEventWorkerExit);
     }
@@ -523,23 +501,23 @@ int32_t seader_worker_task(void* context) {
     SeaderUartBridge* seader_uart = seader_worker->uart;
 
     if(seader_worker->state == SeaderWorkerStateCheckSam) {
-        FURI_LOG_D(TAG, "Check for SAM");
+        SEADER_VERBOSE_D(TAG, "Check for SAM");
         seader_ccid_check_for_sam(seader_uart);
     } else if(seader_worker->state == SeaderWorkerStateVirtualCredential) {
-        FURI_LOG_D(TAG, "Virtual Credential");
+        SEADER_VERBOSE_D(TAG, "Virtual Credential");
         seader_worker_virtual_credential(seader);
     } else if(seader_worker->state == SeaderWorkerStateAPDURunner) {
-        FURI_LOG_D(TAG, "APDU Runner");
+        SEADER_VERBOSE_D(TAG, "APDU Runner");
         seader_apdu_runner_init(seader);
         return 0;
     } else if(seader_worker->state == SeaderWorkerStateHfTeardown) {
-        FURI_LOG_I(TAG, "HF teardown started");
+        SEADER_VERBOSE_I(TAG, "HF teardown started");
         seader_worker_release_hf_session(seader);
         if(seader_worker->callback) {
             seader_worker->callback(SeaderWorkerEventHfTeardownComplete, seader_worker->context);
         }
     } else if(seader_worker->state == SeaderWorkerStateReading) {
-        FURI_LOG_D(TAG, "Reading mode started");
+        SEADER_VERBOSE_D(TAG, "Reading mode started");
         seader_worker_reading(seader);
     }
     seader_worker_change_state(seader_worker, SeaderWorkerStateReady);
@@ -549,7 +527,7 @@ int32_t seader_worker_task(void* context) {
 
 void seader_worker_reading(Seader* seader) {
     SeaderWorker* seader_worker = seader->worker;
-    FURI_LOG_I(TAG, "Reading loop started");
+    SEADER_VERBOSE_I(TAG, "Reading loop started");
 
     if(!seader_hf_plugin_acquire(seader) || !seader->plugin_hf || !seader->hf_plugin_ctx) {
         FURI_LOG_E(
@@ -579,13 +557,13 @@ void seader_worker_reading(Seader* seader) {
             seader->hf_read_failure_reason = SeaderHfReadFailureReasonNone;
             seader->hf_read_last_progress_tick = 0U;
         }
-        FURI_LOG_D(TAG, "HF loop selected type=%d stage=%d", type_to_read, seader_worker->stage);
+        SEADER_VERBOSE_D(TAG, "HF loop selected type=%d stage=%d", type_to_read, seader_worker->stage);
 
         if(type_to_read == SeaderCredentialTypeNone) {
             SeaderCredentialType detected_types[SEADER_MAX_DETECTED_CARD_TYPES] = {0};
             const size_t detected_type_count = seader->plugin_hf->detect_supported_types(
                 seader->hf_plugin_ctx, detected_types, COUNT_OF(detected_types));
-            FURI_LOG_I(TAG, "HF plugin detected %u type(s)", detected_type_count);
+            SEADER_VERBOSE_I(TAG, "HF plugin detected %u type(s)", detected_type_count);
             read_plan =
                 seader_hf_read_plan_build(type_to_read, detected_types, detected_type_count);
         } else {
@@ -600,7 +578,7 @@ void seader_worker_reading(Seader* seader) {
             }
             break;
         } else if(read_plan.decision == SeaderHfReadDecisionStartRead) {
-            FURI_LOG_I(TAG, "HF start read for type=%d", read_plan.type_to_read);
+            SEADER_VERBOSE_I(TAG, "HF start read for type=%d", read_plan.type_to_read);
             seader->hf_read_state = SeaderHfReadStateDetecting;
             seader->hf_read_failure_reason = SeaderHfReadFailureReasonNone;
             seader->hf_read_last_progress_tick = furi_get_tick();
@@ -609,7 +587,7 @@ void seader_worker_reading(Seader* seader) {
             if(detected) {
                 seader->hf_session_state = SeaderHfSessionStateActive;
             }
-            FURI_LOG_I(TAG, "HF start read result=%d", detected);
+            SEADER_VERBOSE_I(TAG, "HF start read result=%d", detected);
         }
 
         if(detected) {
@@ -642,7 +620,7 @@ void seader_worker_reading(Seader* seader) {
         }
     }
 
-    FURI_LOG_I(TAG, "Reading loop stopped");
+    SEADER_VERBOSE_I(TAG, "Reading loop stopped");
 }
 
 void seader_worker_run_hf_conversation(Seader* seader) {
@@ -663,12 +641,12 @@ void seader_worker_run_hf_conversation(Seader* seader) {
             seader->hf_read_last_progress_tick = furi_get_tick();
             furi_assert(slot_index < SEADER_WORKER_APDU_SLOT_COUNT);
             SeaderAPDU* seaderApdu = &seader_worker->apdu_slots[slot_index];
-            FURI_LOG_D(TAG, "Dequeue SAM message [%d bytes]", seaderApdu->len);
+            SEADER_VERBOSE_D(TAG, "Dequeue SAM message [%d bytes]", seaderApdu->len);
             if(seader_process_success_response_i(
                    seader, seaderApdu->buf, seaderApdu->len, true, NULL)) {
                 // message was processed, loop again to see if SAM has more to say
             } else {
-                FURI_LOG_I(TAG, "Response false, ending conversation");
+                SEADER_VERBOSE_I(TAG, "Response false, ending conversation");
                 seader_worker->stage = SeaderPollerEventTypeComplete;
                 view_dispatcher_send_custom_event(
                     seader->view_dispatcher, SeaderCustomEventWorkerExit);

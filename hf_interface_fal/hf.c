@@ -1,4 +1,5 @@
 #include "hf_interface.h"
+#include "../trace_log.h"
 
 #include "../protocol/picopass_poller.h"
 #include "../protocol/rfal_picopass.h"
@@ -12,17 +13,8 @@
 #include <nfc/helpers/iso13239_crc.h>
 
 #define TAG "PluginHF"
-#ifdef HF_HARDEN_DIAG
-#define HF_DIAG_D(...) FURI_LOG_D(TAG, __VA_ARGS__)
-#define HF_DIAG_I(...) FURI_LOG_I(TAG, __VA_ARGS__)
-#else
-#define HF_DIAG_D(...) \
-    do {               \
-    } while(0)
-#define HF_DIAG_I(...) \
-    do {               \
-    } while(0)
-#endif
+#define HF_DIAG_D(...) SEADER_VERBOSE_D(TAG, __VA_ARGS__)
+#define HF_DIAG_I(...) SEADER_VERBOSE_I(TAG, __VA_ARGS__)
 
 #define HF_PLUGIN_POLLER_MAX_FWT         (200000U)
 #define HF_PLUGIN_POLLER_MAX_BUFFER_SIZE (258U)
@@ -555,7 +547,7 @@ static NfcCommand plugin_hf_poller_callback_iso14443_4a(NfcGenericEvent event, v
             }
             ctx->api->set_stage(ctx->host_ctx, PluginHfStageConversation);
         } else if(stage == PluginHfStageConversation) {
-            FURI_LOG_D(TAG, "14A enter conversation");
+            SEADER_VERBOSE_D(TAG, "14A enter conversation");
             ret = plugin_hf_run_conversation(ctx);
         } else if(stage == PluginHfStageComplete) {
             ret = NfcCommandStop;
@@ -621,7 +613,7 @@ static NfcCommand plugin_hf_poller_callback_mfc(NfcGenericEvent event, void* con
             }
             ctx->api->set_stage(ctx->host_ctx, PluginHfStageConversation);
         } else if(stage == PluginHfStageConversation) {
-            FURI_LOG_D(TAG, "MFC enter conversation");
+            SEADER_VERBOSE_D(TAG, "MFC enter conversation");
             ret = plugin_hf_run_conversation(ctx);
         } else if(stage == PluginHfStageComplete) {
             ret = NfcCommandStop;
@@ -664,7 +656,7 @@ static NfcCommand plugin_hf_poller_callback_picopass(PicopassPollerEvent event, 
             }
             ctx->api->set_stage(ctx->host_ctx, PluginHfStageConversation);
         } else if(stage == PluginHfStageConversation) {
-            FURI_LOG_D(TAG, "Picopass enter conversation");
+            SEADER_VERBOSE_D(TAG, "Picopass enter conversation");
             ret = plugin_hf_run_conversation(ctx);
         } else if(stage == PluginHfStageComplete) {
             ret = NfcCommandStop;
