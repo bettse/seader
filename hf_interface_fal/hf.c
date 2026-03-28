@@ -51,6 +51,28 @@ static const uint8_t plugin_hf_select_desfire_app_no_le[] =
     {0x00, 0xA4, 0x04, 0x00, 0x07, 0xD2, 0x76, 0x00, 0x00, 0x85, 0x01, 0x00};
 static const uint8_t plugin_hf_file_not_found[] = {0x6a, 0x82};
 
+static NfcCommand plugin_hf_run_conversation(PluginHfContext* ctx) {
+    if(!ctx || !ctx->api) {
+        FURI_LOG_E(TAG, "Cannot run HF conversation without valid context");
+        return NfcCommandStop;
+    }
+
+    furi_thread_set_current_priority(FuriThreadPriorityLowest);
+    ctx->api->run_conversation(ctx->host_ctx);
+
+    PluginHfStage stage = ctx->api->get_stage(ctx->host_ctx);
+    if(stage == PluginHfStageComplete) {
+        return NfcCommandStop;
+    }
+
+    if(stage == PluginHfStageFail) {
+        ctx->api->notify_worker_exit(ctx->host_ctx);
+        return NfcCommandStop;
+    }
+
+    return NfcCommandContinue;
+}
+
 static bool plugin_hf_validate_host_api(const PluginHfHostApi* api) {
     if(!api) {
         FURI_LOG_E(TAG, "Missing HF host API");
@@ -65,10 +87,8 @@ static bool plugin_hf_validate_host_api(const PluginHfHostApi* api) {
         }                                                 \
     } while(false)
 
-    HF_REQUIRE_API(notify_card_detected);
     HF_REQUIRE_API(notify_worker_exit);
-    HF_REQUIRE_API(sam_can_accept_card);
-    HF_REQUIRE_API(send_card_detected);
+    HF_REQUIRE_API(begin_card_session);
     HF_REQUIRE_API(send_nfc_rx);
     HF_REQUIRE_API(run_conversation);
     HF_REQUIRE_API(set_stage);
@@ -91,18 +111,27 @@ static bool plugin_hf_validate_host_api(const PluginHfHostApi* api) {
     return true;
 }
 
-static PluginHfContext* plugin_hf_require_ctx(void* plugin_ctx) {
+static PluginHfContext* plugin_hf_get_ctx(void* plugin_ctx) {
     PluginHfContext* ctx = plugin_ctx;
-    furi_check(ctx);
-    furi_check(ctx->api);
-    furi_check(ctx->host_ctx);
-    furi_check(ctx->nfc);
-    furi_check(ctx->nfc_device);
+    if(!ctx || !ctx->api || !ctx->host_ctx || !ctx->nfc || !ctx->nfc_device) {
+        FURI_LOG_W(
+            TAG,
+            "Invalid HF plugin context ctx=%p api=%p host=%p nfc=%p device=%p",
+            (void*)ctx,
+            ctx ? (void*)ctx->api : NULL,
+            ctx ? ctx->host_ctx : NULL,
+            ctx ? (void*)ctx->nfc : NULL,
+            ctx ? (void*)ctx->nfc_device : NULL);
+        return NULL;
+    }
     return ctx;
 }
 
 static void plugin_hf_cleanup_pollers(PluginHfContext* ctx) {
-    ctx = plugin_hf_require_ctx(ctx);
+    ctx = plugin_hf_get_ctx(ctx);
+    if(!ctx) {
+        return;
+    }
     if(ctx->poller) {
         nfc_poller_stop(ctx->poller);
         nfc_poller_free(ctx->poller);
@@ -116,7 +145,10 @@ static void plugin_hf_cleanup_pollers(PluginHfContext* ctx) {
 }
 
 static void plugin_hf_set_read_error(PluginHfContext* ctx, const char* text) {
-    ctx = plugin_hf_require_ctx(ctx);
+    ctx = plugin_hf_get_ctx(ctx);
+    if(!ctx) {
+        return;
+    }
     if(ctx->api->set_read_error) {
         ctx->api->set_read_error(ctx->host_ctx, text);
     }
@@ -154,9 +186,10 @@ static PicopassError plugin_hf_fake_epurse_update(BitBuffer* tx_buffer, BitBuffe
 
 static void
     plugin_hf_capture_sio(PluginHfContext* ctx, BitBuffer* tx_buffer, BitBuffer* rx_buffer) {
-    ctx = plugin_hf_require_ctx(ctx);
-    furi_check(tx_buffer);
-    furi_check(rx_buffer);
+    ctx = plugin_hf_get_ctx(ctx);
+    if(!ctx || !tx_buffer || !rx_buffer) {
+        return;
+    }
     const uint8_t* buffer = bit_buffer_get_data(tx_buffer);
     size_t len = bit_buffer_get_size_bytes(tx_buffer);
     const uint8_t* rx_buffer_data = bit_buffer_get_data(rx_buffer);
@@ -179,7 +212,10 @@ static void
 }
 
 static void plugin_hf_iso15693_transmit(PluginHfContext* ctx, uint8_t* buffer, size_t len) {
-    ctx = plugin_hf_require_ctx(ctx);
+    ctx = plugin_hf_get_ctx(ctx);
+    if(!ctx) {
+        return;
+    }
     if(!buffer || len == 0U) {
         FURI_LOG_W(TAG, "Skip picopass transmit invalid input");
         ctx->api->set_stage(ctx->host_ctx, PluginHfStageFail);
@@ -240,7 +276,10 @@ static void plugin_hf_iso14443a_transmit(
     UNUSED(timeout);
     UNUSED(format);
 
-    ctx = plugin_hf_require_ctx(ctx);
+    ctx = plugin_hf_get_ctx(ctx);
+    if(!ctx) {
+        return;
+    }
     if(!buffer || len == 0U || !ctx->iso14443_4a_poller) {
         FURI_LOG_W(TAG, "Skip 14A transmit invalid state");
         ctx->api->set_stage(ctx->host_ctx, PluginHfStageFail);
@@ -306,7 +345,10 @@ static void plugin_hf_mfc_transmit(
     uint8_t format[3]) {
     UNUSED(timeout);
 
-    ctx = plugin_hf_require_ctx(ctx);
+    ctx = plugin_hf_get_ctx(ctx);
+    if(!ctx) {
+        return;
+    }
     if(!buffer || len == 0U || !ctx->mfc_poller) {
         FURI_LOG_W(TAG, "Skip MFC transmit invalid state");
         ctx->api->set_stage(ctx->host_ctx, PluginHfStageFail);
@@ -424,7 +466,10 @@ static void plugin_hf_mfc_transmit(
 }
 
 static NfcCommand plugin_hf_poller_callback_iso14443_4a(NfcGenericEvent event, void* context) {
-    PluginHfContext* ctx = plugin_hf_require_ctx(context);
+    PluginHfContext* ctx = plugin_hf_get_ctx(context);
+    if(!ctx) {
+        return NfcCommandStop;
+    }
     NfcCommand ret = NfcCommandContinue;
     const Iso14443_4aPollerEvent* iso_event = event.event_data;
     if(event.protocol != NfcProtocolIso14443_4a || !iso_event) {
@@ -438,13 +483,15 @@ static NfcCommand plugin_hf_poller_callback_iso14443_4a(NfcGenericEvent event, v
     if(iso_event->type == Iso14443_4aPollerEventTypeReady) {
         HF_DIAG_D("14A ready stage=%d", stage);
         if(stage == PluginHfStageCardDetect) {
-            ctx->api->notify_card_detected(ctx->host_ctx);
-            if(!ctx->api->sam_can_accept_card(ctx->host_ctx)) {
-                return NfcCommandContinue;
+            if(!ctx->poller || !ctx->nfc_device) {
+                FURI_LOG_E(
+                    TAG,
+                    "14A detect without poller/device poller=%p device=%p",
+                    (void*)ctx->poller,
+                    (void*)ctx->nfc_device);
+                ctx->api->set_stage(ctx->host_ctx, PluginHfStageFail);
+                return NfcCommandStop;
             }
-
-            furi_check(ctx->poller);
-            furi_check(ctx->nfc_device);
             const void* poller_data = nfc_poller_get_data(ctx->poller);
             if(!poller_data) {
                 FURI_LOG_E(TAG, "14A ready without poller data");
@@ -501,20 +548,15 @@ static NfcCommand plugin_hf_poller_callback_iso14443_4a(NfcGenericEvent event, v
                 }
             }
 
-            ctx->api->send_card_detected(
-                ctx->host_ctx, iso14443_3a_get_sak(iso3a), uid, uid_len, ats, ats_len);
-            FURI_LOG_D(TAG, "14A cardDetected delivered uid_len=%u ats_len=%u", uid_len, ats_len);
+            if(!ctx->api->begin_card_session(
+                   ctx->host_ctx, iso14443_3a_get_sak(iso3a), uid, uid_len, ats, ats_len)) {
+                ctx->api->set_stage(ctx->host_ctx, PluginHfStageFail);
+                return NfcCommandStop;
+            }
             ctx->api->set_stage(ctx->host_ctx, PluginHfStageConversation);
         } else if(stage == PluginHfStageConversation) {
             FURI_LOG_D(TAG, "14A enter conversation");
-            ctx->api->run_conversation(ctx->host_ctx);
-            stage = ctx->api->get_stage(ctx->host_ctx);
-            if(stage == PluginHfStageComplete) {
-                ret = NfcCommandStop;
-            } else if(stage == PluginHfStageFail) {
-                ctx->api->notify_worker_exit(ctx->host_ctx);
-                ret = NfcCommandStop;
-            }
+            ret = plugin_hf_run_conversation(ctx);
         } else if(stage == PluginHfStageComplete) {
             ret = NfcCommandStop;
         } else if(stage == PluginHfStageFail) {
@@ -532,7 +574,10 @@ static NfcCommand plugin_hf_poller_callback_iso14443_4a(NfcGenericEvent event, v
 }
 
 static NfcCommand plugin_hf_poller_callback_mfc(NfcGenericEvent event, void* context) {
-    PluginHfContext* ctx = plugin_hf_require_ctx(context);
+    PluginHfContext* ctx = plugin_hf_get_ctx(context);
+    if(!ctx) {
+        return NfcCommandStop;
+    }
     NfcCommand ret = NfcCommandContinue;
     MfClassicPollerEvent* mfc_event = event.event_data;
     if(event.protocol != NfcProtocolMfClassic || !mfc_event) {
@@ -546,12 +591,11 @@ static NfcCommand plugin_hf_poller_callback_mfc(NfcGenericEvent event, void* con
     if(mfc_event->type == MfClassicPollerEventTypeSuccess) {
         HF_DIAG_D("MFC success stage=%d", stage);
         if(stage == PluginHfStageCardDetect) {
-            ctx->api->notify_card_detected(ctx->host_ctx);
-            if(!ctx->api->sam_can_accept_card(ctx->host_ctx)) {
-                return NfcCommandContinue;
+            if(!ctx->poller) {
+                FURI_LOG_E(TAG, "MFC detect without poller");
+                ctx->api->set_stage(ctx->host_ctx, PluginHfStageFail);
+                return NfcCommandStop;
             }
-
-            furi_check(ctx->poller);
             const MfClassicData* mfc_data = nfc_poller_get_data(ctx->poller);
             if(!mfc_data || !mfc_data->iso14443_3a_data) {
                 FURI_LOG_E(TAG, "MFC data unavailable");
@@ -565,25 +609,20 @@ static NfcCommand plugin_hf_poller_callback_mfc(NfcGenericEvent event, void* con
                 ctx->api->set_stage(ctx->host_ctx, PluginHfStageFail);
                 return NfcCommandStop;
             }
-            ctx->api->send_card_detected(
-                ctx->host_ctx,
-                iso14443_3a_get_sak(mfc_data->iso14443_3a_data),
-                uid,
-                uid_len,
-                NULL,
-                0);
-            FURI_LOG_D(TAG, "MFC cardDetected delivered uid_len=%u", uid_len);
+            if(!ctx->api->begin_card_session(
+                   ctx->host_ctx,
+                   iso14443_3a_get_sak(mfc_data->iso14443_3a_data),
+                   uid,
+                   uid_len,
+                   NULL,
+                   0)) {
+                ctx->api->set_stage(ctx->host_ctx, PluginHfStageFail);
+                return NfcCommandStop;
+            }
             ctx->api->set_stage(ctx->host_ctx, PluginHfStageConversation);
         } else if(stage == PluginHfStageConversation) {
             FURI_LOG_D(TAG, "MFC enter conversation");
-            ctx->api->run_conversation(ctx->host_ctx);
-            stage = ctx->api->get_stage(ctx->host_ctx);
-            if(stage == PluginHfStageComplete) {
-                ret = NfcCommandStop;
-            } else if(stage == PluginHfStageFail) {
-                ctx->api->notify_worker_exit(ctx->host_ctx);
-                ret = NfcCommandStop;
-            }
+            ret = plugin_hf_run_conversation(ctx);
         } else if(stage == PluginHfStageComplete) {
             ret = NfcCommandStop;
         } else if(stage == PluginHfStageFail) {
@@ -599,7 +638,10 @@ static NfcCommand plugin_hf_poller_callback_mfc(NfcGenericEvent event, void* con
 }
 
 static NfcCommand plugin_hf_poller_callback_picopass(PicopassPollerEvent event, void* context) {
-    PluginHfContext* ctx = plugin_hf_require_ctx(context);
+    PluginHfContext* ctx = plugin_hf_get_ctx(context);
+    if(!ctx) {
+        return NfcCommandStop;
+    }
     NfcCommand ret = NfcCommandContinue;
     PluginHfStage stage = ctx->api->get_stage(ctx->host_ctx);
 
@@ -609,26 +651,21 @@ static NfcCommand plugin_hf_poller_callback_picopass(PicopassPollerEvent event, 
     } else if(event.type == PicopassPollerEventTypeSuccess) {
         HF_DIAG_D("Picopass success stage=%d", stage);
         if(stage == PluginHfStageCardDetect) {
-            ctx->api->notify_card_detected(ctx->host_ctx);
-            if(!ctx->api->sam_can_accept_card(ctx->host_ctx)) {
-                return NfcCommandContinue;
-            }
             uint8_t* csn = ctx->api->picopass_get_csn(ctx->host_ctx);
-            furi_check(csn);
-            ctx->api->send_card_detected(
-                ctx->host_ctx, 0, csn, sizeof(PicopassSerialNum), NULL, 0);
-            FURI_LOG_D(TAG, "Picopass cardDetected delivered");
+            if(!csn) {
+                FURI_LOG_E(TAG, "Picopass CSN unavailable");
+                ctx->api->set_stage(ctx->host_ctx, PluginHfStageFail);
+                return NfcCommandStop;
+            }
+            if(!ctx->api->begin_card_session(
+                   ctx->host_ctx, 0, csn, sizeof(PicopassSerialNum), NULL, 0)) {
+                ctx->api->set_stage(ctx->host_ctx, PluginHfStageFail);
+                return NfcCommandStop;
+            }
             ctx->api->set_stage(ctx->host_ctx, PluginHfStageConversation);
         } else if(stage == PluginHfStageConversation) {
             FURI_LOG_D(TAG, "Picopass enter conversation");
-            ctx->api->run_conversation(ctx->host_ctx);
-            stage = ctx->api->get_stage(ctx->host_ctx);
-            if(stage == PluginHfStageComplete) {
-                ret = NfcCommandStop;
-            } else if(stage == PluginHfStageFail) {
-                ctx->api->notify_worker_exit(ctx->host_ctx);
-                ret = NfcCommandStop;
-            }
+            ret = plugin_hf_run_conversation(ctx);
         } else if(stage == PluginHfStageComplete) {
             ret = NfcCommandStop;
         } else if(stage == PluginHfStageFail) {
@@ -674,7 +711,11 @@ static void* plugin_hf_alloc(const PluginHfHostApi* api, void* host_ctx) {
 }
 
 static void plugin_hf_free(void* plugin_ctx) {
-    PluginHfContext* ctx = plugin_hf_require_ctx(plugin_ctx);
+    PluginHfContext* ctx = plugin_hf_get_ctx(plugin_ctx);
+    if(!ctx) {
+        free(plugin_ctx);
+        return;
+    }
     plugin_hf_cleanup_pollers(ctx);
     free(ctx);
 }
@@ -683,9 +724,11 @@ static size_t plugin_hf_detect_supported_types(
     void* plugin_ctx,
     SeaderCredentialType* detected_types,
     size_t detected_capacity) {
-    PluginHfContext* ctx = plugin_hf_require_ctx(plugin_ctx);
-    furi_check(detected_types);
-    furi_check(detected_capacity > 0U);
+    PluginHfContext* ctx = plugin_hf_get_ctx(plugin_ctx);
+    if(!ctx || !detected_types || detected_capacity == 0U) {
+        FURI_LOG_W(TAG, "HF detect called with invalid state");
+        return 0U;
+    }
     size_t detected_type_count = 0;
     HF_DIAG_D("Detect supported HF types");
     NfcPoller* poller_detect = nfc_poller_alloc(ctx->nfc, NfcProtocolIso14443_4a);
@@ -718,7 +761,10 @@ static size_t plugin_hf_detect_supported_types(
 }
 
 static bool plugin_hf_start_read_for_type(void* plugin_ctx, SeaderCredentialType type) {
-    PluginHfContext* ctx = plugin_hf_require_ctx(plugin_ctx);
+    PluginHfContext* ctx = plugin_hf_get_ctx(plugin_ctx);
+    if(!ctx) {
+        return false;
+    }
     NfcPoller* poller_detect = NULL;
 
     plugin_hf_cleanup_pollers(ctx);
@@ -779,14 +825,20 @@ static bool plugin_hf_start_read_for_type(void* plugin_ctx, SeaderCredentialType
 }
 
 static void plugin_hf_stop(void* plugin_ctx) {
-    PluginHfContext* ctx = plugin_hf_require_ctx(plugin_ctx);
+    PluginHfContext* ctx = plugin_hf_get_ctx(plugin_ctx);
+    if(!ctx) {
+        return;
+    }
     plugin_hf_cleanup_pollers(ctx);
     ctx->active_type = SeaderCredentialTypeNone;
 }
 
 static bool plugin_hf_handle_action(void* plugin_ctx, const PluginHfAction* action) {
-    PluginHfContext* ctx = plugin_hf_require_ctx(plugin_ctx);
-    furi_check(action);
+    PluginHfContext* ctx = plugin_hf_get_ctx(plugin_ctx);
+    if(!ctx || !action) {
+        FURI_LOG_W(TAG, "HF action called with invalid state");
+        return false;
+    }
     HF_DIAG_D("Handle action type=%d len=%u", action->type, action->len);
 
     if(action->type == PluginHfActionTypePicopassTx) {

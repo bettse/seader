@@ -76,3 +76,64 @@ void seader_runtime_finalize_hf_release(
         *mode_runtime = SeaderModeRuntimeNone;
     }
 }
+
+void seader_runtime_fail_hf_startup(
+    SeaderHfReadState* hf_read_state,
+    SeaderHfReadFailureReason* failure_reason,
+    uint32_t* last_progress_tick,
+    SeaderHfSessionState* hf_session_state,
+    SeaderModeRuntime* mode_runtime) {
+    if(hf_read_state) {
+        *hf_read_state = SeaderHfReadStateTerminalFail;
+    }
+
+    if(failure_reason) {
+        *failure_reason = SeaderHfReadFailureReasonUnavailable;
+    }
+
+    if(last_progress_tick) {
+        *last_progress_tick = 0U;
+    }
+
+    if(hf_session_state) {
+        *hf_session_state = SeaderHfSessionStateUnloaded;
+    }
+
+    if(mode_runtime && *mode_runtime == SeaderModeRuntimeHF) {
+        *mode_runtime = SeaderModeRuntimeNone;
+    }
+}
+
+bool seader_runtime_begin_board_auto_recover(
+    bool sam_present,
+    bool hf_runtime_active,
+    SeaderCredentialType selected_read_type,
+    bool* pending,
+    bool* resume_read,
+    SeaderCredentialType* preserved_read_type) {
+    if(!sam_present || !pending || !resume_read || !preserved_read_type || *pending) {
+        return false;
+    }
+
+    *pending = true;
+    *resume_read = hf_runtime_active;
+    *preserved_read_type = hf_runtime_active ? selected_read_type : SeaderCredentialTypeNone;
+    return true;
+}
+
+void seader_runtime_finish_board_auto_recover(
+    bool* pending,
+    bool* resume_read,
+    SeaderCredentialType* preserved_read_type) {
+    if(pending) {
+        *pending = false;
+    }
+
+    if(resume_read) {
+        *resume_read = false;
+    }
+
+    if(preserved_read_type) {
+        *preserved_read_type = SeaderCredentialTypeNone;
+    }
+}
