@@ -260,6 +260,19 @@ static void seader_hf_read_fail(Seader* seader, SeaderHfReadFailureReason reason
         sizeof(seader->read_error));
 }
 
+static uint16_t seader_board_vbus_mv_from_volts(float vbus_voltage) {
+    if(vbus_voltage <= 0.0f) {
+        return 0U;
+    }
+
+    const float scaled_mv = (vbus_voltage * 1000.0f) + 0.5f;
+    if(scaled_mv >= 65535.0f) {
+        return UINT16_MAX;
+    }
+
+    return (uint16_t)scaled_mv;
+}
+
 static void seader_board_runtime_monitor_tick(Seader* seader) {
     if(!seader || !seader->power || !seader->board_power_enabled ||
        seader->board_status == SeaderBoardStatusPowerLost) {
@@ -274,17 +287,18 @@ static void seader_board_runtime_monitor_tick(Seader* seader) {
 
     PowerInfo info;
     power_get_info(seader->power, &info);
+    const uint16_t vbus_mv = seader_board_vbus_mv_from_volts(info.voltage_vbus);
 
     const bool otg_requested = power_is_otg_enabled(seader->power);
     const uint32_t now = furi_get_tick();
     const uint32_t elapsed =
         seader->board_power_loss_pending ? (now - seader->board_power_loss_started_at) : 0U;
-    const bool otg_fault = furi_hal_power_check_otg_fault() && info.voltage_vbus < 4.5f;
+    const bool otg_fault = furi_hal_power_check_otg_fault() && vbus_mv < 4500U;
 
     const SeaderBoardRuntimePowerState runtime_state = seader_board_runtime_power_state(
         otg_requested,
         info.is_otg_enabled,
-        info.voltage_vbus,
+        vbus_mv,
         otg_fault,
         seader->board_power_loss_pending,
         elapsed,
@@ -399,21 +413,21 @@ static bool seader_board_power_on(Seader* seader) {
 
     furi_delay_ms(SEADER_BOARD_POWER_SETTLE_MS);
     const bool otg_enabled = furi_hal_power_is_otg_enabled();
-    const float vbus_voltage = furi_hal_power_get_usb_voltage();
+    const uint16_t vbus_mv = seader_board_vbus_mv_from_volts(furi_hal_power_get_usb_voltage());
     seader->board_power_owned = plan.owns_otg && otg_enabled;
 
-    if(!seader_board_power_is_available(otg_enabled, vbus_voltage)) {
+    if(!seader_board_power_is_available(otg_enabled, vbus_mv)) {
         FURI_LOG_W(
             TAG,
-            "Board power unavailable after OTG request: otg=%d vbus=%.1fV",
+            "Board power unavailable after OTG request: otg=%d vbus=%umV",
             otg_enabled,
-            (double)vbus_voltage);
+            vbus_mv);
         seader_board_power_fail(seader, SeaderBoardStatusFaultPreEnable);
         return false;
     }
 
-    if(!otg_enabled && vbus_voltage >= 4.5f) {
-        FURI_LOG_I(TAG, "Using external VBUS power at %.1fV", (double)vbus_voltage);
+    if(!otg_enabled && vbus_mv >= 4500U) {
+        FURI_LOG_I(TAG, "Using external VBUS power at %umV", vbus_mv);
     }
 
     if(furi_hal_power_check_otg_fault()) {

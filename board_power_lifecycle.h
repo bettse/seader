@@ -33,11 +33,11 @@ typedef struct {
 } SeaderBoardPowerAcquirePlan;
 
 SeaderBoardPowerAcquirePlan seader_board_power_plan_acquire(bool otg_already_enabled);
-bool seader_board_power_is_available(bool otg_enabled, float vbus_voltage);
+bool seader_board_power_is_available(bool otg_enabled, uint16_t vbus_mv);
 SeaderBoardRuntimePowerState seader_board_runtime_power_state(
     bool otg_requested,
     bool otg_enabled,
-    float vbus_voltage,
+    uint16_t vbus_mv,
     bool otg_fault,
     bool grace_active,
     uint32_t grace_elapsed_ms,

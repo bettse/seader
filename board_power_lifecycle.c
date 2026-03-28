@@ -1,5 +1,7 @@
 #include "board_power_lifecycle.h"
 
+#define SEADER_BOARD_POWER_AVAILABLE_MV 4500U
+
 SeaderBoardPowerAcquirePlan seader_board_power_plan_acquire(bool otg_already_enabled) {
     SeaderBoardPowerAcquirePlan plan = {
         .should_enable_otg = !otg_already_enabled,
@@ -9,23 +11,23 @@ SeaderBoardPowerAcquirePlan seader_board_power_plan_acquire(bool otg_already_ena
     return plan;
 }
 
-bool seader_board_power_is_available(bool otg_enabled, float vbus_voltage) {
-    return otg_enabled || vbus_voltage >= 4.5f;
+bool seader_board_power_is_available(bool otg_enabled, uint16_t vbus_mv) {
+    return otg_enabled || vbus_mv >= SEADER_BOARD_POWER_AVAILABLE_MV;
 }
 
 SeaderBoardRuntimePowerState seader_board_runtime_power_state(
     bool otg_requested,
     bool otg_enabled,
-    float vbus_voltage,
+    uint16_t vbus_mv,
     bool otg_fault,
     bool grace_active,
     uint32_t grace_elapsed_ms,
     uint32_t grace_window_ms) {
-    if(seader_board_power_is_available(otg_enabled, vbus_voltage)) {
+    if(seader_board_power_is_available(otg_enabled, vbus_mv)) {
         return SeaderBoardRuntimePowerStateHealthy;
     }
 
-    if(otg_fault && vbus_voltage < 4.5f) {
+    if(otg_fault && vbus_mv < SEADER_BOARD_POWER_AVAILABLE_MV) {
         return SeaderBoardRuntimePowerStateLost;
     }
 

@@ -44,9 +44,9 @@ static MunitResult test_power_available_when_usb_vbus_is_already_present(
     (void)params;
     (void)fixture;
 
-    munit_assert_true(seader_board_power_is_available(false, 5.0f));
-    munit_assert_true(seader_board_power_is_available(true, 0.0f));
-    munit_assert_false(seader_board_power_is_available(false, 4.4f));
+    munit_assert_true(seader_board_power_is_available(false, 5000U));
+    munit_assert_true(seader_board_power_is_available(true, 0U));
+    munit_assert_false(seader_board_power_is_available(false, 4400U));
     return MUNIT_OK;
 }
 
@@ -56,7 +56,7 @@ static MunitResult test_power_unavailable_when_neither_otg_nor_vbus_is_present(
     (void)params;
     (void)fixture;
 
-    munit_assert_false(seader_board_power_is_available(false, 0.0f));
+    munit_assert_false(seader_board_power_is_available(false, 0U));
     return MUNIT_OK;
 }
 
@@ -67,23 +67,23 @@ static MunitResult test_runtime_power_state_uses_handoff_grace(
     (void)fixture;
 
     munit_assert_int(
-        seader_board_runtime_power_state(false, false, 5.0f, false, false, 0U, 2000U),
+        seader_board_runtime_power_state(false, false, 5000U, false, false, 0U, 2000U),
         ==,
         SeaderBoardRuntimePowerStateHealthy);
     munit_assert_int(
-        seader_board_runtime_power_state(true, false, 0.0f, false, false, 0U, 2000U),
+        seader_board_runtime_power_state(true, false, 0U, false, false, 0U, 2000U),
         ==,
         SeaderBoardRuntimePowerStateGracePending);
     munit_assert_int(
-        seader_board_runtime_power_state(true, false, 0.0f, false, true, 1500U, 2000U),
+        seader_board_runtime_power_state(true, false, 0U, false, true, 1500U, 2000U),
         ==,
         SeaderBoardRuntimePowerStateGracePending);
     munit_assert_int(
-        seader_board_runtime_power_state(true, false, 0.0f, false, true, 2000U, 2000U),
+        seader_board_runtime_power_state(true, false, 0U, false, true, 2000U, 2000U),
         ==,
         SeaderBoardRuntimePowerStateLost);
     munit_assert_int(
-        seader_board_runtime_power_state(true, true, 0.0f, false, true, 2000U, 2000U),
+        seader_board_runtime_power_state(true, true, 0U, false, true, 2000U, 2000U),
         ==,
         SeaderBoardRuntimePowerStateHealthy);
     return MUNIT_OK;
@@ -96,7 +96,7 @@ static MunitResult test_runtime_power_state_fault_is_immediate(
     (void)fixture;
 
     munit_assert_int(
-        seader_board_runtime_power_state(true, false, 0.0f, true, false, 0U, 2000U),
+        seader_board_runtime_power_state(true, false, 0U, true, false, 0U, 2000U),
         ==,
         SeaderBoardRuntimePowerStateLost);
     return MUNIT_OK;
