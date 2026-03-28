@@ -18,8 +18,7 @@ void seader_scene_delete_on_enter(void* context) {
     // Setup Custom Widget view
     char temp_str[64];
     snprintf(temp_str, sizeof(temp_str), "\e#Delete %s?\e#", seader->credential->name);
-    widget_add_text_box_element(
-        widget, 0, 0, 128, 23, AlignCenter, AlignCenter, temp_str, false);
+    widget_add_text_box_element(widget, 0, 0, 128, 23, AlignCenter, AlignCenter, temp_str, false);
     widget_add_button_element(
         widget, GuiButtonTypeLeft, "Back", seader_scene_delete_widget_callback, seader);
     widget_add_button_element(
