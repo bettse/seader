@@ -43,14 +43,7 @@ void seader_scene_start_on_enter(void* context) {
     seader_start_popup_set_stage(seader, SeaderStartupStageCheckingSam);
 
     view_dispatcher_switch_to_view(seader->view_dispatcher, SeaderViewPopup);
-
-    if(seader_board_status_requires_power_cycle(seader->board_status) &&
-       !seader_board_retry_power_cycle(seader)) {
-        view_dispatcher_send_custom_event(seader->view_dispatcher, SeaderWorkerEventSamMissing);
-        return;
-    }
-
-    seader_scene_start_begin_detection(seader);
+    view_dispatcher_send_custom_event(seader->view_dispatcher, SeaderCustomEventStartDetect);
 }
 
 bool seader_scene_start_on_event(void* context, SceneManagerEvent event) {
@@ -58,7 +51,16 @@ bool seader_scene_start_on_event(void* context, SceneManagerEvent event) {
     bool consumed = false;
 
     if(event.type == SceneManagerEventTypeCustom) {
-        if(event.event == SeaderWorkerEventSamPresent) {
+        if(event.event == SeaderCustomEventStartDetect) {
+            if(seader_board_status_requires_power_cycle(seader->board_status) &&
+               !seader_board_retry_power_cycle(seader)) {
+                view_dispatcher_send_custom_event(
+                    seader->view_dispatcher, SeaderWorkerEventSamMissing);
+            } else {
+                seader_scene_start_begin_detection(seader);
+            }
+            consumed = true;
+        } else if(event.event == SeaderWorkerEventSamPresent) {
             seader->board_status = SeaderBoardStatusReady;
             if(seader->board_auto_recover_pending) {
                 const bool resume_read = seader->board_auto_recover_resume_read;

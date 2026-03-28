@@ -30,7 +30,11 @@ void seader_scene_sam_missing_widget_callback(GuiButtonType result, InputType ty
 
 void seader_scene_sam_missing_on_enter(void* context) {
     Seader* seader = context;
-    Widget* widget = seader->widget;
+    Widget* widget = seader_get_widget(seader);
+    if(!widget) {
+        FURI_LOG_E("SeaderSceneSamMissing", "Widget view unavailable");
+        return;
+    }
     const bool retry_exhausted = (seader->board_retry_remaining == 0U);
 
     seader_scene_sam_missing_alloc_strings(seader);
@@ -112,6 +116,8 @@ bool seader_scene_sam_missing_on_event(void* context, SceneManagerEvent event) {
 
 void seader_scene_sam_missing_on_exit(void* context) {
     Seader* seader = context;
-    widget_reset(seader->widget);
+    if(seader->widget) {
+        widget_reset(seader->widget);
+    }
     seader_scene_sam_missing_free_strings(seader);
 }

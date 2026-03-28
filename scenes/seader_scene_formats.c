@@ -17,6 +17,11 @@ void seader_scene_formats_on_enter(void* context) {
     Seader* seader = context;
     PluginWiegand* plugin = seader_wiegand_plugin_acquire(seader) ? seader->plugin_wiegand : NULL;
     SeaderCredential* credential = seader->credential;
+    TextBox* text_box = seader_get_text_box(seader);
+    if(!text_box) {
+        FURI_LOG_E("SeaderSceneFormats", "Text box view unavailable");
+        return;
+    }
 
     seader_scene_formats_alloc_strings(seader);
     FuriString* str = seader->text_box_store;
@@ -41,8 +46,8 @@ void seader_scene_formats_on_enter(void* context) {
         furi_string_set_str(str, "Wiegand parser unavailable.");
     }
 
-    text_box_set_font(seader->text_box, TextBoxFontHex);
-    text_box_set_text(seader->text_box, furi_string_get_cstr(seader->text_box_store));
+    text_box_set_font(text_box, TextBoxFontHex);
+    text_box_set_text(text_box, furi_string_get_cstr(seader->text_box_store));
     view_dispatcher_switch_to_view(seader->view_dispatcher, SeaderViewTextBox);
 }
 
@@ -64,7 +69,9 @@ void seader_scene_formats_on_exit(void* context) {
     Seader* seader = context;
 
     // Clear views
-    text_box_reset(seader->text_box);
+    if(seader->text_box) {
+        text_box_reset(seader->text_box);
+    }
     if(seader->text_box_store) {
         furi_string_free(seader->text_box_store);
         seader->text_box_store = NULL;

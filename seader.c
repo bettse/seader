@@ -29,6 +29,64 @@ static void seader_hf_read_reset(Seader* seader);
 static void seader_hf_read_note_progress(Seader* seader);
 static void seader_hf_read_fail(Seader* seader, SeaderHfReadFailureReason reason);
 static bool seader_board_auto_recover_begin(Seader* seader);
+static void seader_hf_mode_reset(Seader* seader);
+
+TextInput* seader_get_text_input(Seader* seader) {
+    if(!seader) {
+        return NULL;
+    }
+
+    if(!seader->text_input) {
+        seader->text_input = text_input_alloc();
+        if(!seader->text_input) {
+            FURI_LOG_E(TAG, "Failed to allocate text input view");
+            return NULL;
+        }
+
+        view_dispatcher_add_view(
+            seader->view_dispatcher, SeaderViewTextInput, text_input_get_view(seader->text_input));
+    }
+
+    return seader->text_input;
+}
+
+TextBox* seader_get_text_box(Seader* seader) {
+    if(!seader) {
+        return NULL;
+    }
+
+    if(!seader->text_box) {
+        seader->text_box = text_box_alloc();
+        if(!seader->text_box) {
+            FURI_LOG_E(TAG, "Failed to allocate text box view");
+            return NULL;
+        }
+
+        view_dispatcher_add_view(
+            seader->view_dispatcher, SeaderViewTextBox, text_box_get_view(seader->text_box));
+    }
+
+    return seader->text_box;
+}
+
+Widget* seader_get_widget(Seader* seader) {
+    if(!seader) {
+        return NULL;
+    }
+
+    if(!seader->widget) {
+        seader->widget = widget_alloc();
+        if(!seader->widget) {
+            FURI_LOG_E(TAG, "Failed to allocate widget view");
+            return NULL;
+        }
+
+        view_dispatcher_add_view(
+            seader->view_dispatcher, SeaderViewWidget, widget_get_view(seader->widget));
+    }
+
+    return seader->widget;
+}
 
 static void seader_board_runtime_clear_loss_pending(Seader* seader) {
     if(!seader) {
@@ -82,6 +140,19 @@ static bool seader_board_auto_recover_begin(Seader* seader) {
     seader->board_status = SeaderBoardStatusRetryRequested;
     scene_manager_next_scene(seader->scene_manager, SeaderSceneStart);
     return true;
+}
+
+static void seader_hf_mode_reset(Seader* seader) {
+    if(!seader) {
+        return;
+    }
+
+    seader_runtime_reset_hf_mode(
+        &seader->hf_mode_active,
+        &seader->hf_mode_ctx.selected_read_type,
+        seader->hf_mode_ctx.detected_card_types,
+        COUNT_OF(seader->hf_mode_ctx.detected_card_types),
+        &seader->hf_mode_ctx.detected_card_type_count);
 }
 
 static bool seader_board_handle_runtime_power_lost(Seader* seader) {
@@ -889,21 +960,11 @@ Seader* seader_alloc() {
     view_dispatcher_add_view(
         seader->view_dispatcher, SeaderViewLoading, loading_get_view(seader->loading));
 
-    // Text Input
-    seader->text_input = text_input_alloc();
-    view_dispatcher_add_view(
-        seader->view_dispatcher, SeaderViewTextInput, text_input_get_view(seader->text_input));
-
-    // TextBox
-    seader->text_box = text_box_alloc();
-    view_dispatcher_add_view(
-        seader->view_dispatcher, SeaderViewTextBox, text_box_get_view(seader->text_box));
+    // Text Input / TextBox / Widget are allocated lazily on first use.
+    seader->text_input = NULL;
+    seader->text_box = NULL;
     seader->text_box_store = NULL;
-
-    // Custom Widget
-    seader->widget = widget_alloc();
-    view_dispatcher_add_view(
-        seader->view_dispatcher, SeaderViewWidget, widget_get_view(seader->widget));
+    seader->widget = NULL;
 
     // Scene strings are allocated lazily by the scenes that need them.
     seader->temp_string1 = NULL;
@@ -994,19 +1055,25 @@ void seader_free(Seader* seader) {
     loading_free(seader->loading);
 
     // TextInput
-    view_dispatcher_remove_view(seader->view_dispatcher, SeaderViewTextInput);
-    text_input_free(seader->text_input);
+    if(seader->text_input) {
+        view_dispatcher_remove_view(seader->view_dispatcher, SeaderViewTextInput);
+        text_input_free(seader->text_input);
+    }
 
     // TextBox
-    view_dispatcher_remove_view(seader->view_dispatcher, SeaderViewTextBox);
-    text_box_free(seader->text_box);
+    if(seader->text_box) {
+        view_dispatcher_remove_view(seader->view_dispatcher, SeaderViewTextBox);
+        text_box_free(seader->text_box);
+    }
     if(seader->text_box_store) {
         furi_string_free(seader->text_box_store);
     }
 
     // Custom Widget
-    view_dispatcher_remove_view(seader->view_dispatcher, SeaderViewWidget);
-    widget_free(seader->widget);
+    if(seader->widget) {
+        view_dispatcher_remove_view(seader->view_dispatcher, SeaderViewWidget);
+        widget_free(seader->widget);
+    }
 
     // Free reusable strings
     if(seader->temp_string1) furi_string_free(seader->temp_string1);
@@ -1270,9 +1337,7 @@ bool seader_hf_finish_teardown_action(Seader* seader) {
 
     FURI_LOG_I(TAG, "HF teardown complete action=%d", seader->hf_teardown_action);
     seader_show_loading_popup(seader, false);
-    seader_hf_mode_set_selected_read_type(seader, SeaderCredentialTypeNone);
-    seader_hf_mode_clear_detected_types(seader);
-    seader_hf_mode_deactivate(seader);
+    seader_hf_mode_reset(seader);
 
     const SeaderHfTeardownAction action = seader->hf_teardown_action;
     seader->hf_teardown_action = SeaderHfTeardownActionNone;
@@ -1371,7 +1436,7 @@ bool seader_hf_mode_activate(Seader* seader) {
         return true;
     }
 
-    memset(&seader->hf_mode_ctx, 0, sizeof(seader->hf_mode_ctx));
+    seader_hf_mode_reset(seader);
     seader->hf_mode_active = true;
     seader->hf_mode_ctx.selected_read_type = SeaderCredentialTypeNone;
     return true;
@@ -1380,8 +1445,7 @@ bool seader_hf_mode_activate(Seader* seader) {
 void seader_hf_mode_deactivate(Seader* seader) {
     furi_assert(seader);
 
-    memset(&seader->hf_mode_ctx, 0, sizeof(seader->hf_mode_ctx));
-    seader->hf_mode_active = false;
+    seader_hf_mode_reset(seader);
 }
 
 SeaderCredentialType seader_hf_mode_get_selected_read_type(const Seader* seader) {

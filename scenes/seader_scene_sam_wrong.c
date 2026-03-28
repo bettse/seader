@@ -23,7 +23,11 @@ void seader_scene_sam_wrong_widget_callback(GuiButtonType result, InputType type
 
 void seader_scene_sam_wrong_on_enter(void* context) {
     Seader* seader = context;
-    Widget* widget = seader->widget;
+    Widget* widget = seader_get_widget(seader);
+    if(!widget) {
+        FURI_LOG_E("SeaderSceneSamWrong", "Widget view unavailable");
+        return;
+    }
     char atr_summary[48];
 
     seader_scene_sam_wrong_alloc_strings(seader);
@@ -87,6 +91,8 @@ bool seader_scene_sam_wrong_on_event(void* context, SceneManagerEvent event) {
 
 void seader_scene_sam_wrong_on_exit(void* context) {
     Seader* seader = context;
-    widget_reset(seader->widget);
+    if(seader->widget) {
+        widget_reset(seader->widget);
+    }
     seader_scene_sam_wrong_free_strings(seader);
 }

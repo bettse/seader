@@ -64,7 +64,11 @@ void seader_scene_credential_info_on_enter(void* context) {
     Seader* seader = context;
     SeaderCredential* credential = seader->credential;
     seader_wiegand_plugin_acquire(seader);
-    Widget* widget = seader->widget;
+    Widget* widget = seader_get_widget(seader);
+    if(!widget) {
+        FURI_LOG_E(TAG, "Widget view unavailable");
+        return;
+    }
 
     seader_scene_credential_info_alloc_strings(seader);
     FuriString* type_str = seader->temp_string1;
@@ -158,7 +162,9 @@ void seader_scene_credential_info_on_exit(void* context) {
     Seader* seader = context;
 
     // Clear views
-    widget_reset(seader->widget);
+    if(seader->widget) {
+        widget_reset(seader->widget);
+    }
     seader_scene_credential_info_free_strings(seader);
     seader_wiegand_plugin_release(seader);
 }

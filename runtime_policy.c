@@ -1,5 +1,7 @@
 #include "runtime_policy.h"
 
+#include <string.h>
+
 /* A newly accepted SAM must not inherit visible metadata from the previous card while
    asynchronous version/serial/UHF maintenance responses are still in flight. */
 void seader_runtime_reset_cached_sam_metadata(
@@ -135,5 +137,28 @@ void seader_runtime_finish_board_auto_recover(
 
     if(preserved_read_type) {
         *preserved_read_type = SeaderCredentialTypeNone;
+    }
+}
+
+void seader_runtime_reset_hf_mode(
+    bool* hf_mode_active,
+    SeaderCredentialType* selected_read_type,
+    SeaderCredentialType detected_types[],
+    size_t detected_capacity,
+    size_t* detected_type_count) {
+    if(selected_read_type) {
+        *selected_read_type = SeaderCredentialTypeNone;
+    }
+
+    if(detected_types && detected_capacity > 0U) {
+        memset(detected_types, 0, detected_capacity * sizeof(detected_types[0]));
+    }
+
+    if(detected_type_count) {
+        *detected_type_count = 0U;
+    }
+
+    if(hf_mode_active) {
+        *hf_mode_active = false;
     }
 }

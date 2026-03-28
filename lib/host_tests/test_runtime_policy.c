@@ -206,6 +206,37 @@ static MunitResult test_begin_board_auto_recover_rejects_invalid_or_duplicate_st
     return MUNIT_OK;
 }
 
+static MunitResult test_reset_hf_mode_clears_selection_and_detected_types(
+    const MunitParameter params[],
+    void* fixture) {
+    (void)params;
+    (void)fixture;
+
+    bool hf_mode_active = true;
+    SeaderCredentialType selected_read_type = SeaderCredentialTypePicopass;
+    SeaderCredentialType detected_types[3] = {
+        SeaderCredentialType14A,
+        SeaderCredentialTypeMifareClassic,
+        SeaderCredentialTypePicopass,
+    };
+    size_t detected_type_count = 3U;
+
+    seader_runtime_reset_hf_mode(
+        &hf_mode_active,
+        &selected_read_type,
+        detected_types,
+        3U,
+        &detected_type_count);
+
+    munit_assert_false(hf_mode_active);
+    munit_assert_int(selected_read_type, ==, SeaderCredentialTypeNone);
+    munit_assert_size(detected_type_count, ==, 0U);
+    for(size_t i = 0; i < 3U; i++) {
+        munit_assert_int(detected_types[i], ==, SeaderCredentialTypeNone);
+    }
+    return MUNIT_OK;
+}
+
 static MunitTest test_runtime_policy_cases[] = {
     {(char*)"/reset-sam-metadata", test_reset_cached_sam_metadata_clears_all_fields, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {(char*)"/begin-uhf-probe", test_begin_uhf_probe_sets_runtime_and_initializes_probe, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
@@ -216,6 +247,7 @@ static MunitTest test_runtime_policy_cases[] = {
     {(char*)"/finalize-hf-release", test_finalize_hf_release_sets_terminal_state, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {(char*)"/begin-board-auto-recover", test_begin_board_auto_recover_sets_pending_and_target, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {(char*)"/begin-board-auto-recover-invalid", test_begin_board_auto_recover_rejects_invalid_or_duplicate_state, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {(char*)"/reset-hf-mode", test_reset_hf_mode_clears_selection_and_detected_types, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {NULL, NULL, NULL, NULL, 0, NULL},
 };
 

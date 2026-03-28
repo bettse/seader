@@ -13,7 +13,7 @@
 #define ASN1_PREFIX                       6
 #define SEADER_HEX_LOG_MAX_BYTES          32U
 #define SEADER_HF_CONVERSATION_TIMEOUT_MS 3000U
-#define SEADER_WORKER_STACK_SIZE          4096U
+#define SEADER_WORKER_STACK_SIZE          2048U
 // #define ASN1_DEBUG      true
 
 #define RFAL_PICOPASS_TXRX_FLAGS                                                    \
@@ -541,12 +541,6 @@ int32_t seader_worker_task(void* context) {
     } else if(seader_worker->state == SeaderWorkerStateReading) {
         FURI_LOG_D(TAG, "Reading mode started");
         seader_worker_reading(seader);
-    }
-    if(seader && seader->is_debug_enabled) {
-        FURI_LOG_D(
-            TAG,
-            "Worker thread stack watermark free=%lu",
-            (unsigned long)furi_thread_get_stack_space(furi_thread_get_current_id()));
     }
     seader_worker_change_state(seader_worker, SeaderWorkerStateReady);
 

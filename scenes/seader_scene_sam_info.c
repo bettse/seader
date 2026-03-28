@@ -44,7 +44,11 @@ void seader_scene_sam_info_widget_callback(GuiButtonType result, InputType type,
 
 void seader_scene_sam_info_on_enter(void* context) {
     Seader* seader = context;
-    Widget* widget = seader->widget;
+    Widget* widget = seader_get_widget(seader);
+    if(!widget) {
+        FURI_LOG_E(TAG, "Widget view unavailable");
+        return;
+    }
 
     seader_scene_sam_info_alloc_strings(seader);
     FuriString* fw_str = seader->temp_string1;
@@ -101,6 +105,8 @@ void seader_scene_sam_info_on_exit(void* context) {
     Seader* seader = context;
 
     // Clear views
-    widget_reset(seader->widget);
+    if(seader->widget) {
+        widget_reset(seader->widget);
+    }
     seader_scene_sam_info_free_strings(seader);
 }

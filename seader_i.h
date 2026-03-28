@@ -91,6 +91,8 @@ enum SeaderCustomEvent {
     SeaderCustomEventSamStatusUpdated,
     SeaderCustomEventBoardAutoRecover,
     SeaderCustomEventBoardPowerLost,
+    SeaderCustomEventStartDetect,
+    SeaderCustomEventBeginRead,
 };
 
 typedef enum {
@@ -238,6 +240,13 @@ void seader_blink_start(Seader* seader);
 void seader_blink_stop(Seader* seader);
 
 void seader_nfc_loading_callback(void* context, bool show);
+
+TextInput* seader_get_text_input(Seader* seader);
+
+TextBox* seader_get_text_box(Seader* seader);
+
+Widget* seader_get_widget(Seader* seader);
+
 void seader_show_loading_popup(void* context, bool show);
 
 bool seader_hf_mode_activate(Seader* seader);

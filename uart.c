@@ -2,7 +2,7 @@
 
 #define TAG                              "SeaderUART"
 #define BAUDRATE_DEFAULT                 115200
-#define SEADER_UART_WORKER_STACK_SIZE    (4U * 1024U)
+#define SEADER_UART_WORKER_STACK_SIZE    (3U * 1024U)
 #define SEADER_UART_TX_WORKER_STACK_SIZE (1024U)
 
 static void seader_uart_on_irq_rx_dma_cb(
@@ -194,12 +194,6 @@ int32_t seader_uart_tx_thread(void* context) {
                     seader_uart->serial_handle, seader_uart->tx_buf, seader_uart->tx_len);
             }
         }
-    }
-    if(seader->is_debug_enabled) {
-        FURI_LOG_D(
-            TAG,
-            "TX thread stack watermark free=%lu",
-            (unsigned long)furi_thread_get_stack_space(furi_thread_get_current_id()));
     }
     return 0;
 }

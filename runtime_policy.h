@@ -44,3 +44,9 @@ void seader_runtime_finish_board_auto_recover(
     bool* pending,
     bool* resume_read,
     SeaderCredentialType* preserved_read_type);
+void seader_runtime_reset_hf_mode(
+    bool* hf_mode_active,
+    SeaderCredentialType* selected_read_type,
+    SeaderCredentialType detected_types[],
+    size_t detected_capacity,
+    size_t* detected_type_count);
