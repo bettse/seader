@@ -899,6 +899,71 @@ static void seader_hf_worker_event_callback(uint32_t event, void* context) {
     view_dispatcher_send_custom_event(seader->view_dispatcher, event);
 }
 
+static bool seader_hf_host_nfc_acquire(Seader* seader) {
+    if(!seader) {
+        return false;
+    }
+
+    if(seader->nfc && seader->nfc_device) {
+        return true;
+    }
+
+    if(seader->nfc || seader->nfc_device) {
+        FURI_LOG_W(
+            TAG,
+            "Normalize partial host NFC state nfc=%p device=%p",
+            (void*)seader->nfc,
+            (void*)seader->nfc_device);
+        if(seader->nfc_device) {
+            nfc_device_free(seader->nfc_device);
+            seader->nfc_device = NULL;
+        }
+        if(seader->nfc) {
+            nfc_free(seader->nfc);
+            seader->nfc = NULL;
+        }
+    }
+
+    seader->nfc = nfc_alloc();
+    seader->nfc_device = seader->nfc ? nfc_device_alloc() : NULL;
+    if(!seader->nfc || !seader->nfc_device) {
+        FURI_LOG_E(
+            TAG,
+            "Failed to allocate host NFC objects nfc=%p device=%p",
+            (void*)seader->nfc,
+            (void*)seader->nfc_device);
+        if(seader->nfc_device) {
+            nfc_device_free(seader->nfc_device);
+            seader->nfc_device = NULL;
+        }
+        if(seader->nfc) {
+            nfc_free(seader->nfc);
+            seader->nfc = NULL;
+        }
+        return false;
+    }
+
+    nfc_device_set_loading_callback(seader->nfc_device, seader_nfc_loading_callback, seader);
+    return true;
+}
+
+static void seader_hf_host_nfc_release(void* context) {
+    Seader* seader = context;
+    if(!seader) {
+        return;
+    }
+
+    if(seader->nfc_device) {
+        nfc_device_free(seader->nfc_device);
+        seader->nfc_device = NULL;
+    }
+
+    if(seader->nfc) {
+        nfc_free(seader->nfc);
+        seader->nfc = NULL;
+    }
+}
+
 static void seader_hf_session_force_unloaded(Seader* seader) {
     if(!seader) {
         return;
@@ -1042,8 +1107,8 @@ Seader* seader_alloc() {
         seader->uhf_status_label,
         sizeof(seader->uhf_status_label));
     seader_uhf_snmp_probe_init(&seader->snmp_probe);
-    seader->nfc = nfc_alloc();
-    seader->nfc_device = seader->nfc ? nfc_device_alloc() : NULL;
+    seader->nfc = NULL;
+    seader->nfc_device = NULL;
     memset(&seader->hf_mode_ctx, 0, sizeof(seader->hf_mode_ctx));
     seader->hf_mode_active = false;
 
@@ -1061,14 +1126,6 @@ Seader* seader_alloc() {
     seader->uart = seader_uart_alloc(seader);
 
     seader->credential = seader_credential_alloc();
-
-    if(!seader->nfc || !seader->nfc_device) {
-        FURI_LOG_W(
-            TAG,
-            "HF host NFC objects unavailable at startup nfc=%p device=%p",
-            seader->nfc,
-            seader->nfc_device);
-    }
 
     // Open GUI record
     seader->gui = furi_record_open(RECORD_GUI);
@@ -1118,10 +1175,6 @@ Seader* seader_alloc() {
     seader->start_scene_active = false;
     seader->sam_present_menu_guard_active = false;
 
-    if(seader->nfc_device) {
-        nfc_device_set_loading_callback(seader->nfc_device, seader_nfc_loading_callback, seader);
-    }
-
     if(seader->is_debug_enabled) {
         FURI_LOG_D(
             TAG,
@@ -1147,15 +1200,7 @@ void seader_free(Seader* seader) {
 
     seader_wiegand_plugin_release(seader);
 
-    if(seader->nfc_device) {
-        nfc_device_free(seader->nfc_device);
-        seader->nfc_device = NULL;
-    }
-
-    if(seader->nfc) {
-        nfc_free(seader->nfc);
-        seader->nfc = NULL;
-    }
+    seader_hf_host_nfc_release(seader);
 
     seader_uart_free(seader->uart);
     seader->uart = NULL;
@@ -1350,7 +1395,7 @@ bool seader_hf_plugin_acquire(Seader* seader) {
     }
 
     /* Re-acquire is allowed only when the live runtime is already coherent. */
-    if(seader->plugin_hf && seader->hf_plugin_ctx) {
+    if(seader->plugin_hf && seader->hf_plugin_ctx && seader->nfc && seader->nfc_device) {
         if(seader->hf_session_state == SeaderHfSessionStateUnloaded) {
             seader->hf_session_state = SeaderHfSessionStateLoaded;
         }
@@ -1360,20 +1405,21 @@ bool seader_hf_plugin_acquire(Seader* seader) {
 
     /* Partial pointer state is always a bug; normalize through the single release path
        instead of trying to reason about each damaged combination inline. */
-    if(seader->hf_plugin_manager || seader->plugin_hf || seader->hf_plugin_ctx) {
+    if(seader->hf_plugin_manager || seader->plugin_hf || seader->hf_plugin_ctx || seader->nfc ||
+       seader->nfc_device) {
         FURI_LOG_W(
             TAG,
-            "Normalize partial HF session manager=%p plugin=%p ctx=%p state=%d",
+            "Normalize partial HF session manager=%p plugin=%p ctx=%p nfc=%p device=%p state=%d",
             (void*)seader->hf_plugin_manager,
             (void*)seader->plugin_hf,
             seader->hf_plugin_ctx,
+            (void*)seader->nfc,
+            (void*)seader->nfc_device,
             seader->hf_session_state);
         seader_hf_plugin_release(seader);
     }
 
-    if(!seader->nfc || !seader->nfc_device) {
-        FURI_LOG_E(
-            TAG, "Host NFC objects unavailable nfc=%p device=%p", seader->nfc, seader->nfc_device);
+    if(!seader_hf_host_nfc_acquire(seader)) {
         return false;
     }
 
@@ -1382,6 +1428,7 @@ bool seader_hf_plugin_acquire(Seader* seader) {
             plugin_manager_alloc(HF_PLUGIN_APP_ID, HF_PLUGIN_API_VERSION, firmware_api_interface);
         if(!seader->hf_plugin_manager) {
             FURI_LOG_E(TAG, "Failed to allocate HF plugin manager");
+            seader_hf_host_nfc_release(seader);
             return false;
         }
     }
@@ -1392,6 +1439,7 @@ bool seader_hf_plugin_acquire(Seader* seader) {
         FURI_LOG_E(TAG, "Failed to load HF plugin");
         plugin_manager_free(seader->hf_plugin_manager);
         seader_hf_session_force_unloaded(seader);
+        seader_hf_host_nfc_release(seader);
         return false;
     }
 
@@ -1401,6 +1449,7 @@ bool seader_hf_plugin_acquire(Seader* seader) {
         FURI_LOG_E(TAG, "Failed to resolve HF plugin entry point");
         plugin_manager_free(seader->hf_plugin_manager);
         seader_hf_session_force_unloaded(seader);
+        seader_hf_host_nfc_release(seader);
         return false;
     }
 
@@ -1409,6 +1458,7 @@ bool seader_hf_plugin_acquire(Seader* seader) {
         FURI_LOG_E(TAG, "Failed to allocate HF plugin context");
         plugin_manager_free(seader->hf_plugin_manager);
         seader_hf_session_force_unloaded(seader);
+        seader_hf_host_nfc_release(seader);
         return false;
     }
 
@@ -1420,7 +1470,8 @@ bool seader_hf_plugin_acquire(Seader* seader) {
 
 static bool seader_hf_has_runtime(const Seader* seader) {
     return seader && (seader->hf_plugin_manager || seader->plugin_hf || seader->hf_plugin_ctx ||
-                      seader->poller || seader->picopass_poller);
+                      seader->poller || seader->picopass_poller || seader->nfc ||
+                      seader->nfc_device);
 }
 
 /* App shutdown uses the same teardown primitive as normal navigation. The only difference
@@ -1456,6 +1507,7 @@ void seader_hf_plugin_release(Seader* seader) {
         .host_picopass_release = seader_hf_release_host_picopass,
         .plugin_free = seader_hf_release_plugin_free,
         .plugin_manager_unload = seader_hf_release_plugin_manager,
+        .host_nfc_release = seader_hf_host_nfc_release,
         .worker_reset = seader_hf_release_worker_reset,
     };
     seader_hf_release_sequence_run(&release_sequence);
