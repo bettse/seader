@@ -320,7 +320,7 @@ size_t seader_ccid_process(Seader* seader, uint8_t* cmd, size_t cmd_len) {
     if(cmd_len > 12 && cmd[0] == SYNC && cmd[1] == CTRL) {
         uint8_t* ccid = cmd + 2;
         message.bMessageType = ccid[0];
-        message.dwLength = *((uint32_t*)(ccid + 1));
+        message.dwLength = seader_ccid_decode_le32(ccid + 1);
         message.bSlot = ccid[5];
         message.bSeq = ccid[6];
         message.bStatus = ccid[7];

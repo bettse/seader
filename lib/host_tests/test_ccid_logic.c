@@ -91,6 +91,17 @@ static MunitResult test_status_decode_time_extension(const MunitParameter params
     return MUNIT_OK;
 }
 
+static MunitResult test_decode_le32_accepts_unaligned_bytes(
+    const MunitParameter params[],
+    void* fixture) {
+    (void)params;
+    (void)fixture;
+
+    const uint8_t frame[] = {0xAA, 0x78, 0x56, 0x34, 0x12, 0xBB};
+    munit_assert_uint32(seader_ccid_decode_le32(frame + 1), ==, 0x12345678U);
+    return MUNIT_OK;
+}
+
 static MunitResult test_find_start_skips_nak_triplet(const MunitParameter params[], void* fixture) {
     (void)params;
     (void)fixture;
@@ -194,6 +205,12 @@ static MunitTest test_ccid_cases[] = {
      NULL},
     {(char*)"/status/decode-time-extension",
      test_status_decode_time_extension,
+     NULL,
+     NULL,
+     MUNIT_TEST_OPTION_NONE,
+     NULL},
+    {(char*)"/frame/decode-le32-unaligned",
+     test_decode_le32_accepts_unaligned_bytes,
      NULL,
      NULL,
      MUNIT_TEST_OPTION_NONE,

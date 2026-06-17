@@ -33,6 +33,11 @@ SeaderCcidStatus seader_ccid_decode_status(uint8_t status) {
     return decoded;
 }
 
+uint32_t seader_ccid_decode_le32(const uint8_t bytes[4]) {
+    return ((uint32_t)bytes[0]) | ((uint32_t)bytes[1] << 8U) | ((uint32_t)bytes[2] << 16U) |
+           ((uint32_t)bytes[3] << 24U);
+}
+
 bool seader_ccid_response_matches_pending(bool pending, uint8_t expected_seq, uint8_t response_seq) {
     return !pending || (expected_seq == response_seq);
 }
