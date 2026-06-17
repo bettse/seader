@@ -5,6 +5,7 @@
 #define BAUDRATE_DEFAULT                 115200
 #define SEADER_UART_WORKER_STACK_SIZE    (3U * 1024U)
 #define SEADER_UART_TX_WORKER_STACK_SIZE (1024U)
+#define SEADER_UART_TX_QUEUE_DEPTH       (2U)
 
 static void seader_uart_on_irq_rx_dma_cb(
     FuriHalSerialHandle* handle,
@@ -81,6 +82,8 @@ int32_t seader_uart_worker(void* context) {
     memcpy(&seader_uart->cfg, &seader_uart->cfg_new, sizeof(SeaderUartConfig));
 
     seader_uart->rx_stream = furi_stream_buffer_alloc(SEADER_UART_RX_BUF_SIZE, 1);
+    seader_uart->tx_queue =
+        furi_message_queue_alloc(SEADER_UART_TX_QUEUE_DEPTH, sizeof(SeaderUartTxFrame));
 
     seader_uart->tx_sem = furi_semaphore_alloc(1, 1);
 
@@ -138,8 +141,27 @@ int32_t seader_uart_worker(void* context) {
     furi_thread_free(seader_uart->tx_thread);
 
     furi_stream_buffer_free(seader_uart->rx_stream);
+    furi_message_queue_free(seader_uart->tx_queue);
     furi_semaphore_free(seader_uart->tx_sem);
     return 0;
+}
+
+bool seader_uart_tx_enqueue(SeaderUartBridge* seader_uart, const uint8_t* data, size_t len) {
+    if(!seader_uart || !seader_uart->tx_queue || !seader_uart->tx_thread) {
+        return false;
+    }
+
+    SeaderUartTxFrame frame = {0};
+    if(!seader_uart_tx_frame_copy(&frame, data, len, SEADER_UART_RX_BUF_SIZE)) {
+        return false;
+    }
+
+    if(furi_message_queue_put(seader_uart->tx_queue, &frame, FuriWaitForever) != FuriStatusOk) {
+        return false;
+    }
+
+    furi_thread_flags_set(furi_thread_get_id(seader_uart->tx_thread), WorkerEvtSamRx);
+    return true;
 }
 
 SeaderUartBridge* seader_uart_enable(SeaderUartConfig* cfg, Seader* seader) {
@@ -176,7 +198,15 @@ int32_t seader_uart_tx_thread(void* context) {
         }
         if(events & WorkerEvtTxStop) break;
         if(events & WorkerEvtSamRx) {
-            if(seader_uart->tx_len > 0) {
+            SeaderUartTxFrame frame = {0};
+            bool queued_frame_sent = false;
+            while(seader_uart->tx_queue &&
+                  furi_message_queue_get(seader_uart->tx_queue, &frame, 0) == FuriStatusOk) {
+                queued_frame_sent = true;
+                furi_hal_serial_tx(seader_uart->serial_handle, frame.data, frame.len);
+            }
+
+            if(!queued_frame_sent && seader_uart->tx_len > 0) {
                 furi_hal_serial_tx(
                     seader_uart->serial_handle, seader_uart->tx_buf, seader_uart->tx_len);
             }
