@@ -41,6 +41,7 @@ test-host:
 			sam_startup_ui.c \
 			ccid_logic.c \
 			allocation_policy.c \
+			worker_loop_policy.c \
 		credential_sio_label.c \
 		t_1_logic.c \
 		t_1.c \

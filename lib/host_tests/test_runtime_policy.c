@@ -5,6 +5,7 @@
 #include "allocation_policy.h"
 #include "runtime_policy.h"
 #include "seader_hf_read_plan.h"
+#include "worker_loop_policy.h"
 
 static MunitResult test_reset_cached_sam_metadata_clears_all_fields(
     const MunitParameter params[],
@@ -284,17 +285,17 @@ static MunitResult test_virtual_credential_loop_terminal_policy(
     (void)fixture;
 
     munit_assert_true(
-        seader_runtime_virtual_credential_should_continue(true, true, false, false, 1U));
+        seader_worker_virtual_credential_should_continue(true, true, false, false, 1U));
     munit_assert_false(
-        seader_runtime_virtual_credential_should_continue(false, true, false, false, 1U));
+        seader_worker_virtual_credential_should_continue(false, true, false, false, 1U));
     munit_assert_false(
-        seader_runtime_virtual_credential_should_continue(true, false, false, false, 1U));
+        seader_worker_virtual_credential_should_continue(true, false, false, false, 1U));
     munit_assert_false(
-        seader_runtime_virtual_credential_should_continue(true, true, true, false, 1U));
+        seader_worker_virtual_credential_should_continue(true, true, true, false, 1U));
     munit_assert_false(
-        seader_runtime_virtual_credential_should_continue(true, true, false, true, 1U));
+        seader_worker_virtual_credential_should_continue(true, true, false, true, 1U));
     munit_assert_false(
-        seader_runtime_virtual_credential_should_continue(true, true, false, false, 0U));
+        seader_worker_virtual_credential_should_continue(true, true, false, false, 0U));
     return MUNIT_OK;
 }
 

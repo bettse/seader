@@ -176,13 +176,3 @@ void seader_runtime_cancel_hf_type_prompt(
         detected_capacity,
         detected_type_count);
 }
-
-bool seader_runtime_virtual_credential_should_continue(
-    bool processing_ok,
-    bool worker_active,
-    bool stage_complete,
-    bool stage_fail,
-    uint8_t empty_loops_remaining) {
-    return processing_ok && worker_active && !stage_complete && !stage_fail &&
-           empty_loops_remaining > 0U;
-}

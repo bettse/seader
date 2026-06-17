@@ -40,6 +40,7 @@ static void seader_sam_set_state(
     SeaderSamState state,
     SeaderSamIntent intent,
     SamCommand_PR command);
+static void seader_snmp_probe_finish(Seader* seader);
 
 static const char* seader_snmp_probe_stage_name(SeaderUhfSnmpProbeStage stage) {
     switch(stage) {

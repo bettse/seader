@@ -2,7 +2,7 @@
 #include "seader_hf_read_plan.h"
 #include "hf_read_lifecycle.h"
 #include "hf_bridge_policy.h"
-#include "runtime_policy.h"
+#include "worker_loop_policy.h"
 #include "trace_log.h"
 
 #include <flipper_format/flipper_format.h>
@@ -499,7 +499,7 @@ void seader_worker_virtual_credential(Seader* seader) {
             if(dead_loops > 0U) {
                 dead_loops--;
             }
-            running = seader_runtime_virtual_credential_should_continue(
+            running = seader_worker_virtual_credential_should_continue(
                 processing_ok,
                 seader_worker->state == SeaderWorkerStateVirtualCredential,
                 seader_worker->stage == SeaderPollerEventTypeComplete,
@@ -509,7 +509,7 @@ void seader_worker_virtual_credential(Seader* seader) {
                 TAG, "Dead loops: %d -> Running: %s", dead_loops, running ? "true" : "false");
             if(running) furi_delay_ms(10); // Don't tight loop if empty
         }
-        running = seader_runtime_virtual_credential_should_continue(
+        running = seader_worker_virtual_credential_should_continue(
             processing_ok,
             seader_worker->state == SeaderWorkerStateVirtualCredential,
             seader_worker->stage == SeaderPollerEventTypeComplete,
