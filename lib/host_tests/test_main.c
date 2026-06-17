@@ -7,6 +7,7 @@ extern MunitSuite test_hf_read_lifecycle_suite;
 extern MunitSuite test_sam_startup_ui_suite;
 extern MunitSuite test_ccid_logic_suite;
 extern MunitSuite test_uart_tx_logic_suite;
+extern MunitSuite test_uart_rx_logic_suite;
 extern MunitSuite test_sam_key_label_suite;
 extern MunitSuite test_t1_existing_suite;
 extern MunitSuite test_t1_protocol_suite;
@@ -42,6 +43,7 @@ int main(int argc, char* argv[]) {
         {"/t1", test_t1_protocol_suite.tests, NULL, 1, MUNIT_SUITE_OPTION_NONE},
         {"/ccid", test_ccid_logic_suite.tests, NULL, 1, MUNIT_SUITE_OPTION_NONE},
         {"/uart-tx", test_uart_tx_logic_suite.tests, NULL, 1, MUNIT_SUITE_OPTION_NONE},
+        {"/uart-rx", test_uart_rx_logic_suite.tests, NULL, 1, MUNIT_SUITE_OPTION_NONE},
         {"/snmp", test_snmp_suite.tests, NULL, 1, MUNIT_SUITE_OPTION_NONE},
         {"/uhf-status-label", test_uhf_status_label_suite.tests, NULL, 1, MUNIT_SUITE_OPTION_NONE},
         {"/credential-sio-label", test_credential_sio_label_suite.tests, NULL, 1, MUNIT_SUITE_OPTION_NONE},

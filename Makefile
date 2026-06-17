@@ -25,6 +25,7 @@ test-host:
 			lib/host_tests/test_sam_key_label.c \
 		lib/host_tests/test_ccid_logic.c \
 		lib/host_tests/test_uart_tx_logic.c \
+		lib/host_tests/test_uart_rx_logic.c \
 		lib/host_tests/test_t1_existing.c \
 		lib/host_tests/test_t1_protocol.c \
 		lib/host_tests/test_snmp.c \
@@ -42,6 +43,7 @@ test-host:
 			sam_startup_ui.c \
 			ccid_logic.c \
 			uart_tx_logic.c \
+			uart_rx_logic.c \
 			allocation_policy.c \
 			worker_loop_policy.c \
 		credential_sio_label.c \

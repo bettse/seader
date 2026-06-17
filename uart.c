@@ -1,5 +1,6 @@
 #include "seader_i.h"
 #include "trace_log.h"
+#include "uart_rx_logic.h"
 
 #define TAG                              "SeaderUART"
 #define BAUDRATE_DEFAULT                 115200
@@ -123,7 +124,10 @@ int32_t seader_uart_worker(void* context) {
             size_t len = furi_stream_buffer_receive(
                 seader_uart->rx_stream, cmd + cmd_len, sizeof(cmd) - cmd_len, 0);
             if(len > 0) {
-                furi_delay_ms(5); //WTF
+                uint32_t delay_ms = seader_uart_rx_inter_chunk_delay_ms(len);
+                if(delay_ms > 0U) {
+                    furi_delay_ms(delay_ms);
+                }
 
                 cmd_len += len;
                 cmd_len = seader_uart_process_buffer(seader, cmd, cmd_len);
