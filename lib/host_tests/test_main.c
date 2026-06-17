@@ -1,6 +1,7 @@
 #include "munit.h"
 
 extern MunitSuite test_lrc_suite;
+extern MunitSuite test_board_identity_suite;
 extern MunitSuite test_board_power_lifecycle_suite;
 extern MunitSuite test_hf_read_lifecycle_suite;
 extern MunitSuite test_sam_startup_ui_suite;
@@ -12,12 +13,14 @@ extern MunitSuite test_snmp_suite;
 extern MunitSuite test_uhf_status_label_suite;
 extern MunitSuite test_credential_sio_label_suite;
 extern MunitSuite test_hf_read_plan_suite;
+extern MunitSuite test_hf_bridge_policy_suite;
 extern MunitSuite test_runtime_policy_suite;
 extern MunitSuite test_wiegand_plugin_suite;
 
 int main(int argc, char* argv[]) {
     MunitSuite child_suites[] = {
         {"/lrc", test_lrc_suite.tests, NULL, 1, MUNIT_SUITE_OPTION_NONE},
+        {"/board-identity", test_board_identity_suite.tests, NULL, 1, MUNIT_SUITE_OPTION_NONE},
         {"/board-power-lifecycle",
          test_board_power_lifecycle_suite.tests,
          NULL,
@@ -41,6 +44,7 @@ int main(int argc, char* argv[]) {
         {"/uhf-status-label", test_uhf_status_label_suite.tests, NULL, 1, MUNIT_SUITE_OPTION_NONE},
         {"/credential-sio-label", test_credential_sio_label_suite.tests, NULL, 1, MUNIT_SUITE_OPTION_NONE},
         {"/hf-read-plan", test_hf_read_plan_suite.tests, NULL, 1, MUNIT_SUITE_OPTION_NONE},
+        {"/hf-bridge-policy", test_hf_bridge_policy_suite.tests, NULL, 1, MUNIT_SUITE_OPTION_NONE},
         {"/runtime-policy", test_runtime_policy_suite.tests, NULL, 1, MUNIT_SUITE_OPTION_NONE},
         {"/wiegand-plugin", test_wiegand_plugin_suite.tests, NULL, 1, MUNIT_SUITE_OPTION_NONE},
         {NULL, NULL, NULL, 0, 0},

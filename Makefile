@@ -17,6 +17,7 @@ test-host:
 	cc $(HOST_TEST_CFLAGS) \
 		lib/host_tests/vendor/munit/munit.c \
 		lib/host_tests/test_main.c \
+			lib/host_tests/test_board_identity.c \
 			lib/host_tests/test_lrc.c \
 			lib/host_tests/test_board_power_lifecycle.c \
 			lib/host_tests/test_hf_read_lifecycle.c \
@@ -29,11 +30,13 @@ test-host:
 			lib/host_tests/test_uhf_status_label.c \
 			lib/host_tests/test_credential_sio_label.c \
 			lib/host_tests/test_hf_read_plan.c \
+			lib/host_tests/test_hf_bridge_policy.c \
 			lib/host_tests/test_wiegand_plugin.c \
 			lib/host_tests/test_runtime_policy.c \
 		lib/host_tests/t1_test_stubs.c \
 		lib/host_tests/bit_buffer_mock.c \
 			lrc.c \
+			board_identity.c \
 			board_power_lifecycle.c \
 			sam_startup_ui.c \
 			ccid_logic.c \
@@ -48,6 +51,7 @@ test-host:
 			uhf_tag_config_view.c \
 			uhf_snmp_probe.c \
 			hf_read_lifecycle.c \
+			hf_bridge_policy.c \
 			seader_hf_read_plan.c \
 			wiegand_interface_fal/wiegand.c \
 		runtime_policy.c \
