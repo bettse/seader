@@ -31,6 +31,12 @@ static uint8_t seader_ccid_next_sequence(SeaderUartBridge* seader_uart, uint8_t 
     return seader_ccid_sequence_advance(&slot_state->sequence);
 }
 
+static void seader_ccid_publish_tx_frame(SeaderUartBridge* seader_uart, const uint8_t* frame, size_t len) {
+    if(!seader_uart_tx_enqueue(seader_uart, frame, len)) {
+        FURI_LOG_E(TAG, "Failed to queue CCID frame len=%u", (unsigned)len);
+    }
+}
+
 static SeaderUartBridge* seader_ccid_active_uart(Seader* seader) {
     furi_check(seader);
     furi_check(seader->worker);
@@ -56,7 +62,7 @@ void seader_ccid_IccPowerOn(SeaderUartBridge* seader_uart, uint8_t slot) {
     seader_uart->tx_buf[2 + 7] = 1; //power
 
     seader_uart->tx_len = seader_add_lrc(seader_uart->tx_buf, 2 + 10);
-    furi_thread_flags_set(furi_thread_get_id(seader_uart->tx_thread), WorkerEvtSamRx);
+    seader_ccid_publish_tx_frame(seader_uart, seader_uart->tx_buf, seader_uart->tx_len);
 }
 
 void seader_ccid_IccPowerOff(SeaderUartBridge* seader_uart, uint8_t slot) {
@@ -72,7 +78,7 @@ void seader_ccid_IccPowerOff(SeaderUartBridge* seader_uart, uint8_t slot) {
     seader_uart->tx_buf[2 + 6] = seader_ccid_next_sequence(seader_uart, slot);
 
     seader_uart->tx_len = seader_add_lrc(seader_uart->tx_buf, 2 + 10);
-    furi_thread_flags_set(furi_thread_get_id(seader_uart->tx_thread), WorkerEvtSamRx);
+    seader_ccid_publish_tx_frame(seader_uart, seader_uart->tx_buf, seader_uart->tx_len);
 }
 
 void seader_ccid_check_for_sam(SeaderUartBridge* seader_uart) {
@@ -96,7 +102,7 @@ void seader_ccid_GetSlotStatus(SeaderUartBridge* seader_uart, uint8_t slot) {
     seader_uart->tx_buf[2 + 6] = seader_ccid_next_sequence(seader_uart, slot);
 
     seader_uart->tx_len = seader_add_lrc(seader_uart->tx_buf, 2 + 10);
-    furi_thread_flags_set(furi_thread_get_id(seader_uart->tx_thread), WorkerEvtSamRx);
+    seader_ccid_publish_tx_frame(seader_uart, seader_uart->tx_buf, seader_uart->tx_len);
 }
 
 void seader_ccid_SetParameters(Seader* seader, uint8_t slot) {
@@ -149,7 +155,7 @@ void seader_ccid_SetParameters(Seader* seader, uint8_t slot) {
     }
 
     seader_uart->tx_len = seader_add_lrc(seader_uart->tx_buf, 2 + 10 + payloadLen);
-    furi_thread_flags_set(furi_thread_get_id(seader_uart->tx_thread), WorkerEvtSamRx);
+    seader_ccid_publish_tx_frame(seader_uart, seader_uart->tx_buf, seader_uart->tx_len);
 }
 
 void seader_ccid_GetParameters(SeaderUartBridge* seader_uart) {
@@ -167,7 +173,7 @@ void seader_ccid_GetParameters(SeaderUartBridge* seader_uart) {
 
     seader_uart->tx_len = seader_add_lrc(seader_uart->tx_buf, 2 + 10);
 
-    furi_thread_flags_set(furi_thread_get_id(seader_uart->tx_thread), WorkerEvtSamRx);
+    seader_ccid_publish_tx_frame(seader_uart, seader_uart->tx_buf, seader_uart->tx_len);
 }
 
 void seader_ccid_XfrBlock(SeaderUartBridge* seader_uart, uint8_t* data, size_t len) {
@@ -221,7 +227,7 @@ void seader_ccid_XfrBlockToSlot(
 
     seader_uart->tx_len = seader_add_lrc(frame, seader_uart->tx_len);
 
-    furi_thread_flags_set(furi_thread_get_id(seader_uart->tx_thread), WorkerEvtSamRx);
+    seader_ccid_publish_tx_frame(seader_uart, frame, seader_uart->tx_len);
 }
 
 size_t seader_ccid_process(Seader* seader, uint8_t* cmd, size_t cmd_len) {
