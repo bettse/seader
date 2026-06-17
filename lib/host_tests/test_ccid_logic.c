@@ -171,6 +171,33 @@ static MunitResult test_data_block_route(const MunitParameter params[], void* fi
     return MUNIT_OK;
 }
 
+static MunitResult test_payload_match_requires_exact_length(
+    const MunitParameter params[],
+    void* fixture) {
+    (void)params;
+    (void)fixture;
+
+    const uint8_t expected[] = {0x3b, 0x90, 0x96, 0x91};
+    const uint8_t exact[] = {0x3b, 0x90, 0x96, 0x91};
+    const uint8_t short_payload_with_matching_prefix[] = {0x3b, 0x90, 0x96, 0x91};
+    const uint8_t long_payload[] = {0x3b, 0x90, 0x96, 0x91, 0x00};
+    const uint8_t wrong_payload[] = {0x3b, 0x90, 0x96, 0x92};
+
+    munit_assert_true(seader_ccid_payload_matches_exact(
+        exact, sizeof(exact), expected, sizeof(expected)));
+    munit_assert_false(seader_ccid_payload_matches_exact(
+        short_payload_with_matching_prefix, sizeof(short_payload_with_matching_prefix) - 1U, expected, sizeof(expected)));
+    munit_assert_false(seader_ccid_payload_matches_exact(
+        long_payload, sizeof(long_payload), expected, sizeof(expected)));
+    munit_assert_false(seader_ccid_payload_matches_exact(
+        wrong_payload, sizeof(wrong_payload), expected, sizeof(expected)));
+    munit_assert_false(
+        seader_ccid_payload_matches_exact(NULL, sizeof(exact), expected, sizeof(expected)));
+    munit_assert_false(
+        seader_ccid_payload_matches_exact(exact, sizeof(exact), NULL, sizeof(expected)));
+    return MUNIT_OK;
+}
+
 static MunitTest test_ccid_cases[] = {
     {(char*)"/sequence/advance-wraps-through-ff",
      test_sequence_advance_wraps,
@@ -235,6 +262,12 @@ static MunitTest test_ccid_cases[] = {
      NULL},
     {(char*)"/routing/data-block-route",
      test_data_block_route,
+     NULL,
+     NULL,
+     MUNIT_TEST_OPTION_NONE,
+     NULL},
+    {(char*)"/payload/match-requires-exact-length",
+     test_payload_match_requires_exact_length,
      NULL,
      NULL,
      MUNIT_TEST_OPTION_NONE,

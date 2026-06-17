@@ -1,5 +1,7 @@
 #include "ccid_logic.h"
 
+#include <string.h>
+
 uint8_t seader_ccid_sequence_advance(uint8_t* sequence) {
     return (*sequence)++;
 }
@@ -96,4 +98,16 @@ SeaderCcidDataRoute seader_ccid_route_data_block(
     }
 
     return SeaderCcidDataRouteSamT1;
+}
+
+bool seader_ccid_payload_matches_exact(
+    const uint8_t* payload,
+    size_t payload_len,
+    const uint8_t* expected,
+    size_t expected_len) {
+    if(!payload || !expected || payload_len != expected_len) {
+        return false;
+    }
+
+    return memcmp(payload, expected, expected_len) == 0;
 }

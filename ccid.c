@@ -420,7 +420,8 @@ size_t seader_ccid_process(Seader* seader, uint8_t* cmd, size_t cmd_len) {
                     SEADER_VERBOSE_D(TAG, "Discarding message on non-sam slot");
                 }
             } else {
-                if(memcmp(SAM_ATR, message.payload, sizeof(SAM_ATR)) == 0) {
+                if(seader_ccid_payload_matches_exact(
+                       message.payload, message.dwLength, SAM_ATR, sizeof(SAM_ATR))) {
                     SEADER_VERBOSE_I(TAG, "SAM ATR!");
                     ccid_state->has_sam = true;
                     ccid_state->sam_slot = message.bSlot;
@@ -431,19 +432,21 @@ size_t seader_ccid_process(Seader* seader, uint8_t* cmd, size_t cmd_len) {
                     } else if(seader_uart->T == 1) {
                         seader_ccid_SetParameters(seader, ccid_state->sam_slot);
                     }
-                } else if(memcmp(SAM_ATR2, message.payload, sizeof(SAM_ATR2)) == 0) {
+                } else if(seader_ccid_payload_matches_exact(
+                              message.payload, message.dwLength, SAM_ATR2, sizeof(SAM_ATR2))) {
                     SEADER_VERBOSE_I(TAG, "SAM ATR2!");
                     ccid_state->has_sam = true;
                     ccid_state->sam_slot = message.bSlot;
-                    seader->ATR_len = sizeof(SAM_ATR);
+                    seader->ATR_len = sizeof(SAM_ATR2);
                     memcpy(seader->ATR, message.payload, seader->ATR_len);
                     // I don't have an ATR2 to test with
                     seader_ccid_GetParameters(seader_uart);
-                } else if(memcmp(SAM_ATR3, message.payload, sizeof(SAM_ATR3)) == 0) {
+                } else if(seader_ccid_payload_matches_exact(
+                              message.payload, message.dwLength, SAM_ATR3, sizeof(SAM_ATR3))) {
                     SEADER_VERBOSE_I(TAG, "SAM ATR3!");
                     ccid_state->has_sam = true;
                     ccid_state->sam_slot = message.bSlot;
-                    seader->ATR_len = sizeof(SAM_ATR);
+                    seader->ATR_len = sizeof(SAM_ATR3);
                     memcpy(seader->ATR, message.payload, seader->ATR_len);
                     if(seader_uart->T == 0) {
                         seader_ccid_GetParameters(seader_uart);

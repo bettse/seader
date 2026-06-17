@@ -49,3 +49,8 @@ SeaderCcidDataRoute seader_ccid_route_data_block(
     uint8_t sam_slot,
     uint8_t message_slot,
     uint8_t protocol_t);
+bool seader_ccid_payload_matches_exact(
+    const uint8_t* payload,
+    size_t payload_len,
+    const uint8_t* expected,
+    size_t expected_len);

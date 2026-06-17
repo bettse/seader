@@ -64,12 +64,7 @@ size_t seader_uart_process_buffer(Seader* seader, uint8_t* cmd, size_t cmd_len) 
         consumed = seader_ccid_process(seader, cmd, cmd_len);
 
         if(consumed > 0) {
-            memset(cmd, 0, consumed);
-            cmd_len -= consumed;
-            if(cmd_len > 0) {
-                memmove(cmd, cmd + consumed, cmd_len);
-            }
-
+            cmd_len = seader_uart_rx_discard_consumed(cmd, cmd_len, consumed);
         }
     } while(consumed > 0 && cmd_len > 0);
     return cmd_len;
