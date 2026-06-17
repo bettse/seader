@@ -37,6 +37,10 @@ static void seader_ccid_publish_tx_frame(SeaderUartBridge* seader_uart, const ui
     }
 }
 
+static size_t seader_ccid_build_control_frame_lrc(uint8_t* frame, size_t frame_len) {
+    return seader_add_lrc(frame, frame_len);
+}
+
 static SeaderUartBridge* seader_ccid_active_uart(Seader* seader) {
     furi_check(seader);
     furi_check(seader->worker);
@@ -52,33 +56,35 @@ void seader_ccid_IccPowerOn(SeaderUartBridge* seader_uart, uint8_t slot) {
     slot_state->powered = true;
 
     SEADER_VERBOSE_D(TAG, "Sending Power On (%d)", slot);
-    memset(seader_uart->tx_buf, 0, SEADER_UART_RX_BUF_SIZE);
-    seader_uart->tx_buf[0] = SYNC;
-    seader_uart->tx_buf[1] = CTRL;
-    seader_uart->tx_buf[2 + 0] = CCID_MESSAGE_TYPE_PC_TO_RDR_ICC_POWER_ON;
+    uint8_t frame[2 + 10 + 1] = {0};
+    frame[0] = SYNC;
+    frame[1] = CTRL;
+    frame[2 + 0] = CCID_MESSAGE_TYPE_PC_TO_RDR_ICC_POWER_ON;
 
-    seader_uart->tx_buf[2 + 5] = slot;
-    seader_uart->tx_buf[2 + 6] = seader_ccid_next_sequence(seader_uart, slot);
-    seader_uart->tx_buf[2 + 7] = 1; //power
+    frame[2 + 5] = slot;
+    frame[2 + 6] = seader_ccid_next_sequence(seader_uart, slot);
+    frame[2 + 7] = 1; //power
 
-    seader_uart->tx_len = seader_add_lrc(seader_uart->tx_buf, 2 + 10);
-    seader_ccid_publish_tx_frame(seader_uart, seader_uart->tx_buf, seader_uart->tx_len);
+    seader_uart->tx_len =
+        seader_ccid_build_control_frame_lrc(frame, seader_ccid_control_frame_size(0U));
+    seader_ccid_publish_tx_frame(seader_uart, frame, seader_uart->tx_len);
 }
 
 void seader_ccid_IccPowerOff(SeaderUartBridge* seader_uart, uint8_t slot) {
     seader_ccid_slot_state(seader_uart, slot)->powered = false;
 
     SEADER_VERBOSE_D(TAG, "Sending Power Off (%d)", slot);
-    memset(seader_uart->tx_buf, 0, SEADER_UART_RX_BUF_SIZE);
-    seader_uart->tx_buf[0] = SYNC;
-    seader_uart->tx_buf[1] = CTRL;
-    seader_uart->tx_buf[2 + 0] = CCID_MESSAGE_TYPE_PC_TO_RDR_ICC_POWER_OFF;
+    uint8_t frame[2 + 10 + 1] = {0};
+    frame[0] = SYNC;
+    frame[1] = CTRL;
+    frame[2 + 0] = CCID_MESSAGE_TYPE_PC_TO_RDR_ICC_POWER_OFF;
 
-    seader_uart->tx_buf[2 + 5] = slot;
-    seader_uart->tx_buf[2 + 6] = seader_ccid_next_sequence(seader_uart, slot);
+    frame[2 + 5] = slot;
+    frame[2 + 6] = seader_ccid_next_sequence(seader_uart, slot);
 
-    seader_uart->tx_len = seader_add_lrc(seader_uart->tx_buf, 2 + 10);
-    seader_ccid_publish_tx_frame(seader_uart, seader_uart->tx_buf, seader_uart->tx_len);
+    seader_uart->tx_len =
+        seader_ccid_build_control_frame_lrc(frame, seader_ccid_control_frame_size(0U));
+    seader_ccid_publish_tx_frame(seader_uart, frame, seader_uart->tx_len);
 }
 
 void seader_ccid_check_for_sam(SeaderUartBridge* seader_uart) {
@@ -94,15 +100,16 @@ void seader_ccid_check_for_sam(SeaderUartBridge* seader_uart) {
 
 void seader_ccid_GetSlotStatus(SeaderUartBridge* seader_uart, uint8_t slot) {
     SEADER_VERBOSE_D(TAG, "seader_ccid_GetSlotStatus(%d)", slot);
-    memset(seader_uart->tx_buf, 0, SEADER_UART_RX_BUF_SIZE);
-    seader_uart->tx_buf[0] = SYNC;
-    seader_uart->tx_buf[1] = CTRL;
-    seader_uart->tx_buf[2 + 0] = CCID_MESSAGE_TYPE_PC_TO_RDR_GET_SLOT_STATUS;
-    seader_uart->tx_buf[2 + 5] = slot;
-    seader_uart->tx_buf[2 + 6] = seader_ccid_next_sequence(seader_uart, slot);
+    uint8_t frame[2 + 10 + 1] = {0};
+    frame[0] = SYNC;
+    frame[1] = CTRL;
+    frame[2 + 0] = CCID_MESSAGE_TYPE_PC_TO_RDR_GET_SLOT_STATUS;
+    frame[2 + 5] = slot;
+    frame[2 + 6] = seader_ccid_next_sequence(seader_uart, slot);
 
-    seader_uart->tx_len = seader_add_lrc(seader_uart->tx_buf, 2 + 10);
-    seader_ccid_publish_tx_frame(seader_uart, seader_uart->tx_buf, seader_uart->tx_len);
+    seader_uart->tx_len =
+        seader_ccid_build_control_frame_lrc(frame, seader_ccid_control_frame_size(0U));
+    seader_ccid_publish_tx_frame(seader_uart, frame, seader_uart->tx_len);
 }
 
 void seader_ccid_SetParameters(Seader* seader, uint8_t slot) {
@@ -115,65 +122,67 @@ void seader_ccid_SetParameters(Seader* seader, uint8_t slot) {
     } else if(seader_uart->T == 1) {
         payloadLen = 7;
     }
-    memset(seader_uart->tx_buf, 0, SEADER_UART_RX_BUF_SIZE);
-    seader_uart->tx_buf[0] = SYNC;
-    seader_uart->tx_buf[1] = CTRL;
-    seader_uart->tx_buf[2 + 0] = CCID_MESSAGE_TYPE_PC_TO_RDR_SET_PARAMETERS;
-    seader_uart->tx_buf[2 + 1] = payloadLen;
-    seader_uart->tx_buf[2 + 5] = slot;
-    seader_uart->tx_buf[2 + 6] = seader_ccid_next_sequence(seader_uart, slot);
-    seader_uart->tx_buf[2 + 7] = seader_uart->T;
-    seader_uart->tx_buf[2 + 8] = 0;
-    seader_uart->tx_buf[2 + 9] = 0;
+    uint8_t frame[2 + 10 + 7 + 1] = {0};
+    frame[0] = SYNC;
+    frame[1] = CTRL;
+    frame[2 + 0] = CCID_MESSAGE_TYPE_PC_TO_RDR_SET_PARAMETERS;
+    frame[2 + 1] = payloadLen;
+    frame[2 + 5] = slot;
+    frame[2 + 6] = seader_ccid_next_sequence(seader_uart, slot);
+    frame[2 + 7] = seader_uart->T;
+    frame[2 + 8] = 0;
+    frame[2 + 9] = 0;
 
     uint8_t* atr = seader->ATR;
     seader_uart->t1.ifsc = atr[5];
 
     if(seader_uart->T == 0) {
         // I'm leaving this here for completeness, but it was actually causing ICC_MUTE on the first apdu.
-        seader_uart->tx_buf[2 + 10] = 0x11; //atr[2]; //bmFindexDindex
-        seader_uart->tx_buf[2 + 11] = 0x00; //bmTCCKST1
-        seader_uart->tx_buf[2 + 12] = 0x00; //bGuardTimeT0
-        seader_uart->tx_buf[2 + 13] = 0x0a; //bWaitingIntegerT0
-        seader_uart->tx_buf[2 + 14] = 0x00; //bClockStop
+        frame[2 + 10] = 0x11; //atr[2]; //bmFindexDindex
+        frame[2 + 11] = 0x00; //bmTCCKST1
+        frame[2 + 12] = 0x00; //bGuardTimeT0
+        frame[2 + 13] = 0x0a; //bWaitingIntegerT0
+        frame[2 + 14] = 0x00; //bClockStop
     } else if(atr[4] == 0xB1 && seader_uart->T == 1) {
-        seader_uart->tx_buf[2 + 10] = atr[2]; //bmFindexDindex
-        seader_uart->tx_buf[2 + 11] = 0x10; //bmTCCKST1
-        seader_uart->tx_buf[2 + 12] = 0xfe; //bGuardTimeT1
-        seader_uart->tx_buf[2 + 13] = atr[6]; //bWaitingIntegerT1
-        seader_uart->tx_buf[2 + 14] = atr[8]; //bClockStop
-        seader_uart->tx_buf[2 + 15] = seader_uart->t1.ifsc; //bIFSC
-        seader_uart->tx_buf[2 + 16] = 0x00; //bNadValue
+        frame[2 + 10] = atr[2]; //bmFindexDindex
+        frame[2 + 11] = 0x10; //bmTCCKST1
+        frame[2 + 12] = 0xfe; //bGuardTimeT1
+        frame[2 + 13] = atr[6]; //bWaitingIntegerT1
+        frame[2 + 14] = atr[8]; //bClockStop
+        frame[2 + 15] = seader_uart->t1.ifsc; //bIFSC
+        frame[2 + 16] = 0x00; //bNadValue
     } else if(seader_uart->T == 1) {
-        seader_uart->tx_buf[2 + 10] = 0x11; //atr[2]; //bmFindexDindex
-        seader_uart->tx_buf[2 + 11] = 0x10; //bmTCCKST1
-        seader_uart->tx_buf[2 + 12] = 0x00; //bGuardTimeT1
-        seader_uart->tx_buf[2 + 13] = 0x4d; //atr[6]; //bWaitingIntegerT1
-        seader_uart->tx_buf[2 + 14] = 0x00; //atr[8]; //bClockStop
-        seader_uart->tx_buf[2 + 15] = seader_uart->t1.ifsc; //bIFSC
-        seader_uart->tx_buf[2 + 16] = 0x00; //bNadValue
+        frame[2 + 10] = 0x11; //atr[2]; //bmFindexDindex
+        frame[2 + 11] = 0x10; //bmTCCKST1
+        frame[2 + 12] = 0x00; //bGuardTimeT1
+        frame[2 + 13] = 0x4d; //atr[6]; //bWaitingIntegerT1
+        frame[2 + 14] = 0x00; //atr[8]; //bClockStop
+        frame[2 + 15] = seader_uart->t1.ifsc; //bIFSC
+        frame[2 + 16] = 0x00; //bNadValue
     }
 
-    seader_uart->tx_len = seader_add_lrc(seader_uart->tx_buf, 2 + 10 + payloadLen);
-    seader_ccid_publish_tx_frame(seader_uart, seader_uart->tx_buf, seader_uart->tx_len);
+    seader_uart->tx_len =
+        seader_ccid_build_control_frame_lrc(frame, seader_ccid_control_frame_size(payloadLen));
+    seader_ccid_publish_tx_frame(seader_uart, frame, seader_uart->tx_len);
 }
 
 void seader_ccid_GetParameters(SeaderUartBridge* seader_uart) {
-    memset(seader_uart->tx_buf, 0, SEADER_UART_RX_BUF_SIZE);
-    seader_uart->tx_buf[0] = SYNC;
-    seader_uart->tx_buf[1] = CTRL;
-    seader_uart->tx_buf[2 + 0] = CCID_MESSAGE_TYPE_PC_TO_RDR_GET_PARAMETERS;
-    seader_uart->tx_buf[2 + 1] = 0;
-    seader_uart->tx_buf[2 + 5] = seader_ccid_current_slot(seader_uart);
-    seader_uart->tx_buf[2 + 6] =
+    uint8_t frame[2 + 10 + 1] = {0};
+    frame[0] = SYNC;
+    frame[1] = CTRL;
+    frame[2 + 0] = CCID_MESSAGE_TYPE_PC_TO_RDR_GET_PARAMETERS;
+    frame[2 + 1] = 0;
+    frame[2 + 5] = seader_ccid_current_slot(seader_uart);
+    frame[2 + 6] =
         seader_ccid_next_sequence(seader_uart, seader_ccid_current_slot(seader_uart));
-    seader_uart->tx_buf[2 + 7] = 0;
-    seader_uart->tx_buf[2 + 8] = 0;
-    seader_uart->tx_buf[2 + 9] = 0;
+    frame[2 + 7] = 0;
+    frame[2 + 8] = 0;
+    frame[2 + 9] = 0;
 
-    seader_uart->tx_len = seader_add_lrc(seader_uart->tx_buf, 2 + 10);
+    seader_uart->tx_len =
+        seader_ccid_build_control_frame_lrc(frame, seader_ccid_control_frame_size(0U));
 
-    seader_ccid_publish_tx_frame(seader_uart, seader_uart->tx_buf, seader_uart->tx_len);
+    seader_ccid_publish_tx_frame(seader_uart, frame, seader_uart->tx_len);
 }
 
 void seader_ccid_XfrBlock(SeaderUartBridge* seader_uart, uint8_t* data, size_t len) {

@@ -111,3 +111,7 @@ bool seader_ccid_payload_matches_exact(
 
     return memcmp(payload, expected, expected_len) == 0;
 }
+
+size_t seader_ccid_control_frame_size(size_t payload_len) {
+    return 2U + 10U + payload_len;
+}

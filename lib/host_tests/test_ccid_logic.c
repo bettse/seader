@@ -198,6 +198,18 @@ static MunitResult test_payload_match_requires_exact_length(
     return MUNIT_OK;
 }
 
+static MunitResult test_control_frame_size_includes_transport_header(
+    const MunitParameter params[],
+    void* fixture) {
+    (void)params;
+    (void)fixture;
+
+    munit_assert_size(seader_ccid_control_frame_size(0U), ==, 12U);
+    munit_assert_size(seader_ccid_control_frame_size(5U), ==, 17U);
+    munit_assert_size(seader_ccid_control_frame_size(7U), ==, 19U);
+    return MUNIT_OK;
+}
+
 static MunitTest test_ccid_cases[] = {
     {(char*)"/sequence/advance-wraps-through-ff",
      test_sequence_advance_wraps,
@@ -268,6 +280,12 @@ static MunitTest test_ccid_cases[] = {
      NULL},
     {(char*)"/payload/match-requires-exact-length",
      test_payload_match_requires_exact_length,
+     NULL,
+     NULL,
+     MUNIT_TEST_OPTION_NONE,
+     NULL},
+    {(char*)"/frame/control-size-includes-header",
+     test_control_frame_size_includes_transport_header,
      NULL,
      NULL,
      MUNIT_TEST_OPTION_NONE,
