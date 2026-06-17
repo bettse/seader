@@ -21,6 +21,7 @@ test-host:
 			lib/host_tests/test_lrc.c \
 			lib/host_tests/test_board_power_lifecycle.c \
 			lib/host_tests/test_hf_read_lifecycle.c \
+			lib/host_tests/test_hf_buffer_pool.c \
 			lib/host_tests/test_sam_startup_ui.c \
 			lib/host_tests/test_sam_key_label.c \
 		lib/host_tests/test_ccid_logic.c \
@@ -42,6 +43,7 @@ test-host:
 			board_power_lifecycle.c \
 			sam_startup_ui.c \
 			ccid_logic.c \
+			hf_buffer_pool.c \
 			uart_tx_logic.c \
 			uart_rx_logic.c \
 			allocation_policy.c \

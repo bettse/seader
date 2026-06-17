@@ -4,6 +4,7 @@ extern MunitSuite test_lrc_suite;
 extern MunitSuite test_board_identity_suite;
 extern MunitSuite test_board_power_lifecycle_suite;
 extern MunitSuite test_hf_read_lifecycle_suite;
+extern MunitSuite test_hf_buffer_pool_suite;
 extern MunitSuite test_sam_startup_ui_suite;
 extern MunitSuite test_ccid_logic_suite;
 extern MunitSuite test_uart_tx_logic_suite;
@@ -33,6 +34,7 @@ int main(int argc, char* argv[]) {
          NULL,
          1,
          MUNIT_SUITE_OPTION_NONE},
+        {"/hf-buffer-pool", test_hf_buffer_pool_suite.tests, NULL, 1, MUNIT_SUITE_OPTION_NONE},
         {"/sam-startup-ui",
          test_sam_startup_ui_suite.tests,
          NULL,

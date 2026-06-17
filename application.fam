@@ -73,6 +73,6 @@ App(
     apptype=FlipperAppType.PLUGIN,
     entry_point="plugin_hf_ep",
     requires=["seader"],
-    sources=["hf_interface_fal/hf.c", "hf_bridge_policy.c"],
+    sources=["hf_interface_fal/hf.c", "hf_bridge_policy.c", "hf_buffer_pool.c"],
     fal_embedded=True,
 )

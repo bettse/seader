@@ -1,5 +1,6 @@
 #include "hf_interface.h"
 #include "../trace_log.h"
+#include "../hf_buffer_pool.h"
 
 #include "../protocol/picopass_poller.h"
 #include "../protocol/rfal_picopass.h"
@@ -33,6 +34,7 @@ typedef struct {
     NfcPoller* poller;
     Iso14443_4aPoller* iso14443_4a_poller;
     MfClassicPoller* mfc_poller;
+    SeaderHfBufferPair buffers;
     SeaderCredentialType active_type;
 } PluginHfContext;
 
@@ -319,18 +321,20 @@ static void plugin_hf_iso15693_transmit(
         ctx->api->set_stage(ctx->host_ctx, PluginHfStageFail);
         return;
     }
-    BitBuffer* tx_buffer = bit_buffer_alloc(len);
-    BitBuffer* rx_buffer = bit_buffer_alloc(HF_PLUGIN_POLLER_MAX_BUFFER_SIZE);
-    uint8_t rx_data[HF_PLUGIN_POLLER_MAX_BUFFER_SIZE];
-    size_t rx_len = 0U;
-    SeaderHfBridgeRfStatus rx_status = SeaderHfBridgeRfStatusTimeout;
-    if(!tx_buffer || !rx_buffer) {
-        FURI_LOG_E(TAG, "Failed to allocate picopass buffers");
-        if(tx_buffer) bit_buffer_free(tx_buffer);
-        if(rx_buffer) bit_buffer_free(rx_buffer);
+    if(!seader_hf_buffer_pair_prepare(
+           &ctx->buffers,
+           HF_PLUGIN_POLLER_MAX_BUFFER_SIZE + 1U,
+           HF_PLUGIN_POLLER_MAX_BUFFER_SIZE,
+           len)) {
+        FURI_LOG_E(TAG, "Failed to prepare picopass buffers");
         ctx->api->set_stage(ctx->host_ctx, PluginHfStageFail);
         return;
     }
+    BitBuffer* tx_buffer = ctx->buffers.tx;
+    BitBuffer* rx_buffer = ctx->buffers.rx;
+    uint8_t rx_data[HF_PLUGIN_POLLER_MAX_BUFFER_SIZE];
+    size_t rx_len = 0U;
+    SeaderHfBridgeRfStatus rx_status = SeaderHfBridgeRfStatusTimeout;
 
     do {
         bit_buffer_append_bytes(tx_buffer, buffer, len);
@@ -362,9 +366,6 @@ static void plugin_hf_iso15693_transmit(
             (uint8_t*)bit_buffer_get_data(rx_buffer),
             bit_buffer_get_size_bytes(rx_buffer));
     } while(false);
-
-    bit_buffer_free(tx_buffer);
-    bit_buffer_free(rx_buffer);
 }
 
 static void plugin_hf_iso14443a_transmit(
@@ -386,15 +387,17 @@ static void plugin_hf_iso14443a_transmit(
         return;
     }
 
-    BitBuffer* tx_buffer = bit_buffer_alloc(len + 1U);
-    BitBuffer* rx_buffer = bit_buffer_alloc(HF_PLUGIN_POLLER_MAX_BUFFER_SIZE);
-    if(!tx_buffer || !rx_buffer) {
-        FURI_LOG_E(TAG, "Failed to allocate 14A buffers");
-        if(tx_buffer) bit_buffer_free(tx_buffer);
-        if(rx_buffer) bit_buffer_free(rx_buffer);
+    if(!seader_hf_buffer_pair_prepare(
+           &ctx->buffers,
+           HF_PLUGIN_POLLER_MAX_BUFFER_SIZE + 1U,
+           HF_PLUGIN_POLLER_MAX_BUFFER_SIZE,
+           len + 1U)) {
+        FURI_LOG_E(TAG, "Failed to prepare 14A buffers");
         ctx->api->set_stage(ctx->host_ctx, PluginHfStageFail);
         return;
     }
+    BitBuffer* tx_buffer = ctx->buffers.tx;
+    BitBuffer* rx_buffer = ctx->buffers.rx;
 
     do {
         bit_buffer_append_bytes(tx_buffer, buffer, len);
@@ -432,9 +435,6 @@ static void plugin_hf_iso14443a_transmit(
             (uint8_t*)bit_buffer_get_data(rx_buffer),
             bit_buffer_get_size_bytes(rx_buffer));
     } while(false);
-
-    bit_buffer_free(tx_buffer);
-    bit_buffer_free(rx_buffer);
 }
 
 static void plugin_hf_mfc_transmit(
@@ -453,15 +453,17 @@ static void plugin_hf_mfc_transmit(
         return;
     }
 
-    BitBuffer* tx_buffer = bit_buffer_alloc(len);
-    BitBuffer* rx_buffer = bit_buffer_alloc(HF_PLUGIN_POLLER_MAX_BUFFER_SIZE);
-    if(!tx_buffer || !rx_buffer) {
-        FURI_LOG_E(TAG, "Failed to allocate MFC buffers");
-        if(tx_buffer) bit_buffer_free(tx_buffer);
-        if(rx_buffer) bit_buffer_free(rx_buffer);
+    if(!seader_hf_buffer_pair_prepare(
+           &ctx->buffers,
+           HF_PLUGIN_POLLER_MAX_BUFFER_SIZE + 1U,
+           HF_PLUGIN_POLLER_MAX_BUFFER_SIZE,
+           len)) {
+        FURI_LOG_E(TAG, "Failed to prepare MFC buffers");
         ctx->api->set_stage(ctx->host_ctx, PluginHfStageFail);
         return;
     }
+    BitBuffer* tx_buffer = ctx->buffers.tx;
+    BitBuffer* rx_buffer = ctx->buffers.rx;
 
     const uint32_t mfc_fwt_fc = plugin_hf_sam_timeout_fwt(timeout);
 
@@ -562,9 +564,6 @@ static void plugin_hf_mfc_transmit(
             (uint8_t*)bit_buffer_get_data(rx_buffer),
             bit_buffer_get_size_bytes(rx_buffer));
     } while(false);
-
-    bit_buffer_free(tx_buffer);
-    bit_buffer_free(rx_buffer);
 }
 
 static NfcCommand plugin_hf_poller_callback_iso14443_4a(NfcGenericEvent event, void* context) {
@@ -801,6 +800,7 @@ static void plugin_hf_free(void* plugin_ctx) {
         return;
     }
     plugin_hf_cleanup_pollers(ctx);
+    seader_hf_buffer_pair_free(&ctx->buffers);
     free(ctx);
 }
 
