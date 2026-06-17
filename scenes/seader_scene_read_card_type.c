@@ -55,6 +55,7 @@ bool seader_scene_read_card_type_on_event(void* context, SceneManagerEvent event
             consumed = true;
         }
     } else if(event.type == SceneManagerEventTypeBack) {
+        seader_hf_mode_deactivate(seader);
         consumed = seader_hf_request_teardown(seader, SeaderHfTeardownActionSamPresent);
     }
 
