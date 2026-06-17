@@ -62,6 +62,56 @@ static MunitResult test_failure_reason_texts_are_stable(
         seader_hf_read_failure_reason_text(SeaderHfReadFailureReasonSamTimeout), "SAM timeout");
     munit_assert_string_equal(
         seader_hf_read_failure_reason_text(SeaderHfReadFailureReasonBoardMissing), "Reader lost");
+    munit_assert_string_equal(
+        seader_hf_read_failure_reason_text(SeaderHfReadFailureReasonSamKeysMissing),
+        "SAM missing keys");
+    return MUNIT_OK;
+}
+
+static MunitResult test_empty_pacs2_detects_sam_keys_missing(
+    const MunitParameter params[],
+    void* fixture) {
+    (void)params;
+    (void)fixture;
+
+    munit_assert_false(seader_pacs2_indicates_sam_keys_missing(false, NULL, 0U));
+    munit_assert_true(seader_pacs2_indicates_sam_keys_missing(true, NULL, 0U));
+    munit_assert_true(seader_pacs2_indicates_sam_keys_missing(true, NULL, 1U));
+    munit_assert_false(
+        seader_pacs2_indicates_sam_keys_missing(true, (const uint8_t[]){0x00U, 0x10U}, 2U));
+    return MUNIT_OK;
+}
+
+static MunitResult test_sam_keys_missing_error_texts_fit_storage(
+    const MunitParameter params[],
+    void* fixture) {
+    (void)params;
+    (void)fixture;
+
+    char label[97] = {0};
+
+    seader_hf_read_format_sam_keys_missing_error(
+        true, SeaderHfPacsMediaTypePicopass, true, false, label, sizeof(label));
+    munit_assert_string_equal(
+        label, "PicoPass recognized.\nUnable to read keys.\nSAM missing standard keys.");
+    munit_assert_size(strlen(label), <, 96U);
+
+    seader_hf_read_format_sam_keys_missing_error(
+        true, SeaderHfPacsMediaTypeMifarePlus, true, true, label, sizeof(label));
+    munit_assert_string_equal(
+        label, "MIFARE Plus recognized.\nUnable to read keys.\nCheck SAM Info.");
+    munit_assert_size(strlen(label), <, 96U);
+
+    seader_hf_read_format_sam_keys_missing_error(
+        false, SeaderHfPacsMediaTypeUnknown, true, false, label, sizeof(label));
+    munit_assert_string_equal(
+        label, "Unable to read keys.\nSAM missing standard\nkeys. Check SAM Info.");
+    munit_assert_size(strlen(label), <, 96U);
+
+    seader_hf_read_format_sam_keys_missing_error(
+        false, SeaderHfPacsMediaTypeUnknown, false, false, label, sizeof(label));
+    munit_assert_string_equal(label, "Unable to read keys.\nCheck SAM Info.");
+    munit_assert_size(strlen(label), <, 96U);
     return MUNIT_OK;
 }
 
@@ -85,6 +135,8 @@ static MunitTest test_hf_read_lifecycle_cases[] = {
     {(char*)"/timeout-policy", test_waiting_states_and_timeout_policy, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {(char*)"/failure-text", test_failure_reason_texts_are_stable, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {(char*)"/failure-text-fits", test_error_texts_fit_read_error_storage, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {(char*)"/empty-pacs2", test_empty_pacs2_detects_sam_keys_missing, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {(char*)"/sam-keys-missing-text", test_sam_keys_missing_error_texts_fit_storage, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {NULL, NULL, NULL, NULL, 0, NULL},
 };
 

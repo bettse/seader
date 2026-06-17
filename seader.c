@@ -148,11 +148,22 @@ static void seader_board_prepare_missing_state(Seader* seader, SeaderBoardStatus
 
     seader->board_status = status;
     seader->sam_present = false;
+    seader->uhf_probe_status = SeaderUhfProbeStatusHidden;
+    seader_uhf_status_label_format(
+        seader->uhf_probe_status,
+        false,
+        false,
+        false,
+        false,
+        seader->uhf_status_label,
+        sizeof(seader->uhf_status_label));
     seader_sam_key_label_format(
         false,
         SeaderSamKeyProbeStatusUnknown,
         NULL,
         0U,
+        false,
+        false,
         seader->sam_key_label,
         sizeof(seader->sam_key_label));
 }
@@ -341,6 +352,32 @@ static void seader_board_set_enable_pin(bool enabled) {
     furi_hal_gpio_write(&gpio_ext_pc3, enabled);
 }
 
+static bool seader_board_probe_pin_pulldown_high(const GpioPin* pin) {
+    furi_hal_gpio_init(pin, GpioModeInput, GpioPullDown, GpioSpeedLow);
+    furi_delay_ms(1U);
+    const bool high = furi_hal_gpio_read(pin);
+    furi_hal_gpio_init(pin, GpioModeAnalog, GpioPullNo, GpioSpeedLow);
+    return high;
+}
+
+static void seader_board_refresh_class(Seader* seader) {
+    if(!seader) {
+        return;
+    }
+
+    const bool pa4 = seader_board_probe_pin_pulldown_high(&gpio_ext_pa4);
+    const bool pc1 = seader_board_probe_pin_pulldown_high(&gpio_ext_pc1);
+    const bool pc0 = seader_board_probe_pin_pulldown_high(&gpio_ext_pc0);
+    seader->board_class = seader_board_classify(pa4, pc1, pc0);
+    FURI_LOG_I(
+        TAG,
+        "Board class=%u straps pa4=%u pc1=%u pc0=%u",
+        seader->board_class,
+        pa4,
+        pc1,
+        pc0);
+}
+
 void seader_start_popup_set_stage(Seader* seader, SeaderStartupStage stage) {
     if(!seader || !seader->popup) {
         return;
@@ -384,6 +421,7 @@ static void seader_board_power_fail(Seader* seader, SeaderBoardStatus status) {
     }
     seader->board_power_enabled = false;
     seader->board_power_owned = false;
+    seader->board_class = SeaderBoardClassUnknown;
     seader->board_status = status;
 }
 
@@ -445,6 +483,7 @@ static bool seader_board_power_on(Seader* seader) {
     }
     seader->board_power_enabled = true;
     seader->board_status = SeaderBoardStatusPowerReadyPendingValidation;
+    seader_board_refresh_class(seader);
     return true;
 }
 
@@ -460,6 +499,7 @@ static void seader_board_power_off(Seader* seader) {
     }
     seader->board_power_enabled = false;
     seader->board_power_owned = false;
+    seader->board_class = SeaderBoardClassUnknown;
 }
 
 bool seader_board_retry_power_cycle(Seader* seader) {
@@ -554,6 +594,15 @@ static bool seader_hf_plugin_begin_card_session(
 static void seader_hf_plugin_send_nfc_rx(void* host_ctx, uint8_t* buffer, size_t len) {
     Seader* seader = host_ctx;
     seader_send_nfc_rx(seader, buffer, len);
+}
+
+static void seader_hf_plugin_send_nfc_rx_status(
+    void* host_ctx,
+    uint8_t* buffer,
+    size_t len,
+    SeaderHfBridgeRfStatus status) {
+    Seader* seader = host_ctx;
+    seader_send_nfc_rx_status(seader, buffer, len, status);
 }
 
 static void seader_hf_plugin_run_conversation(void* host_ctx) {
@@ -753,9 +802,13 @@ static bool seader_hf_plugin_picopass_transmit(
     uint8_t* rx_data,
     size_t rx_capacity,
     size_t* rx_len,
-    uint32_t fwt_fc) {
+    uint32_t fwt_fc,
+    SeaderHfBridgeRfStatus* status) {
     Seader* seader = host_ctx;
     if(!seader->picopass_poller || !tx_data || !rx_data || !rx_len) {
+        if(status) {
+            *status = SeaderHfBridgeRfStatusProtocol;
+        }
         return false;
     }
 
@@ -772,6 +825,23 @@ static bool seader_hf_plugin_picopass_transmit(
     bit_buffer_append_bytes(tx_buffer, tx_data, tx_len);
     PicopassError error =
         picopass_poller_send_frame(seader->picopass_poller, tx_buffer, rx_buffer, fwt_fc);
+    if(status) {
+        switch(error) {
+        case PicopassErrorNone:
+            *status = SeaderHfBridgeRfStatusSuccess;
+            break;
+        case PicopassErrorTimeout:
+            *status = SeaderHfBridgeRfStatusTimeout;
+            break;
+        case PicopassErrorIncorrectCrc:
+            *status = SeaderHfBridgeRfStatusCrc;
+            break;
+        case PicopassErrorProtocol:
+        default:
+            *status = SeaderHfBridgeRfStatusProtocol;
+            break;
+        }
+    }
     if(error == PicopassErrorIncorrectCrc) {
         error = PicopassErrorNone;
     }
@@ -800,6 +870,7 @@ static const PluginHfHostApi seader_hf_plugin_host_api = {
     .notify_worker_exit = seader_hf_plugin_notify_worker_exit,
     .begin_card_session = seader_hf_plugin_begin_card_session,
     .send_nfc_rx = seader_hf_plugin_send_nfc_rx,
+    .send_nfc_rx_status = seader_hf_plugin_send_nfc_rx_status,
     .run_conversation = seader_hf_plugin_run_conversation,
     .set_stage = seader_hf_plugin_set_stage,
     .get_stage = seader_hf_plugin_get_stage,
@@ -930,6 +1001,7 @@ Seader* seader_alloc() {
     seader->board_power_enabled = false;
     seader->board_power_owned = false;
     seader->expansion_disabled = false;
+    seader->board_class = SeaderBoardClassUnknown;
     seader->board_status = SeaderBoardStatusUnknown;
     seader->startup_stage = SeaderStartupStageNone;
     seader->board_retry_remaining = 0U;
@@ -951,12 +1023,14 @@ Seader* seader_alloc() {
     seader->sam_present = false;
     memset(seader->sam_version, 0, sizeof(seader->sam_version));
     seader->sam_key_probe_status = SeaderSamKeyProbeStatusUnknown;
-    seader->uhf_probe_status = SeaderUhfProbeStatusUnknown;
+    seader->uhf_probe_status = SeaderUhfProbeStatusHidden;
     seader_sam_key_label_format(
         false,
         seader->sam_key_probe_status,
         NULL,
         0U,
+        false,
+        false,
         seader->sam_key_label,
         sizeof(seader->sam_key_label));
     seader_uhf_status_label_format(

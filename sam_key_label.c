@@ -23,6 +23,8 @@ void seader_sam_key_label_format(
     SeaderSamKeyProbeStatus probe_status,
     const uint8_t* elite_ice_value,
     size_t elite_ice_value_len,
+    bool standard_pacs_keys_probed,
+    bool standard_pacs_keys_present,
     char* out,
     size_t out_size) {
     if(!out || out_size == 0U) {
@@ -33,6 +35,11 @@ void seader_sam_key_label_format(
 
     if(!sam_present) {
         snprintf(out, out_size, "NO SAM");
+        return;
+    }
+
+    if(standard_pacs_keys_probed && !standard_pacs_keys_present) {
+        snprintf(out, out_size, "MISSING STANDARD KEYS");
         return;
     }
 

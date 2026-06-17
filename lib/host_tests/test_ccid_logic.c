@@ -152,6 +152,7 @@ static MunitResult test_data_block_route(const MunitParameter params[], void* fi
     /* CCID says "bSlot identifies which ICC slot is being addressed"; protocol 00h is T=0 and 01h is T=1. */
     munit_assert_int(seader_ccid_route_data_block(true, 0, 0, 0), ==, SeaderCcidDataRouteSamT0);
     munit_assert_int(seader_ccid_route_data_block(true, 0, 0, 1), ==, SeaderCcidDataRouteSamT1);
+    munit_assert_int(seader_ccid_route_data_block(true, 1, 1, 1), ==, SeaderCcidDataRouteSamT1);
     munit_assert_int(
         seader_ccid_route_data_block(false, 0, 0, 1), ==, SeaderCcidDataRouteAtrRecognition);
     munit_assert_int(

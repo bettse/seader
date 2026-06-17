@@ -62,6 +62,7 @@
 #include "seader_credential.h"
 #include "apdu_log.h"
 #include "board_power_lifecycle.h"
+#include "board_identity.h"
 #include "sam_startup_ui.h"
 #include "sam_key_label.h"
 #include "uhf_snmp_probe.h"
@@ -142,6 +143,7 @@ struct Seader {
     bool board_power_enabled;
     bool board_power_owned;
     bool expansion_disabled;
+    SeaderBoardClass board_class;
     SeaderBoardStatus board_status;
     SeaderStartupStage startup_stage;
     uint8_t board_retry_remaining;

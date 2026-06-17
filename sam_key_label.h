@@ -18,5 +18,7 @@ void seader_sam_key_label_format(
     SeaderSamKeyProbeStatus probe_status,
     const uint8_t* elite_ice_value,
     size_t elite_ice_value_len,
+    bool standard_pacs_keys_probed,
+    bool standard_pacs_keys_present,
     char* out,
     size_t out_size);

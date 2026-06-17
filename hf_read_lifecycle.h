@@ -1,7 +1,19 @@
 #pragma once
 
+#include "sam_key_label.h"
+
 #include <stdbool.h>
 #include <stdint.h>
+#include <stddef.h>
+
+typedef enum {
+    SeaderHfPacsMediaTypeUnknown = 0,
+    SeaderHfPacsMediaTypeDesfire = 1,
+    SeaderHfPacsMediaTypeMifare = 2,
+    SeaderHfPacsMediaTypePicopass = 3,
+    SeaderHfPacsMediaTypeMifarePlus = 6,
+    SeaderHfPacsMediaTypeSeos = 7,
+} SeaderHfPacsMediaType;
 
 typedef enum {
     SeaderHfReadStateIdle = 0,
@@ -21,6 +33,7 @@ typedef enum {
     SeaderHfReadFailureReasonBoardMissing,
     SeaderHfReadFailureReasonProtocolError,
     SeaderHfReadFailureReasonInternalState,
+    SeaderHfReadFailureReasonSamKeysMissing,
 } SeaderHfReadFailureReason;
 
 typedef enum {
@@ -37,3 +50,14 @@ bool seader_hf_read_should_timeout(
     uint32_t elapsed_ms,
     uint32_t timeout_ms);
 const char* seader_hf_read_failure_reason_text(SeaderHfReadFailureReason reason);
+bool seader_pacs2_indicates_sam_keys_missing(
+    bool has_media_type,
+    const uint8_t* pacs_bits,
+    size_t pacs_bits_size);
+void seader_hf_read_format_sam_keys_missing_error(
+    bool has_media_type,
+    SeaderHfPacsMediaType media_type,
+    bool standard_pacs_keys_probed,
+    bool standard_pacs_keys_present,
+    char* out,
+    size_t out_size);

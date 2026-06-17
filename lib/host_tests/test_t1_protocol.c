@@ -308,6 +308,48 @@ static MunitResult test_recv_live_uhf_config_chained_blocks(
     return MUNIT_OK;
 }
 
+static MunitResult test_recv_live_sam_card_detected(
+    const MunitParameter params[],
+    void* fixture) {
+    (void)params;
+    (void)fixture;
+
+    static const char* expected_apdu_hex =
+        "0A4400000000BD028A009000";
+
+    SeaderUartBridge uart = {0};
+    SeaderWorker worker = {0};
+    Seader seader = make_test_seader(&uart, &worker);
+    uint8_t rx_block[64] = {0};
+    uint8_t expected_apdu[64] = {0};
+    CCID_Message message = {0};
+    size_t expected_apdu_len = 0U;
+    const size_t inf_len = 12;
+
+    t1_host_test_reset();
+    uart.t1.ifsd = 0xFE;
+    uart.t1.recv_pcb = 0x00;
+
+    expected_apdu_len =
+        test_hex_to_bytes(expected_apdu_hex, expected_apdu, sizeof(expected_apdu));
+    munit_assert_size(expected_apdu_len, ==, inf_len);
+
+    rx_block[0] = 0x00;
+    rx_block[1] = 0x00;
+    rx_block[2] = (uint8_t)inf_len;
+    memcpy(rx_block + 3, expected_apdu, inf_len);
+    seader_add_lrc(rx_block, 3 + inf_len);
+
+    message.payload = rx_block;
+    message.dwLength = 3 + inf_len + 1;
+    munit_assert_true(seader_recv_t1(&seader, &message));
+    munit_assert_size(g_t1_host_test_state.process_call_count, ==, 1);
+    munit_assert_size(g_t1_host_test_state.last_apdu_len, ==, expected_apdu_len);
+    munit_assert_memory_equal(
+        expected_apdu_len, g_t1_host_test_state.last_apdu, expected_apdu);
+    return MUNIT_OK;
+}
+
 static MunitTest test_t1_regression_cases[] = {
     {(char*)"/recv/wtx-request-responds",
      test_recv_wtx_request_responds,
@@ -365,6 +407,12 @@ static MunitTest test_t1_regression_cases[] = {
      NULL},
     {(char*)"/recv/live-uhf-config-chained-blocks",
      test_recv_live_uhf_config_chained_blocks,
+     NULL,
+     NULL,
+     MUNIT_TEST_OPTION_NONE,
+     NULL},
+    {(char*)"/recv/live-sam-card-detected",
+     test_recv_live_sam_card_detected,
      NULL,
      NULL,
      MUNIT_TEST_OPTION_NONE,
