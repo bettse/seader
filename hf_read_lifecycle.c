@@ -47,6 +47,8 @@ const char* seader_hf_read_failure_reason_text(SeaderHfReadFailureReason reason)
         return "Read state error";
     case SeaderHfReadFailureReasonSamKeysMissing:
         return "SAM missing keys";
+    case SeaderHfReadFailureReasonResourceExhausted:
+        return "SAM exchange memory error";
     case SeaderHfReadFailureReasonNone:
     default:
         return "Read failed";

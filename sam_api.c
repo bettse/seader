@@ -357,10 +357,6 @@ void* calloc(size_t count, size_t size) {
 
 // Forward declarations
 static void seader_abort_active_read(Seader* seader);
-static void seader_abort_active_read_with_reason(
-    Seader* seader,
-    SeaderHfReadFailureReason reason,
-    const char* detail);
 
 static void seader_sam_set_state(
     Seader* seader,
@@ -1038,7 +1034,7 @@ bool seader_parse_serial_number(Seader* seader, uint8_t* buf, size_t size) {
     return seader_sam_save_serial(seader, buf, size);
 }
 
-static void seader_abort_active_read_with_reason(
+void seader_abort_active_read_with_reason(
     Seader* seader,
     SeaderHfReadFailureReason reason,
     const char* detail) {

@@ -65,6 +65,9 @@ static MunitResult test_failure_reason_texts_are_stable(
     munit_assert_string_equal(
         seader_hf_read_failure_reason_text(SeaderHfReadFailureReasonSamKeysMissing),
         "SAM missing keys");
+    munit_assert_string_equal(
+        seader_hf_read_failure_reason_text(SeaderHfReadFailureReasonResourceExhausted),
+        "SAM exchange memory error");
     return MUNIT_OK;
 }
 
@@ -143,6 +146,10 @@ static MunitResult test_error_texts_fit_read_error_storage(
     munit_assert_size(strlen(protected_read_timeout), <, 96U);
     munit_assert_size(
         strlen(seader_hf_read_failure_reason_text(SeaderHfReadFailureReasonInternalState)), <, 96U);
+    munit_assert_size(
+        strlen(seader_hf_read_failure_reason_text(SeaderHfReadFailureReasonResourceExhausted)),
+        <,
+        96U);
     return MUNIT_OK;
 }
 

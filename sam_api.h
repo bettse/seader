@@ -12,6 +12,7 @@
 #include <stdint.h>
 
 #include "hf_bridge_policy.h"
+#include "hf_read_lifecycle.h"
 
 typedef struct Seader Seader;
 typedef struct SeaderPollerContainer SeaderPollerContainer;
@@ -41,6 +42,10 @@ void seader_send_no_card_detected(Seader* seader);
 bool seader_sam_can_accept_card(const Seader* seader);
 bool seader_sam_has_active_card(const Seader* seader);
 void seader_sam_force_idle_for_recovery(Seader* seader);
+void seader_abort_active_read_with_reason(
+    Seader* seader,
+    SeaderHfReadFailureReason reason,
+    const char* detail);
 
 bool seader_process_success_response_i(
     Seader* seader,

@@ -196,6 +196,35 @@ static MunitResult test_recv_i_block_too_large_rejected(const MunitParameter par
     return MUNIT_OK;
 }
 
+static MunitResult test_recv_chained_i_block_oom_returns_error(
+    const MunitParameter params[],
+    void* fixture) {
+    (void)params;
+    (void)fixture;
+
+    SeaderUartBridge uart = {0};
+    SeaderWorker worker = {0};
+    Seader seader = make_test_seader(&uart, &worker);
+    uint8_t i_block_more[] = {0x00, 0x20, 0x02, 0xAA, 0xBB, 0x00};
+    CCID_Message message = {.payload = i_block_more, .dwLength = sizeof(i_block_more)};
+
+    t1_host_test_reset();
+    uart.t1.ifsd = SEADER_T1_IFS_DEFAULT;
+    uart.t1.recv_pcb = 0x00;
+    seader_add_lrc(i_block_more, sizeof(i_block_more) - 1U);
+    bit_buffer_test_fail_next_alloc(true);
+
+    munit_assert_false(seader_recv_t1(&seader, &message));
+    munit_assert_null(uart.t1.rx_buffer);
+    munit_assert_size(g_t1_host_test_state.xfrblock_call_count, ==, 0);
+    munit_assert_size(g_t1_host_test_state.process_call_count, ==, 0);
+    munit_assert_size(g_t1_host_test_state.abort_call_count, ==, 1);
+    munit_assert_int(
+        seader.hf_read_failure_reason, ==, SeaderHfReadFailureReasonResourceExhausted);
+    munit_assert_string_equal(seader.read_error, "SAM exchange memory error");
+    return MUNIT_OK;
+}
+
 static MunitResult test_recv_r_block_nack_retransmits(const MunitParameter params[], void* fixture) {
     (void)params;
     (void)fixture;
@@ -389,6 +418,12 @@ static MunitTest test_t1_regression_cases[] = {
      NULL},
     {(char*)"/recv/i-block-too-large-rejected",
      test_recv_i_block_too_large_rejected,
+     NULL,
+     NULL,
+     MUNIT_TEST_OPTION_NONE,
+     NULL},
+    {(char*)"/recv/chained-i-block-oom-errors",
+     test_recv_chained_i_block_oom_returns_error,
      NULL,
      NULL,
      MUNIT_TEST_OPTION_NONE,

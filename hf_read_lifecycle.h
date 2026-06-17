@@ -34,6 +34,7 @@ typedef enum {
     SeaderHfReadFailureReasonProtocolError,
     SeaderHfReadFailureReasonInternalState,
     SeaderHfReadFailureReasonSamKeysMissing,
+    SeaderHfReadFailureReasonResourceExhausted,
 } SeaderHfReadFailureReason;
 
 typedef enum {
