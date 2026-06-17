@@ -50,6 +50,10 @@ bool seader_hf_read_should_timeout(
     uint32_t elapsed_ms,
     uint32_t timeout_ms);
 const char* seader_hf_read_failure_reason_text(SeaderHfReadFailureReason reason);
+void seader_hf_read_prepare_context(
+    SeaderHfReadFailureReason* failure_reason,
+    char* read_error,
+    size_t read_error_size);
 bool seader_pacs2_indicates_sam_keys_missing(
     bool has_media_type,
     const uint8_t* pacs_bits,

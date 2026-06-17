@@ -68,6 +68,22 @@ static MunitResult test_failure_reason_texts_are_stable(
     return MUNIT_OK;
 }
 
+static MunitResult test_prepare_context_clears_stale_failure(
+    const MunitParameter params[],
+    void* fixture) {
+    (void)params;
+    (void)fixture;
+
+    SeaderHfReadFailureReason failure_reason = SeaderHfReadFailureReasonSamTimeout;
+    char read_error[32] = "previous timeout";
+
+    seader_hf_read_prepare_context(&failure_reason, read_error, sizeof(read_error));
+
+    munit_assert_int(failure_reason, ==, SeaderHfReadFailureReasonNone);
+    munit_assert_char(read_error[0], ==, '\0');
+    return MUNIT_OK;
+}
+
 static MunitResult test_empty_pacs2_detects_sam_keys_missing(
     const MunitParameter params[],
     void* fixture) {
@@ -134,6 +150,7 @@ static MunitTest test_hf_read_lifecycle_cases[] = {
     {(char*)"/card-detect-gating", test_card_detect_starts_only_from_detecting_when_sam_idle, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {(char*)"/timeout-policy", test_waiting_states_and_timeout_policy, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {(char*)"/failure-text", test_failure_reason_texts_are_stable, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {(char*)"/prepare-context", test_prepare_context_clears_stale_failure, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {(char*)"/failure-text-fits", test_error_texts_fit_read_error_storage, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {(char*)"/empty-pacs2", test_empty_pacs2_detects_sam_keys_missing, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {(char*)"/sam-keys-missing-text", test_sam_keys_missing_error_texts_fit_storage, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
