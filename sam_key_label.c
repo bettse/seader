@@ -18,6 +18,23 @@ static bool seader_sam_key_label_is_missing(const uint8_t* value, size_t value_l
     return true;
 }
 
+SeaderSamKeyProbeStatus seader_sam_key_probe_status_from_snmp_result(
+    bool probe_succeeded,
+    const uint8_t* elite_ice_value,
+    size_t elite_ice_value_len) {
+    if(!probe_succeeded) {
+        return SeaderSamKeyProbeStatusProbeFailed;
+    }
+
+    if(!elite_ice_value || elite_ice_value_len == 0U) {
+        return SeaderSamKeyProbeStatusUnknown;
+    }
+
+    return seader_sam_key_label_is_missing(elite_ice_value, elite_ice_value_len) ?
+               SeaderSamKeyProbeStatusVerifiedStandard :
+               SeaderSamKeyProbeStatusVerifiedValue;
+}
+
 void seader_sam_key_label_format(
     bool sam_present,
     SeaderSamKeyProbeStatus probe_status,

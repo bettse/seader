@@ -111,6 +111,32 @@ static MunitResult test_formats_missing_standard_key(const MunitParameter params
     return MUNIT_OK;
 }
 
+static MunitResult test_probe_status_from_snmp_result(const MunitParameter params[], void* fixture) {
+    (void)params;
+    (void)fixture;
+
+    const uint8_t zero64[] = {0x00, 0x00, 0x00, 0x00};
+    const uint8_t ice[] = {'I', 'C', 'E'};
+
+    munit_assert_int(
+        seader_sam_key_probe_status_from_snmp_result(false, zero64, sizeof(zero64)),
+        ==,
+        SeaderSamKeyProbeStatusProbeFailed);
+    munit_assert_int(
+        seader_sam_key_probe_status_from_snmp_result(true, zero64, sizeof(zero64)),
+        ==,
+        SeaderSamKeyProbeStatusVerifiedStandard);
+    munit_assert_int(
+        seader_sam_key_probe_status_from_snmp_result(true, ice, sizeof(ice)),
+        ==,
+        SeaderSamKeyProbeStatusVerifiedValue);
+    munit_assert_int(
+        seader_sam_key_probe_status_from_snmp_result(true, NULL, 0U),
+        ==,
+        SeaderSamKeyProbeStatusUnknown);
+    return MUNIT_OK;
+}
+
 static MunitResult test_sanitizes_non_printable_bytes(const MunitParameter params[], void* fixture) {
     (void)params;
     (void)fixture;
@@ -128,6 +154,7 @@ static MunitTest test_sam_key_label_cases[] = {
     {(char*)"/unknown", test_formats_unknown_for_missing_value, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {(char*)"/standard-key-zero64", test_formats_standard_key_for_successful_zero_value, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {(char*)"/missing-standard-key", test_formats_missing_standard_key, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {(char*)"/probe-status-from-snmp", test_probe_status_from_snmp_result, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {(char*)"/probe-failed", test_probe_failure_never_formats_standard, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {(char*)"/ascii", test_formats_ascii_ice_value, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {(char*)"/sanitize", test_sanitizes_non_printable_bytes, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},

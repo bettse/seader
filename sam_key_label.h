@@ -13,6 +13,10 @@ typedef enum {
     SeaderSamKeyProbeStatusProbeFailed,
 } SeaderSamKeyProbeStatus;
 
+SeaderSamKeyProbeStatus seader_sam_key_probe_status_from_snmp_result(
+    bool probe_succeeded,
+    const uint8_t* elite_ice_value,
+    size_t elite_ice_value_len);
 void seader_sam_key_label_format(
     bool sam_present,
     SeaderSamKeyProbeStatus probe_status,
