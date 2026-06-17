@@ -221,15 +221,6 @@ void seader_ccid_XfrBlockToSlot(
 
     seader_uart->tx_len = seader_add_lrc(frame, seader_uart->tx_len);
 
-    /*
-    char* display = malloc(seader_uart->tx_len * 2 + 1);
-    for(uint8_t i = 0; i < seader_uart->tx_len; i++) {
-        snprintf(display + (i * 2), sizeof(display), "%02x", frame[i]);
-    }
-    SEADER_VERBOSE_D(TAG, "seader_ccid_XfrBlockToSlot(%d) %d: %s", slot, seader_uart->tx_len, display);
-    free(display);
-    */
-
     furi_thread_flags_set(furi_thread_get_id(seader_uart->tx_thread), WorkerEvtSamRx);
 }
 

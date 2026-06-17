@@ -68,13 +68,6 @@ size_t seader_uart_process_buffer(Seader* seader, uint8_t* cmd, size_t cmd_len) 
                 memmove(cmd, cmd + consumed, cmd_len);
             }
 
-            /*
-            memset(display, 0, SEADER_UART_RX_BUF_SIZE);
-            for (uint8_t i = 0; i < cmd_len; i++) {
-                snprintf(display+(i*2), sizeof(display), "%02x", cmd[i]);
-            }
-            FURI_LOG_I(TAG, "cmd is now %d bytes: %s", cmd_len, display);
-            */
         }
     } while(consumed > 0 && cmd_len > 0);
     return cmd_len;
@@ -133,13 +126,6 @@ int32_t seader_uart_worker(void* context) {
             if(len > 0) {
                 furi_delay_ms(5); //WTF
 
-                /*
-                char display[SEADER_UART_RX_BUF_SIZE * 2 + 1] = {0};
-                for (uint8_t i = 0; i < len; i++) {
-                    snprintf(display+(i*2), sizeof(display), "%02x", cmd[cmd_len + i]);
-                }
-                FURI_LOG_I(TAG, "RECV %d bytes: %s", len, display);
-                */
                 cmd_len += len;
                 cmd_len = seader_uart_process_buffer(seader, cmd, cmd_len);
             }
