@@ -40,6 +40,7 @@ test-host:
 			board_power_lifecycle.c \
 			sam_startup_ui.c \
 			ccid_logic.c \
+			allocation_policy.c \
 		credential_sio_label.c \
 		t_1_logic.c \
 		t_1.c \

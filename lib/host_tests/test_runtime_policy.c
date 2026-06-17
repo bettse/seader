@@ -1,6 +1,8 @@
 #include <string.h>
+#include <stdint.h>
 
 #include "munit.h"
+#include "allocation_policy.h"
 #include "runtime_policy.h"
 #include "seader_hf_read_plan.h"
 
@@ -296,6 +298,23 @@ static MunitResult test_virtual_credential_loop_terminal_policy(
     return MUNIT_OK;
 }
 
+static MunitResult test_checked_size_multiply_rejects_overflow(
+    const MunitParameter params[],
+    void* fixture) {
+    (void)params;
+    (void)fixture;
+
+    size_t total_size = 0U;
+    munit_assert_true(seader_size_multiply_checked(4U, 8U, &total_size));
+    munit_assert_size(total_size, ==, 32U);
+
+    total_size = 123U;
+    munit_assert_false(seader_size_multiply_checked(SIZE_MAX, 2U, &total_size));
+    munit_assert_size(total_size, ==, 123U);
+    munit_assert_false(seader_size_multiply_checked(1U, 1U, NULL));
+    return MUNIT_OK;
+}
+
 static MunitTest test_runtime_policy_cases[] = {
     {(char*)"/reset-sam-metadata", test_reset_cached_sam_metadata_clears_all_fields, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {(char*)"/begin-uhf-probe", test_begin_uhf_probe_sets_runtime_and_initializes_probe, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
@@ -309,6 +328,7 @@ static MunitTest test_runtime_policy_cases[] = {
     {(char*)"/reset-hf-mode", test_reset_hf_mode_clears_selection_and_detected_types, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {(char*)"/cancel-hf-type-prompt", test_cancel_hf_type_prompt_resets_future_read_to_full_polling, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {(char*)"/virtual-credential-terminal-policy", test_virtual_credential_loop_terminal_policy, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {(char*)"/checked-size-multiply", test_checked_size_multiply_rejects_overflow, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {NULL, NULL, NULL, NULL, 0, NULL},
 };
 

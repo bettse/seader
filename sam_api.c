@@ -7,6 +7,7 @@
 #include "uhf_snmp_probe.h"
 #include "card_details_builder.h"
 #include "uhf_status_label.h"
+#include "allocation_policy.h"
 #include <toolbox/path.h>
 #include <toolbox/version.h>
 #include <bit_lib/bit_lib.h>
@@ -341,9 +342,14 @@ uint8_t select_desfire_app_no_le[] =
 uint8_t FILE_NOT_FOUND[] = {0x6a, 0x82};
 
 void* calloc(size_t count, size_t size) {
-    void* ptr = malloc(count * size);
+    size_t total_size = 0U;
+    if(!seader_size_multiply_checked(count, size, &total_size)) {
+        return NULL;
+    }
+
+    void* ptr = malloc(total_size);
     if(ptr) {
-        memset(ptr, 0, count * size);
+        memset(ptr, 0, total_size);
     }
     return ptr;
 }
