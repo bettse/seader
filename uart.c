@@ -85,15 +85,11 @@ int32_t seader_uart_worker(void* context) {
     seader_uart->tx_queue =
         furi_message_queue_alloc(SEADER_UART_TX_QUEUE_DEPTH, sizeof(SeaderUartTxFrame));
 
-    seader_uart->tx_sem = furi_semaphore_alloc(1, 1);
-
     seader_uart->tx_thread = furi_thread_alloc_ex(
         "SeaderUartTxWorker", SEADER_UART_TX_WORKER_STACK_SIZE, seader_uart_tx_thread, seader);
 
     seader_uart_serial_init(seader_uart, seader_uart->cfg.uart_ch);
     furi_hal_serial_set_br(seader_uart->serial_handle, seader_uart->cfg.baudrate);
-
-    furi_thread_flags_set(furi_thread_get_id(seader_uart->tx_thread), WorkerEvtSamRx);
 
     furi_thread_start(seader_uart->tx_thread);
 
@@ -142,7 +138,6 @@ int32_t seader_uart_worker(void* context) {
 
     furi_stream_buffer_free(seader_uart->rx_stream);
     furi_message_queue_free(seader_uart->tx_queue);
-    furi_semaphore_free(seader_uart->tx_sem);
     return 0;
 }
 
@@ -199,16 +194,9 @@ int32_t seader_uart_tx_thread(void* context) {
         if(events & WorkerEvtTxStop) break;
         if(events & WorkerEvtSamRx) {
             SeaderUartTxFrame frame = {0};
-            bool queued_frame_sent = false;
             while(seader_uart->tx_queue &&
                   furi_message_queue_get(seader_uart->tx_queue, &frame, 0) == FuriStatusOk) {
-                queued_frame_sent = true;
                 furi_hal_serial_tx(seader_uart->serial_handle, frame.data, frame.len);
-            }
-
-            if(!queued_frame_sent && seader_uart->tx_len > 0) {
-                furi_hal_serial_tx(
-                    seader_uart->serial_handle, seader_uart->tx_buf, seader_uart->tx_len);
             }
         }
     }

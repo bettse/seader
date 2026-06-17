@@ -54,8 +54,6 @@ struct SeaderUartBridge {
     FuriMessageQueue* tx_queue;
     FuriHalSerialHandle* serial_handle;
 
-    FuriSemaphore* tx_sem;
-
     SeaderUartState st;
 
     uint8_t tx_buf[SEADER_UART_RX_BUF_SIZE];
