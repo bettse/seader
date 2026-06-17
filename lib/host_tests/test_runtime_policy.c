@@ -275,6 +275,27 @@ static MunitResult test_cancel_hf_type_prompt_resets_future_read_to_full_polling
     return MUNIT_OK;
 }
 
+static MunitResult test_virtual_credential_loop_terminal_policy(
+    const MunitParameter params[],
+    void* fixture) {
+    (void)params;
+    (void)fixture;
+
+    munit_assert_true(
+        seader_runtime_virtual_credential_should_continue(true, true, false, false, 1U));
+    munit_assert_false(
+        seader_runtime_virtual_credential_should_continue(false, true, false, false, 1U));
+    munit_assert_false(
+        seader_runtime_virtual_credential_should_continue(true, false, false, false, 1U));
+    munit_assert_false(
+        seader_runtime_virtual_credential_should_continue(true, true, true, false, 1U));
+    munit_assert_false(
+        seader_runtime_virtual_credential_should_continue(true, true, false, true, 1U));
+    munit_assert_false(
+        seader_runtime_virtual_credential_should_continue(true, true, false, false, 0U));
+    return MUNIT_OK;
+}
+
 static MunitTest test_runtime_policy_cases[] = {
     {(char*)"/reset-sam-metadata", test_reset_cached_sam_metadata_clears_all_fields, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {(char*)"/begin-uhf-probe", test_begin_uhf_probe_sets_runtime_and_initializes_probe, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
@@ -287,6 +308,7 @@ static MunitTest test_runtime_policy_cases[] = {
     {(char*)"/begin-board-auto-recover-invalid", test_begin_board_auto_recover_rejects_invalid_or_duplicate_state, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {(char*)"/reset-hf-mode", test_reset_hf_mode_clears_selection_and_detected_types, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {(char*)"/cancel-hf-type-prompt", test_cancel_hf_type_prompt_resets_future_read_to_full_polling, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {(char*)"/virtual-credential-terminal-policy", test_virtual_credential_loop_terminal_policy, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {NULL, NULL, NULL, NULL, 0, NULL},
 };
 

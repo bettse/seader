@@ -2,6 +2,7 @@
 #include "seader_hf_read_plan.h"
 #include "hf_read_lifecycle.h"
 #include "hf_bridge_policy.h"
+#include "runtime_policy.h"
 #include "trace_log.h"
 
 #include <flipper_format/flipper_format.h>
@@ -468,6 +469,7 @@ void seader_worker_virtual_credential(Seader* seader) {
         seader, 0, NULL, seader->credential->diversifier, sizeof(PicopassSerialNum), NULL, 0);
 
     bool running = true;
+    bool processing_ok = true;
     // Max times the loop will run with no message to process
     uint8_t dead_loops = 20;
 
@@ -490,17 +492,29 @@ void seader_worker_virtual_credential(Seader* seader) {
                 // no-op
             } else {
                 SEADER_VERBOSE_I(TAG, "Response false");
-                running = false;
+                processing_ok = false;
             }
             seader_worker_release_apdu_slot(seader_worker, slot_index);
         } else {
-            dead_loops--;
-            running = (dead_loops > 0);
+            if(dead_loops > 0U) {
+                dead_loops--;
+            }
+            running = seader_runtime_virtual_credential_should_continue(
+                processing_ok,
+                seader_worker->state == SeaderWorkerStateVirtualCredential,
+                seader_worker->stage == SeaderPollerEventTypeComplete,
+                seader_worker->stage == SeaderPollerEventTypeFail,
+                dead_loops);
             SEADER_VERBOSE_D(
                 TAG, "Dead loops: %d -> Running: %s", dead_loops, running ? "true" : "false");
             if(running) furi_delay_ms(10); // Don't tight loop if empty
         }
-        running = (seader_worker->stage != SeaderPollerEventTypeComplete);
+        running = seader_runtime_virtual_credential_should_continue(
+            processing_ok,
+            seader_worker->state == SeaderWorkerStateVirtualCredential,
+            seader_worker->stage == SeaderPollerEventTypeComplete,
+            seader_worker->stage == SeaderPollerEventTypeFail,
+            dead_loops);
     }
 
     if(dead_loops > 0 && seader_worker->stage == SeaderPollerEventTypeComplete) {
