@@ -245,6 +245,7 @@ void seader_nfc_loading_callback(void* context, bool show);
 
 Submenu* seader_get_submenu(Seader* seader);
 void seader_release_submenu(Seader* seader);
+void seader_release_inactive_lazy_views(Seader* seader);
 
 TextInput* seader_get_text_input(Seader* seader);
 

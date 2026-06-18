@@ -105,6 +105,37 @@ void seader_release_submenu(Seader* seader) {
     seader->submenu = NULL;
 }
 
+void seader_release_inactive_lazy_views(Seader* seader) {
+    if(!seader) {
+        return;
+    }
+
+    seader_release_submenu(seader);
+
+    if(seader->text_input) {
+        view_dispatcher_remove_view(seader->view_dispatcher, SeaderViewTextInput);
+        text_input_free(seader->text_input);
+        seader->text_input = NULL;
+    }
+
+    if(seader->text_box) {
+        view_dispatcher_remove_view(seader->view_dispatcher, SeaderViewTextBox);
+        text_box_free(seader->text_box);
+        seader->text_box = NULL;
+    }
+
+    if(seader->text_box_store) {
+        furi_string_free(seader->text_box_store);
+        seader->text_box_store = NULL;
+    }
+
+    if(seader->widget) {
+        view_dispatcher_remove_view(seader->view_dispatcher, SeaderViewWidget);
+        widget_free(seader->widget);
+        seader->widget = NULL;
+    }
+}
+
 TextInput* seader_get_text_input(Seader* seader) {
     if(!seader) {
         return NULL;
@@ -1259,26 +1290,7 @@ void seader_free(Seader* seader) {
     view_dispatcher_remove_view(seader->view_dispatcher, SeaderViewLoading);
     loading_free(seader->loading);
 
-    // TextInput
-    if(seader->text_input) {
-        view_dispatcher_remove_view(seader->view_dispatcher, SeaderViewTextInput);
-        text_input_free(seader->text_input);
-    }
-
-    // TextBox
-    if(seader->text_box) {
-        view_dispatcher_remove_view(seader->view_dispatcher, SeaderViewTextBox);
-        text_box_free(seader->text_box);
-    }
-    if(seader->text_box_store) {
-        furi_string_free(seader->text_box_store);
-    }
-
-    // Custom Widget
-    if(seader->widget) {
-        view_dispatcher_remove_view(seader->view_dispatcher, SeaderViewWidget);
-        widget_free(seader->widget);
-    }
+    seader_release_inactive_lazy_views(seader);
 
     // Free reusable strings
     if(seader->temp_string1) furi_string_free(seader->temp_string1);
