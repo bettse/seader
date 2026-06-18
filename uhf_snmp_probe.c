@@ -4,38 +4,10 @@
 #include <string.h>
 
 static const uint8_t oid_elite_ice[] = {0x03, 0x01, 0x07, 0x01, 0x38};
-static const uint8_t oid_standard_encryption_key[] = {
-    0x2B,
-    0x06,
-    0x01,
-    0x04,
-    0x01,
-    0x81,
-    0xE4,
-    0x38,
-    0x01,
-    0x01,
-    0x02,
-    0x01,
-    0x0C,
-    0x03,
-    0x01};
-static const uint8_t oid_standard_signature_key[] = {
-    0x2B,
-    0x06,
-    0x01,
-    0x04,
-    0x01,
-    0x81,
-    0xE4,
-    0x38,
-    0x01,
-    0x01,
-    0x02,
-    0x01,
-    0x0C,
-    0x02,
-    0x01};
+static const uint8_t oid_standard_encryption_key[] =
+    {0x2B, 0x06, 0x01, 0x04, 0x01, 0x81, 0xE4, 0x38, 0x01, 0x01, 0x02, 0x01, 0x0C, 0x03, 0x01};
+static const uint8_t oid_standard_signature_key[] =
+    {0x2B, 0x06, 0x01, 0x04, 0x01, 0x81, 0xE4, 0x38, 0x01, 0x01, 0x02, 0x01, 0x0C, 0x02, 0x01};
 static const uint8_t oid_uhf_tags_config[] = {0x03, 0x01, 0x07, 0x03, 0x0B, 0x00};
 static const uint8_t oid_monza4qt_access_key[] = {
     0x2B,
@@ -99,14 +71,19 @@ static bool seader_uhf_snmp_probe_mark_standard_key_missing(SeaderUhfSnmpProbe* 
     return false;
 }
 
-static bool seader_uhf_snmp_probe_key_missing_error(uint32_t error_code, const uint8_t* data, size_t data_len) {
+static bool seader_uhf_snmp_probe_key_missing_error(
+    uint32_t error_code,
+    const uint8_t* data,
+    size_t data_len) {
     return error_code == 0x11U && data_len >= 2U &&
-           ((data[0] == 0x2EU && data[1] == 0x00U) ||
-            (data[0] == 0x37U && data[1] == 0x00U) ||
+           ((data[0] == 0x2EU && data[1] == 0x00U) || (data[0] == 0x37U && data[1] == 0x00U) ||
             (data[0] == 0x39U && data[1] == 0x00U));
 }
 
-static bool seader_uhf_snmp_probe_key_present_error(uint32_t error_code, const uint8_t* data, size_t data_len) {
+static bool seader_uhf_snmp_probe_key_present_error(
+    uint32_t error_code,
+    const uint8_t* data,
+    size_t data_len) {
     return error_code == 0x06U && data_len >= 2U && data[0] == 0x69U && data[1] == 0x82U;
 }
 
@@ -411,5 +388,6 @@ bool seader_uhf_snmp_probe_consume_error(
 }
 
 bool seader_uhf_snmp_probe_standard_pacs_keys_present(const SeaderUhfSnmpProbe* probe) {
-    return probe && probe->standard_encryption_key_present && probe->standard_signature_key_present;
+    return probe && probe->standard_encryption_key_present &&
+           probe->standard_signature_key_present;
 }

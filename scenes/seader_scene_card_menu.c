@@ -48,8 +48,7 @@ void seader_scene_card_menu_on_enter(void* context) {
         submenu, "Save MFC", SubmenuIndexSaveMFC, seader_scene_card_menu_submenu_callback, seader);
 
     submenu_set_selected_item(
-        submenu,
-        scene_manager_get_scene_state(seader->scene_manager, SeaderSceneCardMenu));
+        submenu, scene_manager_get_scene_state(seader->scene_manager, SeaderSceneCardMenu));
 
     view_dispatcher_switch_to_view(seader->view_dispatcher, SeaderViewMenu);
 }

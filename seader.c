@@ -431,12 +431,7 @@ static void seader_board_refresh_class(Seader* seader) {
     const bool pc0 = seader_board_probe_pin_pulldown_high(&gpio_ext_pc0);
     seader->board_class = seader_board_classify(pa4, pc1, pc0);
     FURI_LOG_I(
-        TAG,
-        "Board class=%u straps pa4=%u pc1=%u pc0=%u",
-        seader->board_class,
-        pa4,
-        pc1,
-        pc0);
+        TAG, "Board class=%u straps pa4=%u pc1=%u pc0=%u", seader->board_class, pa4, pc1, pc0);
 }
 
 void seader_start_popup_set_stage(Seader* seader, SeaderStartupStage stage) {
@@ -1513,9 +1508,9 @@ bool seader_hf_plugin_acquire(Seader* seader) {
 }
 
 static bool seader_hf_has_runtime(const Seader* seader) {
-    return seader && (seader->hf_plugin_manager || seader->plugin_hf || seader->hf_plugin_ctx ||
-                      seader->poller || seader->picopass_poller || seader->nfc ||
-                      seader->nfc_device);
+    return seader &&
+           (seader->hf_plugin_manager || seader->plugin_hf || seader->hf_plugin_ctx ||
+            seader->poller || seader->picopass_poller || seader->nfc || seader->nfc_device);
 }
 
 /* App shutdown uses the same teardown primitive as normal navigation. The only difference

@@ -70,4 +70,3 @@ uint32_t seader_hf_bridge_timeout_us_to_fwt_fc(uint32_t timeout_us) {
 
     return (uint32_t)fwt_fc;
 }
-

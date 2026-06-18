@@ -158,8 +158,8 @@ static void seader_reset_cached_sam_metadata(Seader* seader) {
 
     seader->sam_key_probe_status = SeaderSamKeyProbeStatusUnknown;
     seader->uhf_probe_status = seader_board_class_supports_uhf(seader->board_class) ?
-                                    SeaderUhfProbeStatusUnknown :
-                                    SeaderUhfProbeStatusHidden;
+                                   SeaderUhfProbeStatusUnknown :
+                                   SeaderUhfProbeStatusHidden;
     seader->sam_version[0] = 0U;
     seader->sam_version[1] = 0U;
     seader->uhf_status_label[0] = '\0';
@@ -220,7 +220,8 @@ static void seader_start_snmp_probe(Seader* seader) {
         seader_update_sam_key_label(seader, NULL, 0U);
     }
     if(seader->uhf_probe_status != SeaderUhfProbeStatusSuccess) {
-        seader->uhf_probe_status = seader->snmp_probe.supports_uhf ? SeaderUhfProbeStatusUnknown : SeaderUhfProbeStatusHidden;
+        seader->uhf_probe_status = seader->snmp_probe.supports_uhf ? SeaderUhfProbeStatusUnknown :
+                                                                     SeaderUhfProbeStatusHidden;
         seader_update_uhf_status_label(seader);
     }
     seader_sam_set_state(
@@ -230,7 +231,8 @@ static void seader_start_snmp_probe(Seader* seader) {
         SamCommand_PR_processSNMPMessage);
 
     if(!seader_snmp_probe_send_next_request(seader)) {
-        seader->uhf_probe_status = seader->snmp_probe.supports_uhf ? SeaderUhfProbeStatusFailed : SeaderUhfProbeStatusHidden;
+        seader->uhf_probe_status = seader->snmp_probe.supports_uhf ? SeaderUhfProbeStatusFailed :
+                                                                     SeaderUhfProbeStatusHidden;
         seader_update_uhf_status_label(seader);
         seader_snmp_probe_finish(seader);
     }
@@ -1889,10 +1891,7 @@ bool seader_process_success_response_i(
         }
 
         seader_trace(
-            TAG,
-            "defer offline nfcSend state=%d intent=%d",
-            seader->sam_state,
-            seader->sam_intent);
+            TAG, "defer offline nfcSend state=%d intent=%d", seader->sam_state, seader->sam_intent);
         return false;
     }
 

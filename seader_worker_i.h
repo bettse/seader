@@ -43,7 +43,6 @@ struct SeaderWorker {
     bool apdu_slot_in_use[SEADER_WORKER_APDU_SLOT_COUNT];
 };
 
-
 void seader_worker_change_state(SeaderWorker* seader_worker, SeaderWorkerState state);
 
 int32_t seader_worker_task(void* context);

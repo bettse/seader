@@ -35,8 +35,7 @@ void seader_scene_saved_menu_on_enter(void* context) {
     }
 
     submenu_set_selected_item(
-        submenu,
-        scene_manager_get_scene_state(seader->scene_manager, SeaderSceneSavedMenu));
+        submenu, scene_manager_get_scene_state(seader->scene_manager, SeaderSceneSavedMenu));
 
     view_dispatcher_switch_to_view(seader->view_dispatcher, SeaderViewMenu);
 }

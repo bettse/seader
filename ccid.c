@@ -31,7 +31,8 @@ static uint8_t seader_ccid_next_sequence(SeaderUartBridge* seader_uart, uint8_t 
     return seader_ccid_sequence_advance(&slot_state->sequence);
 }
 
-static void seader_ccid_publish_tx_frame(SeaderUartBridge* seader_uart, const uint8_t* frame, size_t len) {
+static void
+    seader_ccid_publish_tx_frame(SeaderUartBridge* seader_uart, const uint8_t* frame, size_t len) {
     if(!seader_uart_tx_enqueue(seader_uart, frame, len)) {
         FURI_LOG_E(TAG, "Failed to queue CCID frame len=%u", (unsigned)len);
     }
@@ -173,8 +174,7 @@ void seader_ccid_GetParameters(SeaderUartBridge* seader_uart) {
     frame[2 + 0] = CCID_MESSAGE_TYPE_PC_TO_RDR_GET_PARAMETERS;
     frame[2 + 1] = 0;
     frame[2 + 5] = seader_ccid_current_slot(seader_uart);
-    frame[2 + 6] =
-        seader_ccid_next_sequence(seader_uart, seader_ccid_current_slot(seader_uart));
+    frame[2 + 6] = seader_ccid_next_sequence(seader_uart, seader_ccid_current_slot(seader_uart));
     frame[2 + 7] = 0;
     frame[2 + 8] = 0;
     frame[2 + 9] = 0;

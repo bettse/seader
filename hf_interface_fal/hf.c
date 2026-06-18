@@ -589,10 +589,7 @@ static NfcCommand plugin_hf_poller_callback_iso14443_4a(NfcGenericEvent event, v
         HF_DIAG_D("14A ready stage=%d", stage);
         if(stage == PluginHfStageCardDetect) {
             if(!ctx->poller) {
-                FURI_LOG_E(
-                    TAG,
-                    "14A detect without poller poller=%p",
-                    (void*)ctx->poller);
+                FURI_LOG_E(TAG, "14A detect without poller poller=%p", (void*)ctx->poller);
                 ctx->api->set_stage(ctx->host_ctx, PluginHfStageFail);
                 return NfcCommandStop;
             }
@@ -837,10 +834,11 @@ static size_t plugin_hf_detect_supported_types(
     }
 
     ctx->detected_type_count = detected_type_count;
-    const size_t cached_type_count =
-        detected_type_count < COUNT_OF(ctx->detected_types) ? detected_type_count :
-                                                              COUNT_OF(ctx->detected_types);
-    memcpy(ctx->detected_types, detected_types, cached_type_count * sizeof(ctx->detected_types[0]));
+    const size_t cached_type_count = detected_type_count < COUNT_OF(ctx->detected_types) ?
+                                         detected_type_count :
+                                         COUNT_OF(ctx->detected_types);
+    memcpy(
+        ctx->detected_types, detected_types, cached_type_count * sizeof(ctx->detected_types[0]));
 
     return detected_type_count;
 }

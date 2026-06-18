@@ -15,4 +15,3 @@ SeaderBoardClass seader_board_classify(bool pa4_high, bool pc1_high, bool pc0_hi
 bool seader_board_class_supports_uhf(SeaderBoardClass board_class) {
     return board_class == SeaderBoardClassUhfCarrier;
 }
-

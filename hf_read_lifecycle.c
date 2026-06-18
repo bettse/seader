@@ -110,10 +110,8 @@ void seader_hf_read_format_sam_keys_missing_error(
 
     out[0] = '\0';
 
-    const char* media_label =
-        has_media_type ? seader_hf_read_media_type_label(media_type) : NULL;
-    const bool standard_keys_missing =
-        standard_pacs_keys_probed && !standard_pacs_keys_present;
+    const char* media_label = has_media_type ? seader_hf_read_media_type_label(media_type) : NULL;
+    const bool standard_keys_missing = standard_pacs_keys_probed && !standard_pacs_keys_present;
 
     if(media_label && standard_keys_missing) {
         snprintf(
@@ -126,18 +124,13 @@ void seader_hf_read_format_sam_keys_missing_error(
 
     if(media_label) {
         snprintf(
-            out,
-            out_size,
-            "%s recognized.\nUnable to read keys.\nCheck SAM Info.",
-            media_label);
+            out, out_size, "%s recognized.\nUnable to read keys.\nCheck SAM Info.", media_label);
         return;
     }
 
     if(standard_keys_missing) {
         snprintf(
-            out,
-            out_size,
-            "Unable to read keys.\nSAM missing standard\nkeys. Check SAM Info.");
+            out, out_size, "Unable to read keys.\nSAM missing standard\nkeys. Check SAM Info.");
         return;
     }
 
