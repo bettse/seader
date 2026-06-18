@@ -2,6 +2,7 @@
 #include "../trace_log.h"
 #include "../hf_buffer_pool.h"
 #include "../hf_14a_session.h"
+#include "../seader_hf_read_plan.h"
 
 #include "../protocol/picopass_poller.h"
 #include "../protocol/rfal_picopass.h"
@@ -37,6 +38,8 @@ typedef struct {
     MfClassicPoller* mfc_poller;
     SeaderHfBufferPair buffers;
     SeaderCredentialType active_type;
+    SeaderCredentialType detected_types[3];
+    size_t detected_type_count;
 } PluginHfContext;
 
 static const uint8_t plugin_hf_update_block2[] = {RFAL_PICOPASS_CMD_UPDATE, 0x02};
@@ -806,6 +809,7 @@ static size_t plugin_hf_detect_supported_types(
     }
     size_t detected_type_count = 0;
     HF_DIAG_D("Detect supported HF types");
+    ctx->detected_type_count = 0U;
     NfcPoller* poller_detect = nfc_poller_alloc(ctx->nfc, NfcProtocolIso14443_4a);
     if(!poller_detect) {
         FURI_LOG_W(TAG, "Failed to allocate 14A detect poller");
@@ -832,6 +836,12 @@ static size_t plugin_hf_detect_supported_types(
             detected_types, &detected_type_count, detected_capacity, SeaderCredentialTypePicopass);
     }
 
+    ctx->detected_type_count = detected_type_count;
+    const size_t cached_type_count =
+        detected_type_count < COUNT_OF(ctx->detected_types) ? detected_type_count :
+                                                              COUNT_OF(ctx->detected_types);
+    memcpy(ctx->detected_types, detected_types, cached_type_count * sizeof(ctx->detected_types[0]));
+
     return detected_type_count;
 }
 
@@ -845,18 +855,22 @@ static bool plugin_hf_start_read_for_type(void* plugin_ctx, SeaderCredentialType
     plugin_hf_cleanup_pollers(ctx);
     ctx->active_type = type;
     HF_DIAG_I("Start read type=%d", type);
+    const bool verify_start_type = seader_hf_read_plan_should_verify_start_type(
+        type, ctx->detected_types, ctx->detected_type_count);
 
     if(type == SeaderCredentialType14A) {
-        poller_detect = nfc_poller_alloc(ctx->nfc, NfcProtocolIso14443_4a);
-        if(!poller_detect) {
-            FURI_LOG_E(TAG, "Failed to allocate 14A detect poller");
-            return false;
-        }
-        if(!nfc_poller_detect(poller_detect)) {
+        if(verify_start_type) {
+            poller_detect = nfc_poller_alloc(ctx->nfc, NfcProtocolIso14443_4a);
+            if(!poller_detect) {
+                FURI_LOG_E(TAG, "Failed to allocate 14A detect poller");
+                return false;
+            }
+            if(!nfc_poller_detect(poller_detect)) {
+                nfc_poller_free(poller_detect);
+                return false;
+            }
             nfc_poller_free(poller_detect);
-            return false;
         }
-        nfc_poller_free(poller_detect);
         ctx->poller = nfc_poller_alloc(ctx->nfc, NfcProtocolIso14443_4a);
         if(!ctx->poller) {
             FURI_LOG_E(TAG, "Failed to allocate 14A poller");
@@ -867,16 +881,18 @@ static bool plugin_hf_start_read_for_type(void* plugin_ctx, SeaderCredentialType
         nfc_poller_start(ctx->poller, plugin_hf_poller_callback_iso14443_4a, ctx);
         return true;
     } else if(type == SeaderCredentialTypeMifareClassic) {
-        poller_detect = nfc_poller_alloc(ctx->nfc, NfcProtocolMfClassic);
-        if(!poller_detect) {
-            FURI_LOG_E(TAG, "Failed to allocate MFC detect poller");
-            return false;
-        }
-        if(!nfc_poller_detect(poller_detect)) {
+        if(verify_start_type) {
+            poller_detect = nfc_poller_alloc(ctx->nfc, NfcProtocolMfClassic);
+            if(!poller_detect) {
+                FURI_LOG_E(TAG, "Failed to allocate MFC detect poller");
+                return false;
+            }
+            if(!nfc_poller_detect(poller_detect)) {
+                nfc_poller_free(poller_detect);
+                return false;
+            }
             nfc_poller_free(poller_detect);
-            return false;
         }
-        nfc_poller_free(poller_detect);
         ctx->poller = nfc_poller_alloc(ctx->nfc, NfcProtocolMfClassic);
         if(!ctx->poller) {
             FURI_LOG_E(TAG, "Failed to allocate MFC poller");
