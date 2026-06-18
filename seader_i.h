@@ -67,6 +67,7 @@
 #include "sam_key_label.h"
 #include "uhf_snmp_probe.h"
 #include "uhf_status_label.h"
+#include "hf_buffer_pool.h"
 
 #define WORKER_ALL_RX_EVENTS                                                      \
     (WorkerEvtStop | WorkerEvtRxDone | WorkerEvtCfgChange | WorkerEvtLineCfgSet | \
@@ -199,6 +200,7 @@ struct Seader {
     Nfc* nfc;
     NfcPoller* poller;
     PicopassPoller* picopass_poller;
+    SeaderHfBufferPair picopass_host_buffers;
 
     NfcDevice* nfc_device;
 

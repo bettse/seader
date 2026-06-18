@@ -873,16 +873,18 @@ static bool seader_hf_plugin_picopass_transmit(
         return false;
     }
 
-    BitBuffer* tx_buffer = bit_buffer_alloc(tx_len);
-    BitBuffer* rx_buffer = bit_buffer_alloc(rx_capacity);
-    bool success = false;
-    if(!tx_buffer || !rx_buffer) {
+    if(!seader_hf_buffer_pair_prepare(
+           &seader->picopass_host_buffers, tx_len, rx_capacity, tx_len)) {
         FURI_LOG_E(TAG, "Failed to allocate picopass host tx/rx buffers");
-        if(tx_buffer) bit_buffer_free(tx_buffer);
-        if(rx_buffer) bit_buffer_free(rx_buffer);
+        if(status) {
+            *status = SeaderHfBridgeRfStatusProtocol;
+        }
         return false;
     }
 
+    BitBuffer* tx_buffer = seader->picopass_host_buffers.tx;
+    BitBuffer* rx_buffer = seader->picopass_host_buffers.rx;
+    bool success = false;
     bit_buffer_append_bytes(tx_buffer, tx_data, tx_len);
     PicopassError error =
         picopass_poller_send_frame(seader->picopass_poller, tx_buffer, rx_buffer, fwt_fc);
@@ -913,8 +915,6 @@ static bool seader_hf_plugin_picopass_transmit(
         success = true;
     }
 
-    bit_buffer_free(tx_buffer);
-    bit_buffer_free(rx_buffer);
     return success;
 }
 
@@ -1066,6 +1066,9 @@ static void seader_hf_release_host_picopass(void* context) {
         picopass_poller_free(seader->picopass_poller);
         seader->picopass_poller = NULL;
     }
+    if(seader) {
+        seader_hf_buffer_pair_free(&seader->picopass_host_buffers);
+    }
 }
 
 static void seader_hf_release_plugin_free(void* context) {
@@ -1170,6 +1173,7 @@ Seader* seader_alloc() {
     seader_uhf_snmp_probe_init(&seader->snmp_probe);
     seader->nfc = NULL;
     seader->nfc_device = NULL;
+    seader->picopass_host_buffers = (SeaderHfBufferPair){0};
     memset(&seader->hf_mode_ctx, 0, sizeof(seader->hf_mode_ctx));
     seader->hf_mode_active = false;
 
@@ -1260,6 +1264,7 @@ void seader_free(Seader* seader) {
     seader_wiegand_plugin_release(seader);
 
     seader_hf_host_nfc_release(seader);
+    seader_hf_buffer_pair_free(&seader->picopass_host_buffers);
 
     seader_uart_free(seader->uart);
     seader->uart = NULL;
