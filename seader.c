@@ -4,6 +4,7 @@
 #include "hf_read_lifecycle.h"
 #include "sam_startup_ui.h"
 #include "trace_log.h"
+#include "ui_memory_policy.h"
 
 #define TAG                                       "Seader"
 #define SEADER_PLUGIN_DIR                         APP_ASSETS_PATH("plugins")
@@ -73,6 +74,35 @@ void seader_temp_strings_release(Seader* seader, size_t count) {
             *slots[i] = NULL;
         }
     }
+}
+
+Submenu* seader_get_submenu(Seader* seader) {
+    if(!seader) {
+        return NULL;
+    }
+
+    if(!seader->submenu) {
+        seader->submenu = submenu_alloc();
+        if(!seader->submenu) {
+            FURI_LOG_E(TAG, "Failed to allocate submenu view");
+            return NULL;
+        }
+
+        view_dispatcher_add_view(
+            seader->view_dispatcher, SeaderViewMenu, submenu_get_view(seader->submenu));
+    }
+
+    return seader->submenu;
+}
+
+void seader_release_submenu(Seader* seader) {
+    if(!seader || !seader->submenu) {
+        return;
+    }
+
+    view_dispatcher_remove_view(seader->view_dispatcher, SeaderViewMenu);
+    submenu_free(seader->submenu);
+    seader->submenu = NULL;
 }
 
 TextInput* seader_get_text_input(Seader* seader) {
@@ -1135,10 +1165,8 @@ Seader* seader_alloc() {
     // Open Notification record
     seader->notifications = furi_record_open(RECORD_NOTIFICATION);
 
-    // Submenu
-    seader->submenu = submenu_alloc();
-    view_dispatcher_add_view(
-        seader->view_dispatcher, SeaderViewMenu, submenu_get_view(seader->submenu));
+    // Submenu is allocated lazily by menu scenes and can be released during HF reads.
+    seader->submenu = NULL;
 
     // Popup
     seader->popup = popup_alloc();
@@ -1221,8 +1249,7 @@ void seader_free(Seader* seader) {
     seader->credential = NULL;
 
     // Submenu
-    view_dispatcher_remove_view(seader->view_dispatcher, SeaderViewMenu);
-    submenu_free(seader->submenu);
+    seader_release_submenu(seader);
 
     // Popup
     view_dispatcher_remove_view(seader->view_dispatcher, SeaderViewPopup);

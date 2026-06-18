@@ -36,6 +36,7 @@ test-host:
 			lib/host_tests/test_hf_bridge_policy.c \
 			lib/host_tests/test_wiegand_plugin.c \
 			lib/host_tests/test_runtime_policy.c \
+			lib/host_tests/test_ui_memory_policy.c \
 		lib/host_tests/t1_test_stubs.c \
 		lib/host_tests/bit_buffer_mock.c \
 			lrc.c \
@@ -63,6 +64,7 @@ test-host:
 			seader_hf_read_plan.c \
 			wiegand_interface_fal/wiegand.c \
 		runtime_policy.c \
+		ui_memory_policy.c \
 		-o build/host_tests/seader_tests
 	./build/host_tests/seader_tests
 
