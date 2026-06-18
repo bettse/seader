@@ -1,5 +1,6 @@
 #include "sam_api.h"
 #include "hf_read_lifecycle.h"
+#include "hf_sam_response_view.h"
 #include "seader_i.h"
 #include "protocol/rfal_picopass.h"
 #include "sam_key_label.h"
@@ -1670,29 +1671,26 @@ void seader_mfc_transmit(
     bit_buffer_free(rx_buffer);
 }
 
-void seader_parse_nfc_command_transmit(Seader* seader, NFCSend_t* nfcSend) {
-#ifdef ASN1_DEBUG
-    SEADER_VERBOSE_HEX(
-        FuriLogLevelDebug, TAG, "Transmit data", nfcSend->data.buf, nfcSend->data.size);
-#endif
-
-    const long sam_timeout_us = nfcSend->timeOut;
-    const uint32_t timeout_us = sam_timeout_us > 0L ? (uint32_t)sam_timeout_us : 0U;
-
+static void seader_dispatch_nfc_send(
+    Seader* seader,
+    uint8_t* data,
+    size_t data_len,
+    uint32_t timeout_us,
+    const uint8_t* format,
+    size_t format_len) {
     PluginHfAction action = {
-        .data = nfcSend->data.buf,
-        .len = nfcSend->data.size,
+        .data = data,
+        .len = data_len,
         .timeout = timeout_us,
     };
-    if(nfcSend->format) {
-        const size_t raw_format_len = (size_t)nfcSend->format->size;
-        const size_t format_len = raw_format_len < sizeof(action.format) ? raw_format_len :
-                                                                           sizeof(action.format);
-        memcpy(action.format, nfcSend->format->buf, format_len);
+    if(format) {
+        const size_t copied_format_len =
+            format_len < sizeof(action.format) ? format_len : sizeof(action.format);
+        memcpy(action.format, format, copied_format_len);
     }
 
     if(seader->credential->type == SeaderCredentialTypeVirtual) {
-        seader_virtual_picopass_state_machine(seader, nfcSend->data.buf, nfcSend->data.size);
+        seader_virtual_picopass_state_machine(seader, data, data_len);
     } else if(seader->plugin_hf && seader->hf_plugin_ctx) {
         if(seader->credential->type == SeaderCredentialTypePicopass) {
             action.type = PluginHfActionTypePicopassTx;
@@ -1717,6 +1715,21 @@ void seader_parse_nfc_command_transmit(Seader* seader, NFCSend_t* nfcSend) {
     } else {
         FURI_LOG_W(TAG, "No HF plugin available for nfcSend");
     }
+}
+
+void seader_parse_nfc_command_transmit(Seader* seader, NFCSend_t* nfcSend) {
+#ifdef ASN1_DEBUG
+    SEADER_VERBOSE_HEX(
+        FuriLogLevelDebug, TAG, "Transmit data", nfcSend->data.buf, nfcSend->data.size);
+#endif
+
+    const long sam_timeout_us = nfcSend->timeOut;
+    const uint32_t timeout_us = sam_timeout_us > 0L ? (uint32_t)sam_timeout_us : 0U;
+    const uint8_t* format = nfcSend->format ? nfcSend->format->buf : NULL;
+    const size_t format_len = nfcSend->format ? (size_t)nfcSend->format->size : 0U;
+
+    seader_dispatch_nfc_send(
+        seader, nfcSend->data.buf, nfcSend->data.size, timeout_us, format, format_len);
 }
 
 void seader_parse_nfc_off(Seader* seader) {
@@ -1861,6 +1874,32 @@ bool seader_process_success_response_i(
     Payload_t payload = {0};
     Payload_t* payload_p = &payload;
     bool processed = false;
+    SeaderHfSamNfcSendView nfc_send_view = {0};
+
+    if(seader_hf_sam_response_view_parse_nfc_send(apdu, len, &nfc_send_view)) {
+        if(online) {
+            seader_dispatch_nfc_send(
+                seader,
+                (uint8_t*)nfc_send_view.data,
+                nfc_send_view.data_len,
+                nfc_send_view.timeout_us,
+                nfc_send_view.format,
+                nfc_send_view.format_len);
+            return true;
+        }
+
+        seader_trace(
+            TAG,
+            "defer offline nfcSend state=%d intent=%d",
+            seader->sam_state,
+            seader->sam_intent);
+        return false;
+    }
+
+    if(len < ASN1_PREFIX) {
+        SEADER_VERBOSE_HEX(FuriLogLevelDebug, TAG, "Short APDU payload", apdu, len);
+        return false;
+    }
 
     /* Seader wraps each ASN.1 payload with a 6-byte application header
        {from, to, replyTo, 0x00, 0x00, 0x00}. Skip that prefix before decoding. */

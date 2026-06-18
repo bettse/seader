@@ -35,6 +35,7 @@ test-host:
 			lib/host_tests/test_hf_read_plan.c \
 			lib/host_tests/test_hf_bridge_policy.c \
 			lib/host_tests/test_hf_14a_session.c \
+			lib/host_tests/test_hf_sam_response_view.c \
 			lib/host_tests/test_wiegand_plugin.c \
 			lib/host_tests/test_runtime_policy.c \
 			lib/host_tests/test_ui_memory_policy.c \
@@ -63,6 +64,7 @@ test-host:
 			hf_read_lifecycle.c \
 			hf_bridge_policy.c \
 			hf_14a_session.c \
+			hf_sam_response_view.c \
 			seader_hf_read_plan.c \
 			wiegand_interface_fal/wiegand.c \
 		runtime_policy.c \
