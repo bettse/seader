@@ -20,6 +20,7 @@ extern MunitSuite test_hf_bridge_policy_suite;
 extern MunitSuite test_runtime_policy_suite;
 extern MunitSuite test_wiegand_plugin_suite;
 extern MunitSuite test_ui_memory_policy_suite;
+extern MunitSuite test_hf_14a_session_suite;
 
 int main(int argc, char* argv[]) {
     MunitSuite child_suites[] = {
@@ -52,6 +53,7 @@ int main(int argc, char* argv[]) {
         {"/credential-sio-label", test_credential_sio_label_suite.tests, NULL, 1, MUNIT_SUITE_OPTION_NONE},
         {"/hf-read-plan", test_hf_read_plan_suite.tests, NULL, 1, MUNIT_SUITE_OPTION_NONE},
         {"/hf-bridge-policy", test_hf_bridge_policy_suite.tests, NULL, 1, MUNIT_SUITE_OPTION_NONE},
+        {"/hf-14a-session", test_hf_14a_session_suite.tests, NULL, 1, MUNIT_SUITE_OPTION_NONE},
         {"/runtime-policy", test_runtime_policy_suite.tests, NULL, 1, MUNIT_SUITE_OPTION_NONE},
         {"/wiegand-plugin", test_wiegand_plugin_suite.tests, NULL, 1, MUNIT_SUITE_OPTION_NONE},
         {"/ui-memory-policy",

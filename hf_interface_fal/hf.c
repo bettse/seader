@@ -1,6 +1,7 @@
 #include "hf_interface.h"
 #include "../trace_log.h"
 #include "../hf_buffer_pool.h"
+#include "../hf_14a_session.h"
 
 #include "../protocol/picopass_poller.h"
 #include "../protocol/rfal_picopass.h"
@@ -584,29 +585,25 @@ static NfcCommand plugin_hf_poller_callback_iso14443_4a(NfcGenericEvent event, v
     if(iso_event->type == Iso14443_4aPollerEventTypeReady) {
         HF_DIAG_D("14A ready stage=%d", stage);
         if(stage == PluginHfStageCardDetect) {
-            if(!ctx->poller || !ctx->nfc_device) {
+            if(!ctx->poller) {
                 FURI_LOG_E(
                     TAG,
-                    "14A detect without poller/device poller=%p device=%p",
-                    (void*)ctx->poller,
-                    (void*)ctx->nfc_device);
+                    "14A detect without poller poller=%p",
+                    (void*)ctx->poller);
                 ctx->api->set_stage(ctx->host_ctx, PluginHfStageFail);
                 return NfcCommandStop;
             }
-            const void* poller_data = nfc_poller_get_data(ctx->poller);
-            if(!poller_data) {
+            const Iso14443_4aData* iso_data = nfc_poller_get_data(ctx->poller);
+            if(!iso_data) {
                 FURI_LOG_E(TAG, "14A ready without poller data");
                 ctx->api->set_stage(ctx->host_ctx, PluginHfStageFail);
                 return NfcCommandStop;
             }
-            nfc_device_set_data(ctx->nfc_device, NfcProtocolIso14443_4a, poller_data);
 
             size_t uid_len = 0;
-            const uint8_t* uid = nfc_device_get_uid(ctx->nfc_device, &uid_len);
-            const Iso14443_4aData* iso_data =
-                nfc_device_get_data(ctx->nfc_device, NfcProtocolIso14443_4a);
-            if(!uid || !iso_data) {
-                FURI_LOG_E(TAG, "14A data unavailable uid=%p iso=%p", (void*)uid, (void*)iso_data);
+            const uint8_t* uid = iso14443_4a_get_uid(iso_data, &uid_len);
+            if(!uid) {
+                FURI_LOG_E(TAG, "14A uid unavailable");
                 ctx->api->set_stage(ctx->host_ctx, PluginHfStageFail);
                 return NfcCommandStop;
             }
@@ -617,40 +614,34 @@ static NfcCommand plugin_hf_poller_callback_iso14443_4a(NfcGenericEvent event, v
                 return NfcCommandStop;
             }
 
-            uint32_t t1_tk_size = 0;
+            size_t t1_tk_size = 0;
+            const uint8_t* t1_tk = NULL;
             if(iso_data->ats_data.t1_tk != NULL) {
                 t1_tk_size = simple_array_get_count(iso_data->ats_data.t1_tk);
-                if(t1_tk_size > 0xFF) {
-                    t1_tk_size = 0;
+                if(t1_tk_size) {
+                    t1_tk = simple_array_cget_data(iso_data->ats_data.t1_tk);
                 }
             }
 
-            uint8_t ats_len = 0;
+            size_t ats_size = 0U;
             uint8_t ats[HF_PLUGIN_MAX_ATS_SIZE] = {0};
-            if(iso_data->ats_data.tl > 1) {
-                if(sizeof(ats) < 4U + t1_tk_size) {
-                    FURI_LOG_E(TAG, "ATS buffer too small: %u", (unsigned)(4U + t1_tk_size));
-                    ctx->api->set_stage(ctx->host_ctx, PluginHfStageFail);
-                    return NfcCommandStop;
-                }
-                ats[ats_len++] = iso_data->ats_data.t0;
-                if(iso_data->ats_data.t0 & ISO14443_4A_ATS_T0_TA1)
-                    ats[ats_len++] = iso_data->ats_data.ta_1;
-                if(iso_data->ats_data.t0 & ISO14443_4A_ATS_T0_TB1)
-                    ats[ats_len++] = iso_data->ats_data.tb_1;
-                if(iso_data->ats_data.t0 & ISO14443_4A_ATS_T0_TC1)
-                    ats[ats_len++] = iso_data->ats_data.tc_1;
-                if(t1_tk_size != 0) {
-                    memcpy(
-                        ats + ats_len,
-                        simple_array_cget_data(iso_data->ats_data.t1_tk),
-                        t1_tk_size);
-                    ats_len += t1_tk_size;
-                }
+            const SeaderHf14aAtsSource ats_source = {
+                .tl = iso_data->ats_data.tl,
+                .t0 = iso_data->ats_data.t0,
+                .ta_1 = iso_data->ats_data.ta_1,
+                .tb_1 = iso_data->ats_data.tb_1,
+                .tc_1 = iso_data->ats_data.tc_1,
+                .t1_tk = t1_tk,
+                .t1_tk_size = t1_tk_size,
+            };
+            if(!seader_hf_14a_build_ats(&ats_source, ats, sizeof(ats), &ats_size)) {
+                FURI_LOG_E(TAG, "14A ATS unavailable size=%u", (unsigned)t1_tk_size);
+                ctx->api->set_stage(ctx->host_ctx, PluginHfStageFail);
+                return NfcCommandStop;
             }
 
             ret = plugin_hf_begin_conversation(
-                ctx, iso14443_3a_get_sak(iso3a), uid, uid_len, ats, ats_len);
+                ctx, iso14443_3a_get_sak(iso3a), uid, uid_len, ats, ats_size);
         } else if(stage == PluginHfStageConversation) {
             SEADER_VERBOSE_D(TAG, "14A enter conversation");
             ret = plugin_hf_run_conversation(ctx);
